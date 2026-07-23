@@ -38,6 +38,12 @@ POLL_SECONDS = 15
 MACRO_EVERY = 4          # macro/candles every 60s
 NEWS_EVERY = 20          # news every 5 min
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Persist state to a mounted volume when provided (Railway/Fly), else local dir.
+DATA_DIR = os.environ.get("DATA_DIR", BASE_DIR)
+try:
+    os.makedirs(DATA_DIR, exist_ok=True)
+except Exception:
+    DATA_DIR = BASE_DIR
 
 SYMBOLS = {
     "XAUUSD": {
@@ -46,7 +52,7 @@ SYMBOLS = {
         "macro_w": {"dxy": -0.40, "us10y": -0.35, "vix": 0.25},
         "per_point": 100, "size_note": "1 lot = 100oz = $100/pt",
         "session_filter": True,
-        "pred_file": os.path.join(BASE_DIR, "predictions.json"),
+        "pred_file": os.path.join(DATA_DIR, "predictions.json"),
     },
     "BTCUSD": {
         "tv": "COINBASE:BTCUSD", "name": "BITCOIN", "tv_chart": "COINBASE:BTCUSD",
@@ -54,7 +60,7 @@ SYMBOLS = {
         "macro_w": {"dxy": -0.35, "us10y": -0.25, "vix": -0.40},
         "per_point": 1, "size_note": "1 lot = 1 BTC = $1/pt",
         "session_filter": False,
-        "pred_file": os.path.join(BASE_DIR, "predictions_btc.json"),
+        "pred_file": os.path.join(DATA_DIR, "predictions_btc.json"),
     },
     "USOIL": {
         "tv": "NYMEX:CL1!", "name": "WTI CRUDE", "tv_chart": "NYMEX:CL1!",
@@ -62,7 +68,7 @@ SYMBOLS = {
         "macro_w": {"dxy": -0.30, "us10y": -0.05, "vix": -0.30},
         "per_point": 1000, "size_note": "1 lot = 1000 bbl = $1000/pt",
         "session_filter": True,
-        "pred_file": os.path.join(BASE_DIR, "predictions_oil.json"),
+        "pred_file": os.path.join(DATA_DIR, "predictions_oil.json"),
     },
 }
 
@@ -155,8 +161,8 @@ MACRO_ASSET_WHY = {
 
 EXPIRY_S = 6 * 3600
 COOLDOWN_S = 300
-AUTH_FILE = os.path.join(BASE_DIR, "tv_auth.json")
-DASH_FILE = os.path.join(BASE_DIR, "dashboard.html")
+AUTH_FILE = os.path.join(DATA_DIR, "tv_auth.json")
+DASH_FILE = os.path.join(BASE_DIR, "dashboard.html")   # read-only shipped asset
 
 state_lock = threading.Lock()
 latest = {s: {"status": "starting"} for s in SYMBOLS}
