@@ -1,0 +1,6 @@
+# NEVER commit credentials or local state
+tv_auth.json
+predictions*.json
+deploy/*.key
+__pycache__/
+*.pyc

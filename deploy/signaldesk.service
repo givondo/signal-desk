@@ -1,0 +1,16 @@
+[Unit]
+Description=Signal Desk trading terminal
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/opt/signaldesk
+ExecStart=/usr/bin/python3 /opt/signaldesk/xauusd_trader.py
+Restart=always
+RestartSec=5
+# Defense-in-depth: uncomment to require a login even inside the tailnet
+# Environment=SIGNALDESK_PASS=change-me-now
+# Environment=SIGNALDESK_USER=trader
+
+[Install]
+WantedBy=multi-user.target

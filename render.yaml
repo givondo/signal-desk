@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: signal-desk
+    runtime: python
+    plan: free
+    buildCommand: "echo 'stdlib only - nothing to build'"
+    startCommand: "python xauusd_trader.py"
+    envVars:
+      - key: SIGNALDESK_USER
+        value: trader
+      - key: SIGNALDESK_PASS
+        sync: false   # set this in the Render dashboard - REQUIRED, site is public

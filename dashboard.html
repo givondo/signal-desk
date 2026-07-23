@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f2f4f7">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>SIGNAL DESK</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230b0d10'/%3E%3Ctext x='32' y='44' font-size='30' font-weight='bold' text-anchor='middle' fill='%23c9a227' font-family='Consolas'%3ESD%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.js"></script>
+<style>
+:root{--bg:#f2f4f7;--p1:#ffffff;--p2:#f6f8fa;--bd:#e4e7ec;--bd2:#d4dae3;
+--tx:#1d2433;--dim:#667085;--dim2:#98a2b3;
+--g:#0e8a70;--r:#c93f39;--a:#a97a0b;--b:#2f66c4;
+--gt:rgba(14,138,112,.10);--rt:rgba(201,63,57,.10);--at:rgba(169,122,11,.12);--bt:rgba(47,102,196,.10)}
+*{margin:0;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif}
+[v-cloak]{display:none}
+body{background:var(--bg);color:var(--tx);font-size:12px;min-height:100vh}
+.num,td.n,.mono{font-family:Consolas,'Roboto Mono',monospace;font-variant-numeric:tabular-nums}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#cdd3dd;border-radius:4px}
+a{color:var(--b);text-decoration:none}
+
+/* ---------- top score strip ---------- */
+.strip{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);
+border-bottom:1px solid var(--bd);display:flex;align-items:stretch;gap:0;overflow-x:auto}
+.strip>div{padding:7px 14px;border-right:1px solid var(--bd);display:flex;flex-direction:column;justify-content:center;white-space:nowrap}
+.strip .lb{font-size:9px;color:var(--dim);letter-spacing:1.2px;text-transform:uppercase}
+.strip .v{font-size:15px;font-weight:700}
+.strip .big{font-size:21px;font-weight:800}
+.stars{color:var(--a);font-size:11px;letter-spacing:1px}
+.stars .off{color:var(--dim2)}
+.symsel{background:var(--p2);border:1px solid var(--bd2);color:var(--tx);font-size:12px;font-weight:700;
+padding:4px 8px;margin-top:2px;cursor:pointer;letter-spacing:.4px;font-family:Consolas,monospace}
+.symsel:focus{outline:1px solid var(--a);border-color:var(--a)}
+.dirL{color:var(--g)}.dirS{color:var(--r)}.dirN{color:var(--a)}
+.live{width:7px;height:7px;border-radius:50%;background:var(--g);display:inline-block;margin-right:6px;animation:bl 2s infinite}
+@keyframes bl{50%{opacity:.25}}
+
+/* ---------- layout ---------- */
+.main{display:grid;grid-template-columns:296px 1fr 330px;gap:6px;padding:6px;max-width:1920px;margin:0 auto;align-items:start}
+@media(max-width:1250px){.main{grid-template-columns:280px 1fr}.colR{grid-column:span 2}}
+@media(max-width:900px){.main{grid-template-columns:1fr}.colR{grid-column:auto}}
+.col{display:flex;flex-direction:column;gap:6px;min-width:0}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:start}
+@media(max-width:1100px){.duo{grid-template-columns:1fr}}
+.panel{background:var(--p1);border:1px solid var(--bd)}
+.ph{padding:5px 9px;border-bottom:1px solid var(--bd);font-size:10px;letter-spacing:1.4px;
+color:var(--dim);text-transform:uppercase;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+.pb{padding:6px 9px}
+.kv{display:flex;justify-content:space-between;padding:3px 0;font-size:12px}
+.kv .k{color:var(--dim)}
+.up{color:var(--g)}.dn{color:var(--r)}.nt{color:var(--a)}.mut{color:var(--dim)}
+
+/* ---------- price ---------- */
+.bigpx{font-size:30px;font-weight:800;letter-spacing:-.5px;transition:color .3s}
+.bigpx.fu{color:var(--g)}.bigpx.fd{color:var(--r)}
+.rng{height:4px;background:var(--bd2);position:relative;margin:8px 0 3px}
+.rng i{position:absolute;top:-2px;width:8px;height:8px;background:var(--a);transform:translateX(-50%);transition:left .5s}
+.rlb{display:flex;justify-content:space-between;font-size:10px;color:var(--dim)}
+canvas{width:100%;display:block}
+
+/* ---------- matrix ---------- */
+table{width:100%;border-collapse:collapse}
+.mtx th{font-size:9px;color:var(--dim);letter-spacing:.6px;padding:3px 2px;text-align:center;font-weight:600}
+.mtx td{padding:0;text-align:center;border:1px solid var(--p2)}
+.mtx td:first-child{color:var(--dim);font-size:10px;padding:0 4px;text-align:left;font-weight:700}
+.hc{display:block;height:20px;line-height:20px;font-size:9.5px;font-weight:700}
+.h1{background:var(--gt);color:var(--g)}.h-1{background:var(--rt);color:var(--r)}
+.h0{background:rgba(102,112,133,.07);color:var(--dim)}
+
+/* ---------- scores ---------- */
+.sc{display:flex;align-items:center;gap:7px;padding:2.5px 0}
+.sc .k{width:92px;font-size:10px;color:var(--dim);letter-spacing:.4px}
+.sc .tr{flex:1;height:6px;background:var(--bd2);position:relative}
+.sc .tr i{position:absolute;top:0;bottom:0;transition:all .5s}
+.sc .v{width:36px;text-align:right;font-size:11px;font-weight:700}
+
+/* ---------- center ---------- */
+#tvchart{height:460px;width:100%}
+.qrow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.qbtn{background:var(--p2);border:1px solid var(--bd2);color:var(--dim);font-size:10.5px;padding:4px 9px;cursor:pointer}
+.qbtn:hover{color:var(--tx);border-color:var(--b)}
+.cplog{max-height:170px;overflow-y:auto;font-size:11.5px;line-height:1.55}
+.cpq{color:var(--b);margin-top:7px}
+.cpa{color:var(--tx);border-left:2px solid var(--bd2);padding-left:8px;margin-top:3px}
+.cpin{display:flex;gap:6px;margin-top:8px}
+.cpin input{flex:1;background:var(--p2);border:1px solid var(--bd2);color:var(--tx);padding:6px 9px;font-size:12px}
+.cpin button{background:var(--bt);border:1px solid var(--b);color:var(--b);padding:6px 12px;cursor:pointer;font-weight:700;font-size:11px}
+
+/* ---------- right ---------- */
+.recbig{display:flex;align-items:center;justify-content:space-between}
+.recdir{font-size:26px;font-weight:800;letter-spacing:2px}
+.gradebox{border:1px solid var(--bd2);padding:4px 12px;text-align:center}
+.gradebox .g{font-size:20px;font-weight:800}
+.recgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--bd);margin-top:8px}
+.recgrid>div{background:var(--p1);padding:6px 8px}
+.recgrid .lb{font-size:9px;color:var(--dim);letter-spacing:.8px;text-transform:uppercase}
+.recgrid .vv{font-size:13px;font-weight:700;margin-top:1px}
+.mdl th{font-size:9px;color:var(--dim);text-align:right;padding:3px 4px;letter-spacing:.5px}
+.mdl td{font-size:10.5px;padding:3px 4px;text-align:right;border-top:1px solid var(--p2)}
+.mdl td:first-child,.mdl th:first-child{text-align:left}
+.mdl .mn{font-weight:700;color:var(--tx);font-size:10px}
+.macrow{display:grid;grid-template-columns:86px 62px 56px 20px 1fr;gap:4px;align-items:center;
+padding:3px 0;border-bottom:1px solid var(--p2);font-size:10.5px}
+.macrow:last-child{border-bottom:none}
+.macrow .nm{color:var(--dim);font-size:9.5px;letter-spacing:.3px}
+.macrow .why{color:var(--dim2);font-size:9px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.imp1{color:var(--g)}.imp-1{color:var(--r)}.imp0{color:var(--dim2)}
+.mexp{font-size:10px;color:var(--dim);line-height:1.55;padding:1px 0 6px 2px}
+.mexp b{color:var(--tx);font-weight:600}
+.chk{display:flex;gap:7px;padding:2.5px 0;font-size:11.5px;line-height:1.45}
+.chk .c{width:13px;flex-shrink:0}
+.newsit{padding:5px 0;border-bottom:1px solid var(--p2);font-size:11px;line-height:1.45}
+.newsit:last-child{border-bottom:none}
+.tag{font-size:8.5px;padding:1px 6px;border:1px solid var(--bd2);color:var(--dim);letter-spacing:.6px;margin-right:5px}
+.tag.BULLISH{color:var(--g);border-color:var(--g)}
+.tag.BEARISH{color:var(--r);border-color:var(--r)}
+.alrow{display:flex;gap:8px;padding:3px 0;font-size:11px;border-bottom:1px solid var(--p2)}
+.alrow:last-child{border-bottom:none}
+.alrow .t{color:var(--dim2);flex-shrink:0}
+.alrow .ty{color:var(--b);font-size:9px;letter-spacing:.8px;flex-shrink:0;width:52px;padding-top:1px}
+.riskgrid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--bd)}
+.riskgrid>div{background:var(--p1);padding:5px 8px}
+.riskgrid .lb{font-size:9px;color:var(--dim);letter-spacing:.6px;text-transform:uppercase}
+.riskgrid .vv{font-size:12.5px;font-weight:700}
+.rin{display:flex;gap:8px;margin-bottom:8px;align-items:center;font-size:11px;color:var(--dim)}
+.rin input{width:84px;background:var(--p2);border:1px solid var(--bd2);color:var(--tx);padding:5px 8px;font-size:12px}
+
+/* ---------- analytics ---------- */
+.wide{grid-column:1/-1}
+.tilerow{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:1px;background:var(--bd)}
+.tilerow>div{background:var(--p1);padding:7px 10px}
+.tilerow .lb{font-size:8.5px;color:var(--dim);letter-spacing:.8px;text-transform:uppercase}
+.tilerow .vv{font-size:15px;font-weight:800;margin-top:1px}
+.anal{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
+@media(max-width:1100px){.anal{grid-template-columns:1fr}}
+.led th{font-size:9px;color:var(--dim);text-align:right;padding:4px 6px;letter-spacing:.6px;border-bottom:1px solid var(--bd)}
+.led td{font-size:11px;padding:3px 6px;text-align:right;border-bottom:1px solid var(--p2)}
+.led td:first-child,.led th:first-child{text-align:left}
+.led tr:hover td{background:var(--p2)}
+.pill{font-size:9px;font-weight:700;padding:1px 7px;border:1px solid}
+.pl{color:var(--g);border-color:var(--g);background:var(--gt)}
+.ps{color:var(--r);border-color:var(--r);background:var(--rt)}
+.pn{color:var(--dim);border-color:var(--bd2)}
+
+/* ---------- toasts / modal ---------- */
+.toastwrap{position:fixed;bottom:16px;right:16px;z-index:60;display:flex;flex-direction:column;gap:6px}
+.toast{background:#fff;border:1px solid var(--bd2);border-left:2px solid var(--a);color:var(--tx);
+padding:8px 13px;font-size:11.5px;box-shadow:0 8px 24px rgba(16,24,40,.15)}
+.toast-enter-from,.toast-leave-to{opacity:0;transform:translateY(6px)}
+.toast-enter-active,.toast-leave-active{transition:all .25s}
+.overlay{position:fixed;inset:0;background:rgba(16,24,40,.5);z-index:70;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--p1);border:1px solid var(--bd2);width:100%;max-width:380px;padding:24px 26px;position:relative}
+.modal .x{position:absolute;top:8px;right:12px;background:none;border:none;color:var(--dim);font-size:16px;cursor:pointer}
+.modal h2{font-size:14px;font-weight:600;text-align:center;margin-bottom:16px;color:var(--tx)}
+.field{margin-bottom:10px}
+.field label{display:block;font-size:10px;color:var(--dim);margin-bottom:3px;letter-spacing:.5px;text-transform:uppercase}
+.field input{width:100%;background:var(--p2);border:1px solid var(--bd2);color:var(--tx);padding:8px 10px;font-size:12.5px}
+.mbtn{width:100%;background:var(--bt);border:1px solid var(--b);color:var(--b);padding:9px;font-weight:700;cursor:pointer;font-size:12px;margin-top:4px}
+.gbtn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:#fff;color:#333;
+border:1px solid var(--bd2);padding:9px;font-weight:600;font-size:12.5px;cursor:pointer}
+.gbtn:hover{background:var(--p2)}
+.divider{display:flex;align-items:center;gap:10px;color:var(--dim2);font-size:10px;margin:12px 0}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--bd)}
+.merr{border:1px solid var(--r);background:var(--rt);color:var(--r);padding:7px 10px;font-size:11px;margin-bottom:10px}
+.mnote{font-size:9.5px;color:var(--dim2);text-align:center;margin-top:12px;line-height:1.5}
+.blink{border:none;background:none;color:var(--b);font-size:11px;cursor:pointer;padding:6px 0 0}
+.gsteps{background:var(--p2);border:1px solid var(--bd);padding:9px 11px;font-size:11px;line-height:1.7;color:var(--dim);margin-bottom:10px}
+.spin{display:inline-block;width:11px;height:11px;border:2px solid rgba(77,127,209,.35);border-top-color:var(--b);border-radius:50%;animation:rot .7s linear infinite;margin-right:6px;vertical-align:-1px}
+@keyframes rot{to{transform:rotate(360deg)}}
+.skel{padding:60px;text-align:center;color:var(--dim)}
+/* ---------- mobile ---------- */
+@media(max-width:700px){
+  body{font-size:12.5px}
+  .strip{flex-wrap:wrap}
+  .strip>div{padding:5px 9px;border-right:none;border-bottom:1px solid var(--bd);flex:1 1 auto}
+  .strip .big{font-size:17px}
+  .symsel{padding:8px 10px;font-size:14px;width:100%}
+  .main{grid-template-columns:1fr;padding:5px;gap:6px}
+  .colR{grid-column:auto}
+  #tvchart{height:300px}
+  .bigpx{font-size:26px}
+  .recdir{font-size:21px}
+  .duo{grid-template-columns:1fr}
+  .qbtn,.btn{padding:8px 12px;font-size:12px}
+  .cpin input{padding:9px 10px;font-size:13px}
+  .mtx .hc{height:24px;line-height:24px}
+  td,th{padding:5px 5px}
+  .foot{padding-bottom:24px}
+}
+.foot{color:var(--dim2);font-size:10px;text-align:center;padding:10px;line-height:1.6}
+kbd{background:var(--p2);border:1px solid var(--bd2);padding:0 5px;font-size:10px;font-family:Consolas}
+</style></head><body>
+
+<div id="app" v-cloak>
+  <!-- ============ TOP SCORE STRIP ============ -->
+  <div class="strip num">
+    <div><span class="lb">Signal Desk · Instrument</span>
+      <select class="symsel" :value="sym" @change="switchSym($event.target.value)">
+        <option v-for="s in symbols" :key="s[0]" :value="s[0]">{{ s[1] }}</option>
+      </select></div>
+    <div><span class="lb">Market Score</span><span class="big" :class="dirClass">{{ marketScore }}<span style="font-size:12px;color:var(--dim)">/100</span></span></div>
+    <div><span class="lb">Recommendation</span><span class="big" :class="dirClass">{{ d.direction||'--' }}</span></div>
+    <div><span class="lb">Confidence</span><span class="v">{{ d.confidence!=null?d.confidence+'%':'--' }}</span></div>
+    <div><span class="lb">Trade Quality</span><span class="big" :style="{color:gradeColor}">{{ d.grade||'-' }}</span></div>
+    <div v-for="st in starRows" :key="st.k"><span class="lb">{{ st.k }}</span>
+      <span class="stars">{{ '★'.repeat(st.n) }}<span class="off">{{ '★'.repeat(5-st.n) }}</span></span></div>
+    <div style="margin-left:auto"><span class="lb"><span class="live"></span>{{ macroSource }} · TV {{ d.tv_user||'—' }}
+      <a href="#" @click.prevent="openAuth" style="margin-left:4px">{{ d.tv_user?'':'connect' }}</a></span>
+      <span class="v mono" style="font-size:12px">{{ clock }} UTC · 15m close {{ countdown }}</span></div>
+  </div>
+
+  <div v-if="d.status!=='ok'" class="skel">{{ d.status==='loading'?'CONNECTING TO SIGNAL ENGINE…':'FEED ERROR: '+(d.error||'?')+' — retrying' }}</div>
+
+  <div v-else class="main">
+    <!-- ============ LEFT ============ -->
+    <div class="col">
+      <div class="panel">
+        <div class="ph">Market Overview<span class="mono">{{ d.symbol }}</span></div>
+        <div class="pb">
+          <span class="bigpx num" :class="flash">{{ fmt(d.price) }}</span>
+          <span class="num" :class="d.change_pct>0?'up':d.change_pct<0?'dn':'mut'" style="font-size:13px;font-weight:700;margin-left:8px">{{ d.change_pct>0?'+':'' }}{{ d.change_pct }}%</span>
+          <div class="rng"><i :style="{left:rangePct+'%'}"></i></div>
+          <div class="rlb num"><span>{{ fmt(d.day_low) }}</span><span>DAY RANGE</span><span>{{ fmt(d.day_high) }}</span></div>
+          <div class="kv"><span class="k">ATR 1H / 1D</span><span class="num">{{ fmt(d.atr_1h) }} / {{ fmt(d.atr_d) }}</span></div>
+          <div class="kv"><span class="k">SPREAD (EST)</span><span class="num">{{ fmt(d.spread_est) }}</span></div>
+          <canvas ref="spark" height="64"></canvas>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="ph">Market Status</div>
+        <div class="pb">
+          <div class="kv"><span class="k">SESSION</span><span :class="d.session.liq==='high'?'up':d.session.liq==='low'?'dn':'nt'">{{ d.session.name }}</span></div>
+          <div class="kv"><span class="k">LIQUIDITY</span><span class="mono">{{ d.session.liq.toUpperCase() }}</span></div>
+          <div class="kv"><span class="k">VOLATILITY</span><span :class="{HIGH:'dn',EXTREME:'dn',NORMAL:'nt',LOW:'mut'}[d.regime.vol]">{{ d.regime.vol }}</span></div>
+          <div class="kv"><span class="k">TREND REGIME</span><span :class="d.regime.state==='TRENDING'?'up':d.regime.state==='RANGING'?'dn':'nt'">{{ d.regime.state }} <span class="mut num">ADX {{ d.regime.adx }}</span></span></div>
+          <div class="kv"><span class="k">15M CANDLE CLOSE</span><span class="num">{{ countdown }}</span></div>
+          <div class="kv"><span class="k">TICKET LOGGING</span><span :class="d.tradeable?'up':'dn'">{{ d.tradeable?'ACTIVE':'PAUSED' }}</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="ph">Multi-Timeframe Matrix</div>
+        <div class="pb" style="padding:4px">
+          <table class="mtx num"><thead><tr>
+            <th></th><th>TRND</th><th>MOM</th><th>RSI</th><th>MACD</th><th>ADX</th><th>EMA</th><th>RATE</th>
+          </tr></thead><tbody>
+            <tr v-for="r in d.matrix" :key="r.tf">
+              <td>{{ r.tf }}</td>
+              <td><span :class="['hc','h'+r.trend.s]">{{ {1:'▲','-1':'▼',0:'—'}[r.trend.s] }}</span></td>
+              <td><span :class="['hc','h'+r.mom.s]">{{ {1:'▲','-1':'▼',0:'—'}[r.mom.s] }}</span></td>
+              <td><span :class="['hc','h'+r.rsi.s]">{{ r.rsi.v!=null?Math.round(r.rsi.v):'–' }}</span></td>
+              <td><span :class="['hc','h'+r.macd.s]">{{ {1:'▲','-1':'▼',0:'—'}[r.macd.s] }}</span></td>
+              <td><span :class="['hc','h'+r.adx.s]">{{ r.adx.v!=null?Math.round(r.adx.v):'–' }}</span></td>
+              <td><span :class="['hc','h'+r.ema.s]">{{ {1:'▲','-1':'▼',0:'—'}[r.ema.s] }}</span></td>
+              <td><span :class="['hc','h'+r.rating.s]">{{ {1:'BUY','-1':'SELL',0:'NEUT'}[r.rating.s] }}</span></td>
+            </tr>
+          </tbody></table>
+          <div style="font-size:9px;color:var(--dim2);padding:3px 4px">1m is the data floor — sub-minute frames are not served by the scanner</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="ph">Confluence Scores<span class="mono" :class="dirClass">{{ d.score>0?'+':'' }}{{ d.score }}</span></div>
+        <div class="pb">
+          <div class="sc" v-for="s in d.scores" :key="s.k">
+            <span class="k">{{ s.k }}</span>
+            <div class="tr"><i :style="scoreBar(s.v)"></i></div>
+            <span class="v num" :class="s.v>15?'up':s.v<-15?'dn':'mut'">{{ s.v>0?'+':'' }}{{ s.v }}</span>
+          </div>
+          <div style="font-size:9px;color:var(--dim2);margin-top:4px">−100 … +100 · VOLATILITY &amp; LIQUIDITY are favorability, not direction</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ CENTER ============ -->
+    <div class="col">
+      <div class="panel"><div id="tvchart"></div></div>
+
+      <div class="duo">
+      <div class="panel">
+        <div class="ph">Alerts<span class="mut">{{ (d.alerts||[]).length }}</span></div>
+        <div class="pb" style="max-height:130px;overflow-y:auto">
+          <div v-if="!(d.alerts||[]).length" class="mut" style="font-size:11px">Alert engine armed — direction flips, alignment, regime and macro shifts, volume spikes, A-grade setups, ticket events.</div>
+          <div class="alrow" v-for="(a,i) in d.alerts" :key="i">
+            <span class="t num">{{ a.ts }}</span><span class="ty">{{ a.type }}</span><span>{{ a.msg }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="ph">Desk Copilot<span style="font-size:8.5px;letter-spacing:.5px">RULE-BASED · LIVE STATE ONLY</span></div>
+        <div class="pb">
+          <div class="qrow">
+            <button class="qbtn" v-for="q in quickQs" :key="q" @click="ask(q)">{{ q }}</button>
+          </div>
+          <div class="cplog" ref="cplog">
+            <template v-for="(m,i) in cpLog" :key="i">
+              <div class="cpq">▸ {{ m.q }}</div>
+              <div class="cpa">{{ m.a }}</div>
+            </template>
+          </div>
+          <div class="cpin">
+            <input v-model="cpQ" placeholder="ask the desk…" @keyup.enter="ask(cpQ)">
+            <button @click="ask(cpQ)">ASK</button>
+          </div>
+        </div>
+      </div>
+      </div>
+
+      <div class="duo">
+      <div class="panel">
+        <div class="ph">Macro Intelligence
+          <span><button class="qbtn" style="font-size:9px;padding:2px 8px" @click="macroHelp=!macroHelp">{{ macroHelp?'EXPLAIN: ON':'EXPLAIN: OFF' }}</button>
+          <span class="mono" style="margin-left:6px">{{ macroSource }} {{ d.macro.ts }}</span></span></div>
+        <div class="pb" style="padding:6px 8px">
+          <template v-for="m in d.macro.rows" :key="m.k">
+            <div class="macrow num" style="border-bottom:none">
+              <span class="nm">{{ m.name }}</span>
+              <span>{{ fmt(m.last,2) }}</span>
+              <span :class="m.chg>0?'up':m.chg<0?'dn':'mut'">{{ m.chg>0?'+':'' }}{{ fmt(m.chg,m.unit==='bps'?1:2) }}{{ m.unit==='bps'?'bp':'%' }}</span>
+              <span :class="'imp'+m.impact" style="font-weight:800">{{ m.impact>0?'▲':m.impact<0?'▼':'·' }}</span>
+              <span class="why" v-if="!macroHelp" :title="m.why">{{ m.why }}</span>
+              <span v-else></span>
+            </div>
+            <div v-if="macroHelp" class="mexp">
+              <b>{{ m.why }}.</b> {{ m.note }}
+            </div>
+            <div style="border-bottom:1px solid var(--p2)"></div>
+          </template>
+          <div style="font-size:9px;color:var(--dim2);margin-top:4px">
+            <template v-if="macroHelp">▲ = currently pushing {{ assetWord }} up · ▼ = pushing it down · dot = no meaningful effect right now. Only DXY, 10Y and VIX are scored into the signal — the rest are context.</template>
+            <template v-else>▲▼ = current effect on {{ assetWord }} · toggle EXPLAIN for plain-English detail</template>
+            · Fed odds / real yields / calendar need a paid feed — not shown rather than faked</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="ph">News Intelligence<span style="font-size:8.5px">KEYWORD-CLASSIFIED RSS</span></div>
+        <div class="pb" style="max-height:320px;overflow-y:auto">
+          <div v-if="!(d.news||[]).length" class="mut" style="font-size:11px">Waiting for feed…</div>
+          <div class="newsit" v-for="(n,i) in d.news" :key="i">
+            <span class="tag">{{ n.cat }}</span><span class="tag" :class="n.impact">{{ n.impact }}{{ n.conf!=='-'?' '+n.conf:'' }}</span><br>
+            <a :href="n.link" target="_blank">{{ n.title }}</a>
+            <span style="color:var(--dim2);font-size:9px"> · {{ n.date }}</span>
+          </div>
+        </div>
+      </div>
+      </div>
+    </div>
+
+    <!-- ============ RIGHT ============ -->
+    <div class="col colR">
+      <div class="panel">
+        <div class="ph">Trade Recommendation</div>
+        <div class="pb">
+          <div class="recbig">
+            <span class="recdir" :class="dirClass">{{ d.direction==='NEUTRAL'?'WAIT':d.direction }}</span>
+            <div class="gradebox"><div class="lb" style="font-size:8px;color:var(--dim)">GRADE</div>
+              <div class="g" :style="{color:gradeColor}">{{ d.grade }}</div></div>
+          </div>
+          <div class="recgrid num">
+            <div><div class="lb">Est. Win Prob</div><div class="vv">{{ bestProb }}%</div></div>
+            <div><div class="lb">Target RR</div><div class="vv">1:2</div></div>
+            <div><div class="lb">Confidence</div><div class="vv">{{ d.confidence }}%</div></div>
+            <div><div class="lb">Est. Hold</div><div class="vv">{{ d.hold_est }}</div></div>
+            <div><div class="lb">Exp. Drawdown</div><div class="vv">{{ fmt(d.exp_dd) }}</div></div>
+            <div><div class="lb">Stop Dist</div><div class="vv">{{ fmt(d.sl_dist) }}</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="ph">Entry Models</div>
+        <div class="pb" style="padding:4px 6px;overflow-x:auto">
+          <table class="mdl num" v-if="(d.models||[]).length"><thead><tr>
+            <th>MODEL</th><th>ENTRY</th><th>STOP</th><th>TP1</th><th>TP2</th><th>P%</th></tr></thead>
+            <tbody><tr v-for="m in d.models" :key="m.name" :title="m.note">
+              <td class="mn">{{ m.name }}</td><td>{{ fmt(m.entry) }}</td>
+              <td class="dn">{{ fmt(m.sl) }}</td><td class="up">{{ fmt(m.tp1) }}</td>
+              <td class="up">{{ fmt(m.tp2) }}</td><td>{{ m.prob }}</td>
+            </tr></tbody></table>
+          <div v-else class="mut" style="padding:8px;font-size:11px">NEUTRAL — no entries. Standing aside is a position.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="ph">{{ d.reasons.headline }}<span class="num">{{ d.confidence }}%</span></div>
+        <div class="pb">
+          <div class="chk" v-for="(it,i) in d.reasons.items" :key="i">
+            <span class="c" :class="it.ok?'up':'mut'">{{ it.ok?'✓':'✗' }}</span>
+            <span :class="it.ok?'':'mut'">{{ it.t }}</span>
+          </div>
+          <template v-if="d.reasons.invalidate.length">
+            <div class="ph" style="border:none;padding:8px 0 3px">What invalidates this?</div>
+            <div class="chk" v-for="(iv,i) in d.reasons.invalidate" :key="'iv'+i">
+              <span class="c dn">▸</span><span class="mut">{{ iv }}</span>
+            </div>
+          </template>
+          <div class="chk" v-for="(w,i) in d.warnings" :key="'w'+i">
+            <span class="c nt">⚠</span><span class="nt">{{ w }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="ph">Risk Engine</div>
+        <div class="pb">
+          <div class="rin">ACCT $<input type="number" v-model.number="acct" class="num"> RISK %<input type="number" v-model.number="riskpct" step="0.25" class="num"></div>
+          <div class="riskgrid num">
+            <div><div class="lb">Position Size</div><div class="vv">{{ risk.lots }} lots</div></div>
+            <div><div class="lb">$ Risk</div><div class="vv dn">${{ risk.usd }}</div></div>
+            <div><div class="lb">Exp. Loss / Gain</div><div class="vv">-${{ risk.usd }} / +${{ risk.gain }}</div></div>
+            <div><div class="lb">Kelly %</div><div class="vv">{{ perf.kelly!=null?perf.kelly+'%':'n/a' }}</div></div>
+            <div><div class="lb">Daily Risk Left</div><div class="vv" :class="risk.dayLeft<=1?'dn':''">{{ risk.dayLeft }}R of 3R</div></div>
+            <div><div class="lb">Exposure</div><div class="vv">{{ risk.expo }}% of acct</div></div>
+          </div>
+          <div style="font-size:9px;color:var(--dim2);margin-top:5px">{{ d.size_note }} · Kelly from tracked history · 3R daily stop is a default guardrail</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============ ANALYTICS (FULL WIDTH) ============ -->
+    <div class="panel wide">
+      <div class="ph">Performance Analytics<span class="mono">{{ perf.n||0 }} TRACKED PREDICTIONS · AUTO-JOURNALED</span></div>
+      <div class="pb">
+        <div class="tilerow num">
+          <div><div class="lb">Win Rate</div><div class="vv" :class="(perf.win_rate||0)>=50?'up':'dn'">{{ perf.win_rate!=null?perf.win_rate+'%':'--' }}</div></div>
+          <div><div class="lb">Profit Factor</div><div class="vv">{{ perf.profit_factor??'--' }}</div></div>
+          <div><div class="lb">Sharpe</div><div class="vv">{{ perf.sharpe??'--' }}</div></div>
+          <div><div class="lb">Sortino</div><div class="vv">{{ perf.sortino??'--' }}</div></div>
+          <div><div class="lb">Expectancy</div><div class="vv" :class="rClass(perf.expectancy)">{{ signed(perf.expectancy) }}R</div></div>
+          <div><div class="lb">Total R</div><div class="vv" :class="rClass(perf.total_r)">{{ signed(perf.total_r) }}R</div></div>
+          <div><div class="lb">Max DD</div><div class="vv dn">{{ perf.max_dd!=null?'-'+perf.max_dd+'R':'--' }}</div></div>
+          <div><div class="lb">Avg Hold</div><div class="vv">{{ perf.avg_hold!=null?perf.avg_hold+'m':'--' }}</div></div>
+          <div><div class="lb">Win Streak</div><div class="vv up">{{ perf.streak_w||0 }}</div></div>
+          <div><div class="lb">Loss Streak</div><div class="vv dn">{{ perf.streak_l||0 }}</div></div>
+          <div><div class="lb">Today</div><div class="vv" :class="rClass(perf.today_r)">{{ signed(perf.today_r) }}R</div></div>
+          <div><div class="lb">Active</div><div class="vv" style="font-size:11px">
+            <template v-if="perf.active">#{{ perf.active.id }} {{ perf.active.dir }} <span :class="rClass(perf.active.mtm_r)">{{ signed(perf.active.mtm_r) }}R</span></template>
+            <template v-else>none</template></div></div>
+        </div>
+        <div class="anal">
+          <div><div class="ph" style="border:none;padding:6px 0 3px">Equity Curve (R)</div>
+            <canvas ref="equity" height="130"></canvas></div>
+          <div><div class="ph" style="border:none;padding:6px 0 3px">Daily PnL (R)</div>
+            <canvas ref="daily" height="130"></canvas></div>
+          <div><div class="ph" style="border:none;padding:6px 0 3px">Outcomes</div>
+            <div class="sc" v-for="(n,k) in perf.outcomes" :key="k">
+              <span class="k">{{ k }}</span>
+              <div class="tr"><i :style="{left:0,width:(n/maxOutcome*100)+'%',background:(k==='TP2'||k==='TP1-BE')?'var(--g)':k==='SL'?'var(--r)':'var(--dim)'}"></i></div>
+              <span class="v num">{{ n }}</span>
+            </div>
+            <div class="mut" v-if="!Object.keys(perf.outcomes||{}).length" style="font-size:11px">No resolved predictions yet.</div>
+          </div>
+        </div>
+        <div style="overflow-x:auto;margin-top:8px">
+          <table class="led num"><thead><tr>
+            <th>#</th><th>OPENED</th><th>DIR</th><th>GRADE</th><th>ENTRY</th><th>STOP</th><th>TP1</th><th>TP2</th><th>EXIT</th><th>OUTCOME</th><th>R</th><th>MIN</th>
+          </tr></thead><tbody>
+            <tr v-if="!(perf.recent||[]).length"><td colspan="12" style="text-align:left" class="mut">Collecting — every tradeable signal is auto-logged, managed (TP1→BE→TP2) and scored.</td></tr>
+            <tr v-for="p in perf.recent" :key="p.id">
+              <td>{{ p.id }}</td><td>{{ tstr(p.opened) }}</td>
+              <td style="text-align:left"><span class="pill" :class="p.dir==='LONG'?'pl':'ps'">{{ p.dir }}</span></td>
+              <td>{{ p.grade||'-' }}</td>
+              <td>{{ fmt(p.entry) }}</td><td>{{ fmt(p.sl) }}</td><td>{{ fmt(p.tp1) }}</td><td>{{ fmt(p.tp2) }}</td>
+              <td>{{ fmt(p.exit) }}</td>
+              <td style="text-align:left"><span class="pill" :class="p.r>0.05?'pl':p.r<-0.05?'ps':'pn'">{{ p.outcome }}</span></td>
+              <td :class="rClass(p.r)" style="font-weight:700">{{ signed(p.r) }}</td><td>{{ p.dur_min }}</td>
+            </tr>
+          </tbody></table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">Keyboard: <kbd>1</kbd> GOLD · <kbd>2</kbd> BITCOIN · <kbd>3</kbd> OIL · data refresh 15s · TradingView scanner + Yahoo macro/news · Bloomberg auto-detected via blpapi<br>
+  Copilot &amp; reasoning are deterministic rules over live data (no LLM). Educational tool — NOT financial advice.</div>
+
+  <!-- auth modal -->
+  <div class="overlay" v-if="authOpen" @click.self="closeAuth">
+    <div class="modal">
+      <button class="x" @click="closeAuth">✕</button>
+      <h2>Connect TradingView</h2>
+      <div v-if="tverrMsg" class="merr">{{ tverrMsg }}</div>
+      <template v-if="authStep==='signin'">
+        <button class="gbtn" @click="googleFlow"><svg width="15" height="15" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg> Continue with Google</button>
+        <div class="divider">OR EMAIL</div>
+        <div class="field"><label>Email / username</label><input v-model="tvu" @keyup.enter="tvLogin"></div>
+        <div class="field"><label>Password</label><input v-model="tvp" type="password" @keyup.enter="tvLogin"></div>
+        <button class="mbtn" :disabled="authLoading" @click="tvLogin"><span v-if="authLoading" class="spin"></span>{{ authLoading?'SIGNING IN…':'SIGN IN' }}</button>
+        <button class="blink" @click="authStep='cookies';tverrMsg=''">Use session cookies (2FA accounts)</button>
+        <button class="blink" v-if="d.tv_user" @click="tvLogout" style="color:var(--r)">Disconnect {{ d.tv_user }}</button>
+      </template>
+      <template v-else>
+        <div class="gsteps"><b>1.</b> Finish signing in on the tradingview.com tab.<br><b>2.</b> F12 → Application → Cookies → tradingview.com.<br><b>3.</b> Copy both values below.</div>
+        <div class="field"><label>sessionid</label><input ref="sidbox" v-model="tvsid"></div>
+        <div class="field"><label>sessionid_sign</label><input v-model="tvsign" placeholder="v3:…"></div>
+        <button class="mbtn" :disabled="authLoading" @click="tvCookie"><span v-if="authLoading" class="spin"></span>{{ authLoading?'CONNECTING…':'CONNECT' }}</button>
+        <button class="blink" @click="authStep='signin';tverrMsg=''">← Back</button>
+      </template>
+      <div class="mnote">Credentials go from this PC directly to tradingview.com.<br>Only the session token is stored locally — never your password.</div>
+    </div>
+  </div>
+
+  <div class="toastwrap"><transition-group name="toast">
+    <div class="toast" v-for="t in toasts" :key="t.id">{{ t.msg }}</div>
+  </transition-group></div>
+</div>
+
+<script>
+const {createApp} = Vue;
+createApp({
+  data(){return{
+    sym:'XAUUSD', symbols:[['XAUUSD','GOLD · XAU/USD'],['BTCUSD','BITCOIN · BTC/USD'],['USOIL','WTI CRUDE · USOIL']],
+    d:{status:'loading'}, flash:'', prevPx:null, prevDir:null, alertSeen:0,
+    acct:10000, riskpct:1,
+    now:Date.now(), toasts:[], tid:0,
+    cpQ:'', cpLog:[], quickQs:['Why this bias?','Should I wait?','How strong is this trend?','Is this a fake breakout?','Where are institutions positioned?','Safest entry?',"Summarize today's market"],
+    tvu:'',tvp:'',tvsid:'',tvsign:'',tverrMsg:'',authOpen:false,authStep:'signin',authLoading:false,
+    tvWidgetSym:null, curvePts:[], macroHelp:false,
+  }},
+  computed:{
+    perf(){ return this.d.perf||{} },
+    macroSource(){ return (this.d.macro||{}).source||'--' },
+    assetWord(){ return this.sym==='BTCUSD'?'bitcoin':this.sym==='USOIL'?'oil':'gold' },
+    dirClass(){ return this.d.direction==='LONG'?'dirL':this.d.direction==='SHORT'?'dirS':'dirN' },
+    gradeColor(){ const g=this.d.grade; return g==='A+'||g==='A'?'var(--g)':g==='B'?'var(--a)':g==='C'||g==='D'?'var(--r)':'var(--dim)' },
+    rangePct(){ const p=(this.d.price-this.d.day_low)/((this.d.day_high-this.d.day_low)||1)*100; return Math.max(1,Math.min(99,p)) },
+    clock(){ const d=new Date(this.now); return d.toUTCString().slice(17,25) },
+    countdown(){ const s=900-Math.floor(this.now/1000)%900; return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0') },
+    marketScore(){
+      const sc=this.d.scores||[]; if(!sc.length) return '--';
+      const get=k=>{const s=sc.find(x=>x.k===k);return s?s.v:0};
+      const dir=Math.abs(get('TREND')*0.3+get('MOMENTUM')*0.2+get('STRUCTURE')*0.15+get('MACRO')*0.15+get('FLOW (proxy)')*0.2);
+      const fav=(get('VOLATILITY')+get('LIQUIDITY'))/2;
+      return Math.round(Math.max(0,Math.min(100, dir*0.8 + (fav+100)/200*20 )));
+    },
+    starRows(){
+      const sc=this.d.scores||[]; if(!sc.length) return [];
+      const st=v=>Math.max(0,Math.min(5,Math.round((Math.abs(v))/20)));
+      const get=k=>{const s=sc.find(x=>x.k===k);return s?s.v:0};
+      return [
+        {k:'Trend',n:st(get('TREND'))},{k:'Momentum',n:st(get('MOMENTUM'))},
+        {k:'Liquidity',n:Math.max(0,Math.min(5,Math.round((get('LIQUIDITY')+100)/40)))},
+        {k:'Macro',n:st(get('MACRO'))},
+        {k:'Volatility',n:Math.max(0,Math.min(5,Math.round((get('VOLATILITY')+100)/40)))},
+        {k:'Flow',n:st(get('FLOW (proxy)'))},
+      ];
+    },
+    bestProb(){ const m=this.d.models||[]; return m.length?Math.max(...m.map(x=>x.prob)):'--' },
+    maxOutcome(){ return Math.max(1,...Object.values(this.perf.outcomes||{})) },
+    risk(){
+      const sl=this.d.sl_dist||0, pp=this.d.per_point||100;
+      const usd=this.acct*this.riskpct/100;
+      const lots=sl?usd/(sl*pp):0;
+      const expo=this.d.price?Math.round(lots*this.d.price*pp/this.acct*100):0;
+      const dayLeft=Math.max(0,(3+Math.min(0,this.perf.today_r||0))).toFixed(1);
+      return {lots:lots?lots.toFixed(2):'--', usd:Math.round(usd), gain:Math.round(usd*2),
+              expo, dayLeft};
+    },
+  },
+  methods:{
+    fmt(v,n){ if(n==null) n=(this.d.dp!=null?this.d.dp:2);
+      return v==null?'--':(+v).toLocaleString('en-US',{minimumFractionDigits:n,maximumFractionDigits:n}) },
+    signed(v){ return v==null?'--':(v>0?'+':'')+v },
+    rClass(r){ return r>0.05?'up':r<-0.05?'dn':'mut' },
+    tstr(s){ const d=new Date(s*1000); return (d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0') },
+    scoreBar(v){
+      const pct=Math.min(50,Math.abs(v||0)/2);
+      return {[v<0?'right':'left']:'50%', width:pct+'%',
+              background:v>15?'var(--g)':v<-15?'var(--r)':'var(--dim)'};
+    },
+    toast(msg){ const id=++this.tid; this.toasts.push({id,msg});
+      setTimeout(()=>{this.toasts=this.toasts.filter(t=>t.id!==id)},4500) },
+    switchSym(s){ if(this.sym===s)return; this.sym=s; this.prevPx=null; this.prevDir=null;
+      this.alertSeen=0; this.d={status:'loading'}; this.tick(); },
+    async tick(){
+      try{
+        const sym=this.sym;
+        const r=await fetch('/api/signal?sym='+sym); const d=await r.json();
+        if(sym!==this.sym) return;
+        if(d.status==='ok'){
+          if(this.prevPx!=null&&d.price!==this.prevPx){
+            this.flash=''; requestAnimationFrame(()=>{ this.flash=d.price>this.prevPx?'fu':'fd';
+              this.prevPx=d.price; setTimeout(()=>this.flash='',600) });
+          } else this.prevPx=d.price;
+          if(this.prevDir&&this.prevDir!==d.direction)
+            this.toast(sym+' '+this.prevDir+' → '+d.direction+' @ '+this.fmt(d.price));
+          this.prevDir=d.direction;
+          const na=(d.alerts||[]).length;
+          if(this.alertSeen&&na>this.alertSeen) this.toast(d.alerts[0].type+': '+d.alerts[0].msg);
+          this.alertSeen=na;
+          document.title=this.fmt(d.price)+' '+(d.direction==='LONG'?'▲':d.direction==='SHORT'?'▼':'·')+' '+sym;
+        }
+        this.d=d;
+        this.$nextTick(()=>{ this.mountChart(); this.drawSpark(); this.drawEquity(); this.drawDaily(); });
+      }catch(e){}
+    },
+    mountChart(){
+      if(this.d.status!=='ok'||typeof TradingView==='undefined') return;
+      if(this.tvWidgetSym===this.d.tv_chart) return;
+      this.tvWidgetSym=this.d.tv_chart;
+      const el=document.getElementById('tvchart'); if(!el) return;
+      el.innerHTML='';
+      new TradingView.widget({
+        container_id:'tvchart', autosize:true, symbol:this.d.tv_chart,
+        interval:'15', timezone:'Etc/UTC', theme:'light', style:'1', locale:'en',
+        toolbar_bg:'#ffffff', enable_publishing:false, withdateranges:false,
+        hide_top_toolbar:true, hide_side_toolbar:true, hide_legend:true,
+        allow_symbol_change:false, save_image:false, details:false,
+        studies:[],
+      });
+    },
+    async ask(q){
+      q=(q||'').trim(); if(!q) return; this.cpQ='';
+      const r=await fetch('/api/ask?sym='+this.sym+'&q='+encodeURIComponent(q));
+      const j=await r.json();
+      this.cpLog.push({q, a:j.answer});
+      if(this.cpLog.length>8) this.cpLog.shift();
+      this.$nextTick(()=>{const el=this.$refs.cplog; if(el) el.scrollTop=el.scrollHeight});
+    },
+    cv(ref,h){ const cv=this.$refs[ref]; if(!cv) return null;
+      const ctx=cv.getContext('2d');
+      cv.width=cv.clientWidth*devicePixelRatio; cv.height=h*devicePixelRatio;
+      ctx.scale(devicePixelRatio,devicePixelRatio);
+      ctx.clearRect(0,0,cv.clientWidth,h); return [ctx,cv.clientWidth,h]; },
+    drawSpark(){
+      const c=this.cv('spark',64); if(!c) return; const [ctx,w,h]=c;
+      const hist=this.d.history||[]; if(hist.length<2) return;
+      const ps=hist.map(p=>p[1]),mn=Math.min(...ps),mx=Math.max(...ps),rg=(mx-mn)||1;
+      ctx.beginPath();
+      hist.forEach((p,i)=>{const x=i/(hist.length-1)*w,y=h-5-((p[1]-mn)/rg)*(h-12);
+        i?ctx.lineTo(x,y):ctx.moveTo(x,y)});
+      ctx.strokeStyle='#a97a0b';ctx.lineWidth=1.2;ctx.stroke();
+      ctx.fillStyle='#667085';ctx.font='9px Consolas';
+      ctx.fillText(this.fmt(mx),2,9);ctx.fillText(this.fmt(mn),2,h-1);
+    },
+    drawEquity(){
+      const c=this.cv('equity',130); if(!c) return; const [ctx,w,h]=c;
+      const curve=this.perf.curve||[]; this.curvePts=[];
+      if(!curve.length){ctx.fillStyle='#667085';ctx.font='10px Consolas';
+        ctx.fillText('awaiting first resolved prediction',8,h/2);return}
+      const vals=[0,...curve.map(x=>x.cum)];
+      const mn=Math.min(...vals),mx=Math.max(...vals),rg=(mx-mn)||1;
+      const px=i=>6+(i/(vals.length-1))*(w-12), py=v=>h-14-((v-mn)/rg)*(h-24);
+      ctx.strokeStyle='#e4e7ec';ctx.setLineDash([3,3]);ctx.beginPath();
+      ctx.moveTo(0,py(0));ctx.lineTo(w,py(0));ctx.stroke();ctx.setLineDash([]);
+      ctx.beginPath();vals.forEach((v,i)=>{i?ctx.lineTo(px(i),py(v)):ctx.moveTo(px(i),py(v))});
+      ctx.strokeStyle='#a97a0b';ctx.lineWidth=1.6;ctx.stroke();
+      curve.forEach((x,i)=>{ctx.beginPath();ctx.arc(px(i+1),py(x.cum),2.5,0,7);
+        ctx.fillStyle=x.r>0.05?'#0e8a70':x.r<-0.05?'#c93f39':'#98a2b3';ctx.fill()});
+      const lv=vals[vals.length-1];
+      ctx.fillStyle='#a97a0b';ctx.font='bold 10px Consolas';
+      ctx.fillText((lv>0?'+':'')+lv.toFixed(1)+'R',Math.min(w-34,px(vals.length-1)+4),py(lv)+3);
+    },
+    drawDaily(){
+      const c=this.cv('daily',130); if(!c) return; const [ctx,w,h]=c;
+      const daily=this.perf.daily||{}; const keys=Object.keys(daily).slice(-14);
+      if(!keys.length){ctx.fillStyle='#667085';ctx.font='10px Consolas';
+        ctx.fillText('no closed days yet',8,h/2);return}
+      const vals=keys.map(k=>daily[k]);
+      const mx=Math.max(1,...vals.map(Math.abs));
+      const bw=Math.min(34,(w-10)/keys.length-4), mid=h/2-6;
+      keys.forEach((k,i)=>{
+        const v=daily[k], x=6+i*((w-12)/keys.length), bh=Math.abs(v)/mx*(h/2-16);
+        ctx.fillStyle=v>0.05?'#0e8a70':v<-0.05?'#c93f39':'#98a2b3';
+        ctx.fillRect(x,v>=0?mid-bh:mid,bw,Math.max(2,bh));
+        ctx.fillStyle='#667085';ctx.font='8px Consolas';
+        ctx.fillText(k.slice(3),x,h-2);
+      });
+      ctx.strokeStyle='#e4e7ec';ctx.beginPath();ctx.moveTo(0,mid);ctx.lineTo(w,mid);ctx.stroke();
+    },
+    async tvpost(p){ const r=await fetch('/api/tv_login',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}); return r.json() },
+    openAuth(){ this.authOpen=true; this.authStep='signin'; this.tverrMsg='' },
+    closeAuth(){ if(!this.authLoading){this.authOpen=false;this.tverrMsg=''} },
+    googleFlow(){ this.tverrMsg=''; window.open('https://www.tradingview.com/#signin','_blank');
+      this.authStep='cookies'; this.$nextTick(()=>this.$refs.sidbox&&this.$refs.sidbox.focus()) },
+    async tvLogin(){ this.tverrMsg='';this.authLoading=true;
+      try{ const r=await this.tvpost({mode:'password',username:this.tvu.trim(),password:this.tvp});
+        if(r.ok){this.tvp='';this.authOpen=false;this.toast('TV connected: '+r.username);this.tick()}
+        else this.tverrMsg=(r.error||'login failed')+' — Google-created accounts have no password: use Continue with Google';
+      } finally{this.authLoading=false} },
+    async tvCookie(){ this.tverrMsg='';this.authLoading=true;
+      try{ const r=await this.tvpost({mode:'cookie',sessionid:this.tvsid.trim(),sessionid_sign:this.tvsign.trim()});
+        if(r.ok){this.tvsid='';this.tvsign='';this.authOpen=false;this.toast('TV connected: '+r.username);this.tick()}
+        else this.tverrMsg=r.error||'cookie rejected';
+      } finally{this.authLoading=false} },
+    async tvLogout(){ await this.tvpost({mode:'logout'}); this.authOpen=false;
+      this.toast('TV disconnected'); this.tick() },
+  },
+  mounted(){
+    this.tick(); setInterval(()=>this.tick(),15000);
+    setInterval(()=>{this.now=Date.now()},1000);
+    window.addEventListener('resize',()=>{this.drawSpark();this.drawEquity();this.drawDaily()});
+    window.addEventListener('keydown',e=>{
+      if(e.target.tagName==='INPUT')return;
+      const i='12345678'.indexOf(e.key);
+      if(i>=0&&this.symbols[i])this.switchSym(this.symbols[i][0]);
+      if(e.key==='Escape')this.closeAuth();
+    });
+    const s=document.createElement('script'); s.src='https://s3.tradingview.com/tv.js';
+    s.onload=()=>this.mountChart(); document.head.appendChild(s);
+  },
+}).mount('#app');
+</script></body></html>

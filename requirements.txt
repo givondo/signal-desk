@@ -1,0 +1,2 @@
+# Signal Desk uses only the Python standard library - nothing to install.
+# This file exists so PaaS build systems (Render etc.) detect a Python app.
