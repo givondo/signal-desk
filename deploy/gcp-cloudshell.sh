@@ -39,18 +39,29 @@ ZONE=$(gcloud compute instances list --filter="name=$NAME" \
 if [ -n "${ZONE:-}" ]; then
   say "Reusing existing VM in $ZONE"
 else
+  # resolve the current Ubuntu LTS image family (naming now includes arch)
+  IMG_FAMILY=""
+  for f in ubuntu-2404-lts-amd64 ubuntu-2204-lts-amd64 ubuntu-2404-lts ubuntu-2204-lts; do
+    if gcloud compute images describe-from-family "$f" \
+         --project=ubuntu-os-cloud >/dev/null 2>&1; then
+      IMG_FAMILY=$f; break
+    fi
+  done
+  [ -n "$IMG_FAMILY" ] || { echo "Could not resolve an Ubuntu image family."; exit 1; }
+  say "Using image family: $IMG_FAMILY"
+
   created=no
   for Z in "${ZONES[@]}"; do
     say "Creating e2-micro (Always Free) in $Z ..."
     if gcloud compute instances create "$NAME" --zone="$Z" \
-         --machine-type=e2-micro --image-family=ubuntu-2404-lts \
+         --machine-type=e2-micro --image-family="$IMG_FAMILY" \
          --image-project=ubuntu-os-cloud --boot-disk-size=30GB \
          --boot-disk-type=pd-standard --tags=signaldesk -q; then
       ZONE=$Z; created=yes; break
     fi
-    echo "   $Z had no capacity, trying the next free zone..."
+    echo "   $Z failed (capacity or quota), trying the next free zone..."
   done
-  [ "$created" = yes ] || { echo "All free zones were at capacity - retry later."; exit 1; }
+  [ "$created" = yes ] || { echo "VM creation failed in all zones - see the error above."; exit 1; }
 fi
 
 # --- provisioner (runs on the VM as root) ----------------------------------
