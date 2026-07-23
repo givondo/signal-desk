@@ -31,8 +31,11 @@ border-bottom:1px solid var(--bd);display:flex;align-items:stretch;gap:0;overflo
 .stars{color:var(--a);font-size:11px;letter-spacing:1px}
 .stars .off{color:var(--dim2)}
 .symsel{background:var(--p2);border:1px solid var(--bd2);color:var(--tx);font-size:12px;font-weight:700;
-padding:4px 8px;margin-top:2px;cursor:pointer;letter-spacing:.4px;font-family:Consolas,monospace}
+padding:4px 8px;margin-top:2px;cursor:pointer;letter-spacing:.4px;font-family:Consolas,monospace;min-width:150px}
 .symsel:focus{outline:1px solid var(--a);border-color:var(--a)}
+.rtbadge{font-size:8.5px;font-weight:700;letter-spacing:.5px;padding:1px 5px;border-radius:2px}
+.rtlive{color:var(--g);background:var(--gt)}
+.rtdelay{color:var(--a);background:var(--at)}
 .dirL{color:var(--g)}.dirS{color:var(--r)}.dirN{color:var(--a)}
 .live{width:7px;height:7px;border-radius:50%;background:var(--g);display:inline-block;margin-right:6px;animation:bl 2s infinite}
 @keyframes bl{50%{opacity:.25}}
@@ -198,7 +201,9 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:0 5px;font-size:10p
   <div class="strip num">
     <div><span class="lb">Signal Desk · Instrument</span>
       <select class="symsel" :value="sym" @change="switchSym($event.target.value)">
-        <option v-for="s in symbols" :key="s[0]" :value="s[0]">{{ s[1] }}</option>
+        <optgroup v-for="g in symGroups" :key="g[0]" :label="g[0]">
+          <option v-for="s in g[1]" :key="s[0]" :value="s[0]">{{ s[1] }}</option>
+        </optgroup>
       </select></div>
     <div><span class="lb">Market Score</span><span class="big" :class="dirClass">{{ marketScore }}<span style="font-size:12px;color:var(--dim)">/100</span></span></div>
     <div><span class="lb">Recommendation</span><span class="big" :class="dirClass">{{ d.direction||'--' }}</span></div>
@@ -217,7 +222,9 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:0 5px;font-size:10p
     <!-- ============ LEFT ============ -->
     <div class="col">
       <div class="panel">
-        <div class="ph">Market Overview<span class="mono">{{ d.symbol }}</span></div>
+        <div class="ph">Market Overview
+        <span><span class="rtbadge" :class="d.rt?'rtlive':'rtdelay'">{{ d.rt?'● LIVE':'● DELAYED' }}</span>
+        <span class="mono" style="margin-left:5px">{{ d.symbol }}</span></span></div>
         <div class="pb">
           <span class="bigpx num" :class="flash">{{ fmt(d.price) }}</span>
           <span class="num" :class="d.change_pct>0?'up':d.change_pct<0?'dn':'mut'" style="font-size:13px;font-weight:700;margin-left:8px">{{ d.change_pct>0?'+':'' }}{{ d.change_pct }}%</span>
@@ -477,7 +484,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:0 5px;font-size:10p
     </div>
   </div>
 
-  <div class="foot">Keyboard: <kbd>1</kbd> GOLD · <kbd>2</kbd> BITCOIN · <kbd>3</kbd> OIL · data refresh 15s · TradingView scanner + Yahoo macro/news · Bloomberg auto-detected via blpapi<br>
+  <div class="foot">15 instruments across Metals · Crypto · FX Majors · Indices · Energy — pick from the dropdown (or keys <kbd>1</kbd>–<kbd>9</kbd>) · data refresh 15s, real-time except delayed feeds flagged DELAYED · TradingView scanner + Yahoo macro/news<br>
   Copilot &amp; reasoning are deterministic rules over live data (no LLM). Educational tool — NOT financial advice.</div>
 
   <!-- auth modal -->
@@ -515,7 +522,14 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:0 5px;font-size:10p
 const {createApp} = Vue;
 createApp({
   data(){return{
-    sym:'XAUUSD', symbols:[['XAUUSD','GOLD · XAU/USD'],['BTCUSD','BITCOIN · BTC/USD'],['USOIL','WTI CRUDE · USOIL']],
+    sym:'XAUUSD',
+    symGroups:[
+      ['Metals',[['XAUUSD','Gold · XAU/USD'],['XAGUSD','Silver · XAG/USD']]],
+      ['Crypto',[['BTCUSD','Bitcoin · BTC'],['ETHUSD','Ethereum · ETH'],['SOLUSD','Solana · SOL'],['XRPUSD','XRP']]],
+      ['FX Majors',[['EURUSD','EUR / USD'],['GBPUSD','GBP / USD'],['AUDUSD','AUD / USD'],['NZDUSD','NZD / USD'],['USDJPY','USD / JPY'],['USDCAD','USD / CAD']]],
+      ['Indices',[['US30','Dow 30 · US30'],['NAS100','Nasdaq 100 · NAS']]],
+      ['Energy',[['USOIL','WTI Crude · USOIL']]],
+    ],
     d:{status:'loading'}, flash:'', prevPx:null, prevDir:null, alertSeen:0,
     acct:10000, riskpct:1,
     now:Date.now(), toasts:[], tid:0,
@@ -526,7 +540,8 @@ createApp({
   computed:{
     perf(){ return this.d.perf||{} },
     macroSource(){ return (this.d.macro||{}).source||'--' },
-    assetWord(){ return this.sym==='BTCUSD'?'bitcoin':this.sym==='USOIL'?'oil':'gold' },
+    flatSyms(){ return this.symGroups.flatMap(g=>g[1]) },
+    assetWord(){ return this.d.word || 'the asset' },
     dirClass(){ return this.d.direction==='LONG'?'dirL':this.d.direction==='SHORT'?'dirS':'dirN' },
     gradeColor(){ const g=this.d.grade; return g==='A+'||g==='A'?'var(--g)':g==='B'?'var(--a)':g==='C'||g==='D'?'var(--r)':'var(--dim)' },
     rangePct(){ const p=(this.d.price-this.d.day_low)/((this.d.day_high-this.d.day_low)||1)*100; return Math.max(1,Math.min(99,p)) },
@@ -698,9 +713,9 @@ createApp({
     setInterval(()=>{this.now=Date.now()},1000);
     window.addEventListener('resize',()=>{this.drawSpark();this.drawEquity();this.drawDaily()});
     window.addEventListener('keydown',e=>{
-      if(e.target.tagName==='INPUT')return;
-      const i='12345678'.indexOf(e.key);
-      if(i>=0&&this.symbols[i])this.switchSym(this.symbols[i][0]);
+      if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
+      const i='123456789'.indexOf(e.key);
+      if(i>=0&&this.flatSyms[i])this.switchSym(this.flatSyms[i][0]);
       if(e.key==='Escape')this.closeAuth();
     });
     const s=document.createElement('script'); s.src='https://s3.tradingview.com/tv.js';

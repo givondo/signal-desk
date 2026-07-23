@@ -45,32 +45,177 @@ try:
 except Exception:
     DATA_DIR = BASE_DIR
 
-SYMBOLS = {
-    "XAUUSD": {
-        "tv": "OANDA:XAUUSD", "name": "GOLD SPOT", "tv_chart": "OANDA:XAUUSD",
-        "candles": "GC%3DF", "news_sym": "GC=F", "spread_est": 0.30, "dp": 2,
-        "macro_w": {"dxy": -0.40, "us10y": -0.35, "vix": 0.25},
-        "per_point": 100, "size_note": "1 lot = 100oz = $100/pt",
-        "session_filter": True,
-        "pred_file": os.path.join(DATA_DIR, "predictions.json"),
+# ---- asset-class macro profiles (scoring weights + display impact + why) ----
+# w      : signed weights for the 3 scored drivers (dxy / us10y / vix)
+# impact : effect of each driver RISING (+1 bull / -1 bear / 0 context)
+# why    : one-line reason each driver matters for this asset class
+CLASS_MACRO = {
+    "metal": {
+        "w": {"dxy": -0.40, "us10y": -0.35, "vix": 0.25},
+        "impact": {"dxy": -1, "us10y": -1, "us2y": -1, "vix": 1, "oil": 1,
+                   "silver": 1, "copper": 0, "spx": 0, "ndq": 0, "gcf": 1},
+        "why": {"dxy": "priced in dollars, so a stronger dollar makes it costlier worldwide",
+                "us10y": "pays no yield, so rising rates pull money into bonds instead",
+                "us2y": "tighter Fed policy raises the cost of holding a zero-yield asset",
+                "vix": "a classic safe haven - fear tends to lift it",
+                "oil": "pricey oil stokes inflation, and metals hedge inflation",
+                "silver": "the metals complex moves together - agreement confirms the move",
+                "copper": "growth signal - weak direct link",
+                "spx": "equity appetite competes for the same flows",
+                "ndq": "risk-appetite context", "gcf": "gold-futures flow reference"},
     },
-    "BTCUSD": {
-        "tv": "COINBASE:BTCUSD", "name": "BITCOIN", "tv_chart": "COINBASE:BTCUSD",
-        "candles": "BTC-USD", "news_sym": "BTC-USD", "spread_est": 15.0, "dp": 2,
-        "macro_w": {"dxy": -0.35, "us10y": -0.25, "vix": -0.40},
-        "per_point": 1, "size_note": "1 lot = 1 BTC = $1/pt",
-        "session_filter": False,
-        "pred_file": os.path.join(DATA_DIR, "predictions_btc.json"),
+    "crypto": {
+        "w": {"dxy": -0.35, "us10y": -0.25, "vix": -0.40},
+        "impact": {"dxy": -1, "us10y": -1, "us2y": -1, "vix": -1, "oil": 0,
+                   "silver": 0, "copper": 0, "spx": 1, "ndq": 1, "gcf": 0},
+        "why": {"dxy": "trades like a dollar-priced risk asset - dollar strength drains it",
+                "us10y": "higher yields make safe income attractive and starve risk assets",
+                "us2y": "Fed tightening expectations hit crypto liquidity first",
+                "vix": "sold as a risk asset in fear episodes, not bought as a haven",
+                "oil": "inflation context - weak direct link", "silver": "metals context only",
+                "copper": "global-growth pulse - context", "spx": "follows broad equity risk appetite",
+                "ndq": "correlates strongest with high-beta tech",
+                "gcf": "gold bid while crypto falls = money choosing the old haven"},
     },
-    "USOIL": {
-        "tv": "NYMEX:CL1!", "name": "WTI CRUDE", "tv_chart": "NYMEX:CL1!",
-        "candles": "CL%3DF", "news_sym": "CL=F", "spread_est": 0.03, "dp": 2,
-        "macro_w": {"dxy": -0.30, "us10y": -0.05, "vix": -0.30},
-        "per_point": 1000, "size_note": "1 lot = 1000 bbl = $1000/pt",
-        "session_filter": True,
-        "pred_file": os.path.join(DATA_DIR, "predictions_oil.json"),
+    "anti_usd": {   # EUR GBP AUD NZD - the pair RISES when the dollar FALLS
+        "w": {"dxy": -0.55, "us10y": -0.15, "vix": -0.15},
+        "impact": {"dxy": -1, "us10y": -1, "us2y": -1, "vix": -1, "oil": 0,
+                   "silver": 0, "copper": 0, "spx": 1, "ndq": 0, "gcf": 0},
+        "why": {"dxy": "the pair mirrors the dollar - a stronger USD pushes it down",
+                "us10y": "higher US yields pull capital into the dollar, away from this currency",
+                "us2y": "US rate-hike expectations strengthen the dollar leg",
+                "vix": "risk-off flows into the dollar hurt higher-beta currencies",
+                "oil": "commodity context", "silver": "context only",
+                "copper": "growth-currency context", "spx": "risk-on lifts non-dollar currencies",
+                "ndq": "risk context", "gcf": "haven-flow context"},
+    },
+    "pro_usd": {    # USDJPY USDCAD - the pair RISES when the dollar RISES
+        "w": {"dxy": 0.50, "us10y": 0.35, "vix": -0.10},
+        "impact": {"dxy": 1, "us10y": 1, "us2y": 1, "vix": -1, "oil": 0,
+                   "silver": 0, "copper": 0, "spx": 1, "ndq": 0, "gcf": 0},
+        "why": {"dxy": "USD is the base currency, so dollar strength pushes the pair up",
+                "us10y": "a wider US yield advantage pulls money into the dollar leg",
+                "us2y": "US rate-hike expectations lift the dollar",
+                "vix": "risk-off often bids the haven leg, capping the pair",
+                "oil": "petro-currency context (matters most for USD/CAD)", "silver": "context only",
+                "copper": "growth context", "spx": "risk-on supports carry into the pair",
+                "ndq": "risk context", "gcf": "haven-flow context"},
+    },
+    "index": {
+        "w": {"dxy": -0.10, "us10y": -0.45, "vix": -0.45},
+        "impact": {"dxy": 0, "us10y": -1, "us2y": -1, "vix": -1, "oil": 0,
+                   "silver": 0, "copper": 1, "spx": 1, "ndq": 1, "gcf": -1},
+        "why": {"dxy": "modest link - a strong dollar can trim overseas earnings",
+                "us10y": "higher discount rates compress equity valuations",
+                "us2y": "Fed-tightening expectations weigh on stocks",
+                "vix": "this is the fear gauge's mirror - spikes mean selling",
+                "oil": "energy-cost context", "silver": "context only",
+                "copper": "growth confirmation for cyclical earnings",
+                "spx": "the broad tape - moves together", "ndq": "tech-leadership context",
+                "gcf": "safe-haven rotation away from stocks"},
+    },
+    "energy": {
+        "w": {"dxy": -0.30, "us10y": -0.05, "vix": -0.30},
+        "impact": {"dxy": -1, "us10y": 0, "us2y": 0, "vix": -1, "oil": 0,
+                   "silver": 0, "copper": 1, "spx": 1, "ndq": 0, "gcf": 0},
+        "why": {"dxy": "dollar-priced - a stronger dollar makes it costlier for foreign buyers",
+                "us10y": "weak direct link - matters mainly via growth expectations",
+                "us2y": "policy context - weak direct link",
+                "vix": "risk-off usually means demand fears - UNLESS it's a supply shock, then oil rises with VIX",
+                "oil": "this is the instrument itself", "silver": "context only",
+                "copper": "copper rising = factories busy = more oil demand",
+                "spx": "equity strength signals demand-side confidence", "ndq": "risk context",
+                "gcf": "gold and oil rising together can flag a geopolitical shock"},
     },
 }
+
+
+def _pf(name):
+    return os.path.join(DATA_DIR, name)
+
+
+# roster: cls -> macro profile; dp = price decimals; rt = real-time scanner
+# data (oil is delayed); word/grp used for UI text and grouping. tv_chart == tv.
+SYMBOLS = {
+    "XAUUSD": {"tv": "OANDA:XAUUSD", "name": "GOLD SPOT", "word": "gold",
+               "cls": "metal", "grp": "Metals", "dp": 2, "per_point": 100,
+               "size_note": "1 lot = 100oz = $100/pt", "spread_est": 0.30,
+               "candles": "GC=F", "news_sym": "GC=F", "session_filter": True,
+               "rt": True, "pred_file": _pf("predictions.json")},
+    "XAGUSD": {"tv": "TVC:SILVER", "name": "SILVER SPOT", "word": "silver",
+               "cls": "metal", "grp": "Metals", "dp": 3, "per_point": 5000,
+               "size_note": "1 lot = 5000oz = $5000/pt", "spread_est": 0.03,
+               "candles": "SI=F", "news_sym": "SI=F", "session_filter": True,
+               "rt": True, "pred_file": _pf("predictions_xag.json")},
+    "BTCUSD": {"tv": "COINBASE:BTCUSD", "name": "BITCOIN", "word": "bitcoin",
+               "cls": "crypto", "grp": "Crypto", "dp": 2, "per_point": 1,
+               "size_note": "1 lot = 1 BTC = $1/pt", "spread_est": 15.0,
+               "candles": "BTC-USD", "news_sym": "BTC-USD", "session_filter": False,
+               "rt": True, "pred_file": _pf("predictions_btc.json")},
+    "ETHUSD": {"tv": "COINBASE:ETHUSD", "name": "ETHEREUM", "word": "ether",
+               "cls": "crypto", "grp": "Crypto", "dp": 2, "per_point": 1,
+               "size_note": "1 lot = 1 ETH = $1/pt", "spread_est": 1.2,
+               "candles": "ETH-USD", "news_sym": "ETH-USD", "session_filter": False,
+               "rt": True, "pred_file": _pf("predictions_eth.json")},
+    "SOLUSD": {"tv": "COINBASE:SOLUSD", "name": "SOLANA", "word": "solana",
+               "cls": "crypto", "grp": "Crypto", "dp": 2, "per_point": 1,
+               "size_note": "1 lot = 1 SOL = $1/pt", "spread_est": 0.05,
+               "candles": "SOL-USD", "news_sym": "SOL-USD", "session_filter": False,
+               "rt": True, "pred_file": _pf("predictions_sol.json")},
+    "XRPUSD": {"tv": "COINBASE:XRPUSD", "name": "XRP", "word": "XRP",
+               "cls": "crypto", "grp": "Crypto", "dp": 4, "per_point": 1,
+               "size_note": "1 lot = 1 XRP = $1/pt", "spread_est": 0.001,
+               "candles": "XRP-USD", "news_sym": "XRP-USD", "session_filter": False,
+               "rt": True, "pred_file": _pf("predictions_xrp.json")},
+    "EURUSD": {"tv": "OANDA:EURUSD", "name": "EUR / USD", "word": "the euro",
+               "cls": "anti_usd", "grp": "FX Majors", "dp": 5, "per_point": 100000,
+               "size_note": "1 lot = 100k = $10/pip", "spread_est": 0.00012,
+               "candles": "EURUSD=X", "news_sym": "EURUSD=X", "session_filter": True,
+               "rt": True, "pred_file": _pf("predictions_eur.json")},
+    "GBPUSD": {"tv": "OANDA:GBPUSD", "name": "GBP / USD", "word": "the pound",
+               "cls": "anti_usd", "grp": "FX Majors", "dp": 5, "per_point": 100000,
+               "size_note": "1 lot = 100k = $10/pip", "spread_est": 0.00015,
+               "candles": "GBPUSD=X", "news_sym": "GBPUSD=X", "session_filter": True,
+               "rt": True, "pred_file": _pf("predictions_gbp.json")},
+    "AUDUSD": {"tv": "OANDA:AUDUSD", "name": "AUD / USD", "word": "the aussie",
+               "cls": "anti_usd", "grp": "FX Majors", "dp": 5, "per_point": 100000,
+               "size_note": "1 lot = 100k = $10/pip", "spread_est": 0.00015,
+               "candles": "AUDUSD=X", "news_sym": "AUDUSD=X", "session_filter": True,
+               "rt": True, "pred_file": _pf("predictions_aud.json")},
+    "NZDUSD": {"tv": "OANDA:NZDUSD", "name": "NZD / USD", "word": "the kiwi",
+               "cls": "anti_usd", "grp": "FX Majors", "dp": 5, "per_point": 100000,
+               "size_note": "1 lot = 100k = $10/pip", "spread_est": 0.0002,
+               "candles": "NZDUSD=X", "news_sym": "NZDUSD=X", "session_filter": True,
+               "rt": True, "pred_file": _pf("predictions_nzd.json")},
+    "USDJPY": {"tv": "OANDA:USDJPY", "name": "USD / JPY", "word": "dollar-yen",
+               "cls": "pro_usd", "grp": "FX Majors", "dp": 3, "per_point": None,
+               "per_point_dynamic": True, "size_note": "1 lot = 100k, pip ~ 1000/px",
+               "spread_est": 0.015, "candles": "USDJPY=X", "news_sym": "USDJPY=X",
+               "session_filter": True, "rt": True, "pred_file": _pf("predictions_jpy.json")},
+    "USDCAD": {"tv": "OANDA:USDCAD", "name": "USD / CAD", "word": "dollar-loonie",
+               "cls": "pro_usd", "grp": "FX Majors", "dp": 5, "per_point": 100000,
+               "size_note": "1 lot = 100k = $10/pip", "spread_est": 0.0002,
+               "candles": "USDCAD=X", "news_sym": "USDCAD=X", "session_filter": True,
+               "rt": True, "pred_file": _pf("predictions_cad.json")},
+    "US30": {"tv": "OANDA:US30USD", "name": "DOW 30", "word": "the Dow",
+             "cls": "index", "grp": "Indices", "dp": 1, "per_point": 1,
+             "size_note": "$1 / point (CFD)", "spread_est": 2.0,
+             "candles": "^DJI", "news_sym": "^DJI", "session_filter": True,
+             "rt": True, "pred_file": _pf("predictions_us30.json")},
+    "NAS100": {"tv": "NASDAQ:NDX", "name": "NASDAQ 100", "word": "the Nasdaq",
+               "cls": "index", "grp": "Indices", "dp": 1, "per_point": 1,
+               "size_note": "$1 / point (CFD)", "spread_est": 1.5,
+               "candles": "^NDX", "news_sym": "^NDX", "session_filter": True,
+               "rt": True, "pred_file": _pf("predictions_nas.json")},
+    "USOIL": {"tv": "NYMEX:CL1!", "name": "WTI CRUDE", "word": "oil",
+              "cls": "energy", "grp": "Energy", "dp": 2, "per_point": 1000,
+              "size_note": "1 lot = 1000 bbl = $1000/pt", "spread_est": 0.03,
+              "candles": "CL=F", "news_sym": "CL=F", "session_filter": True,
+              "rt": False, "pred_file": _pf("predictions_oil.json")},
+}
+for _s, _c in SYMBOLS.items():
+    _c["tv_chart"] = _c["tv"]
+    _c["macro_w"] = CLASS_MACRO[_c["cls"]]["w"]
 
 # multi-timeframe matrix: TradingView scanner suffixes (1m is the floor)
 TFS = [("1m", "|1"), ("5m", "|5"), ("15m", "|15"), ("30m", "|30"),
@@ -97,15 +242,8 @@ MACRO_SYMS = [
     ("ndq",   "NQ=F",     "NASDAQ FUT",     "%"),
     ("gcf",   "GC=F",     "GOLD FUT GC",    "%"),
 ]
-# qualitative impact of each driver rising, per asset: +1 bullish, -1 bearish
-MACRO_IMPACT = {
-    "XAUUSD": {"dxy": -1, "us10y": -1, "us2y": -1, "vix": 1, "oil": 1,
-               "silver": 1, "copper": 0, "spx": 0, "ndq": 0, "gcf": 1},
-    "BTCUSD": {"dxy": -1, "us10y": -1, "us2y": -1, "vix": -1, "oil": 0,
-               "silver": 0, "copper": 0, "spx": 1, "ndq": 1, "gcf": 0},
-    "USOIL": {"dxy": -1, "us10y": 0, "us2y": 0, "vix": -1, "oil": 0,
-              "silver": 0, "copper": 1, "spx": 1, "ndq": 0, "gcf": 0},
-}
+# per-symbol qualitative impact, derived from each symbol's asset-class profile
+MACRO_IMPACT = {s: CLASS_MACRO[c["cls"]]["impact"] for s, c in SYMBOLS.items()}
 MACRO_EXPLAIN = {
     "dxy":   "Strength of the US dollar against major currencies",
     "us10y": "Interest the US government pays to borrow for 10 years",
@@ -119,45 +257,8 @@ MACRO_EXPLAIN = {
     "gcf":   "Gold futures - safe-haven flow reference",
 }
 
-# Per-asset rationale: WHY this driver matters for THIS instrument.
-MACRO_ASSET_WHY = {
-    "XAUUSD": {
-        "dxy": "gold is priced in dollars - a stronger dollar makes it more expensive worldwide and pressures the price",
-        "us10y": "gold pays no interest, so when bonds yield more, money rotates out of gold",
-        "us2y": "tighter Fed policy raises the cost of holding a zero-yield asset",
-        "vix": "fear pushes money into safe havens, and gold is the classic one",
-        "oil": "expensive oil feeds inflation, and gold is bought as an inflation hedge",
-        "silver": "silver normally moves with gold - agreement confirms the metals move is real",
-        "copper": "growth signal only - weak direct link to gold",
-        "spx": "equity appetite competes with gold for investor flows",
-        "ndq": "tech risk appetite - background context",
-        "gcf": "paper-gold flow - shows where futures traders are pushing",
-    },
-    "BTCUSD": {
-        "dxy": "bitcoin trades like a dollar-priced risk asset - dollar strength drains it",
-        "us10y": "higher yields make safe income attractive and starve risk assets",
-        "us2y": "Fed tightening expectations hit crypto liquidity first",
-        "vix": "in fear episodes bitcoin is sold as a risk asset, not bought as a haven",
-        "oil": "inflation context - weak direct link",
-        "silver": "metals context only",
-        "copper": "global growth pulse - context only",
-        "spx": "bitcoin follows equity risk appetite closely",
-        "ndq": "bitcoin correlates strongest with high-beta tech",
-        "gcf": "gold bid while BTC falls = money choosing the old haven over the new",
-    },
-    "USOIL": {
-        "dxy": "oil is dollar-priced - a stronger dollar makes it costlier for foreign buyers",
-        "us10y": "weak direct link - matters mainly through growth expectations",
-        "us2y": "policy context - weak direct link",
-        "vix": "risk-off usually means demand fears - UNLESS the fear itself is a supply shock, then oil rises with VIX",
-        "oil": "this is the instrument itself - shown for reference",
-        "silver": "context only",
-        "copper": "copper rising = global factories humming = more oil demand",
-        "spx": "equity strength signals demand-side confidence",
-        "ndq": "context only",
-        "gcf": "gold and oil rising together often flags a geopolitical shock",
-    },
-}
+# per-symbol WHY text, derived from each symbol's asset-class profile
+MACRO_ASSET_WHY = {s: CLASS_MACRO[c["cls"]]["why"] for s, c in SYMBOLS.items()}
 
 EXPIRY_S = 6 * 3600
 COOLDOWN_S = 300
@@ -328,7 +429,8 @@ def macro_score_for(weights):
 def refresh_candles(sym):
     """15m candles -> latest fractal swing high/low as offsets from close."""
     data = http_json("https://query1.finance.yahoo.com/v8/finance/chart/"
-                     f"{SYMBOLS[sym]['candles']}?interval=15m&range=2d")
+                     f"{urllib.parse.quote(SYMBOLS[sym]['candles'])}"
+                     "?interval=15m&range=2d")
     q = data["chart"]["result"][0]["indicators"]["quote"][0]
     hs, ls, cs = [], [], []
     for h, l, c in zip(q["high"], q["low"], q["close"]):
@@ -827,7 +929,7 @@ def build_signal(sym, d):
         eff_txt = ("supportive" if eff > 0 else
                    "a headwind" if eff < 0 else "neutral")
         why_asset = MACRO_ASSET_WHY.get(sym, {}).get(key, "")
-        aword = {"XAUUSD": "gold", "BTCUSD": "bitcoin", "USOIL": "oil"}.get(sym, sym)
+        aword = cfg.get("word", sym)
         note = (f"Currently {verb} → {eff_txt} for {aword}. "
                 f"{why_asset[0].upper() + why_asset[1:]}." if why_asset else
                 f"Currently {verb} → {eff_txt}.")
@@ -842,7 +944,9 @@ def build_signal(sym, d):
         "status": "ok", "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
         "epoch": int(time.time()),
         "symbol": cfg["tv"], "tv_chart": cfg["tv_chart"], "sym": sym,
-        "sym_name": cfg["name"], "per_point": per_point, "dp": dp,
+        "sym_name": cfg["name"], "word": cfg.get("word", sym),
+        "rt": cfg.get("rt", True), "grp": cfg.get("grp", ""),
+        "per_point": per_point, "dp": dp,
         "size_note": cfg["size_note"], "spread_est": cfg["spread_est"],
         "price": round(px, dp), "change_pct": round(d.get("change") or 0, 2),
         "day_high": d.get("high"), "day_low": d.get("low"),
