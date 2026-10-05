@@ -79,6 +79,13 @@ Stop local PC duplicate (optional): remove any SignalDesk autostart batch from W
 
 ---
 
+## Custom HTTPS domain (Precifarm)
+
+Fixed URL **`https://desktrading-today.precifarm.com`** via Cloudflare Named Tunnel:  
+see [README-CLOUDFLARE-DOMAIN.md](./README-CLOUDFLARE-DOMAIN.md).
+
+---
+
 ## Optional: private access (Tailscale)
 
 Instead of exposing 8899 to `0.0.0.0/0`, skip the public firewall rule and on the VM:
