@@ -75,9 +75,13 @@ apt-get update -y
 apt-get install -y python3 git
 rm -rf /opt/signaldesk-src
 git clone https://github.com/givondo/signal-desk.git /opt/signaldesk-src
+mkdir -p /opt/signaldesk
 mkdir -p /opt/signaldesk/data
 cp /opt/signaldesk-src/xauusd_trader.py /opt/signaldesk-src/dashboard.html /opt/signaldesk/
 cp /opt/signaldesk-src/deploy/signaldesk.service /etc/systemd/system/
+for f in /opt/signaldesk-src/predictions*.json; do
+  [ -f "$f" ] && cp "$f" /opt/signaldesk/data/ || true
+done
 mv /tmp/signaldesk.env /etc/signaldesk.env
 chmod 600 /etc/signaldesk.env
 systemctl daemon-reload
