@@ -7,6 +7,7 @@ Serves http://localhost:8899 (dashboard.html) and a JSON API:
                                   scores, entry models, reasons, macro, news,
                                   alerts, performance analytics
   /api/ask?sym=..&q=..            rule-based copilot answers from live state
+  /api/desk/brief?sym=XAUUSD      Precifarm analyst brief (plain text)
   /api/tv_login (POST)            TradingView account session
 
 Data: TradingView scanner (multi-timeframe technicals), Yahoo (macro complex,
@@ -1267,6 +1268,25 @@ def build_signal(sym, d):
         and not is_chop
     )
 
+    session_fav = session.get("liq") in ("high", "normal")
+    c10, c10b, setup_pf = 0, {}, None
+    if confluence_score_10:
+        _pf_sig = {
+            "direction": direction, "aligned": aligned, "regime": regime,
+            "session": session, "tradeable": tradeable, "mtf_agreement": mtf_pct,
+            "engine": {"daily_ok": daily_ok, "macro_ok": macro_ok,
+                       "structure_s": structure_s},
+            "levels": levels, "models": models, "macro_score": macro,
+            "grade": grade, "reasons": reasons, "sym_name": cfg["name"],
+        }
+        c10, c10b = confluence_score_10(
+            _pf_sig, calendar_ok=False, session_favourable=session_fav)
+        try:
+            from precifarm_analyst import _infer_setup_type
+            setup_pf = _infer_setup_type(_pf_sig)
+        except ImportError:
+            pass
+
     engine = {
         "v": "4.3",
         "band": round(band, 3),
@@ -1282,6 +1302,10 @@ def build_signal(sym, d):
         "daily_ok": daily_ok,
         "macro_ok": macro_ok,
         "chop": is_chop,
+        "confluence_10": c10,
+        "confluence_breakdown": c10b,
+        "setup_type": setup_pf,
+        "publish_threshold": 7,
     }
 
     return {
@@ -1490,6 +1514,39 @@ class Tracker:
 
 
 trackers = {s: Tracker(SYMBOLS[s]["pred_file"]) for s in SYMBOLS}
+
+
+# ---------------------------------------------------------------- Precifarm desk brief
+
+try:
+    from precifarm_analyst import build_desk_brief, confluence_score_10, EAT as _EAT
+except ImportError:
+    build_desk_brief = confluence_score_10 = None
+    _EAT = None
+
+
+def precifarm_brief_for(sym, qs_extra=None):
+    qs_extra = qs_extra or {}
+    with state_lock:
+        sig = dict(latest.get(sym) or {})
+    if sig.get("status") != "ok":
+        return "1. DESK STATUS: WATCHLIST ONLY — feed not ready.\n"
+    if not build_desk_brief:
+        return "Precifarm analyst module not loaded.\n"
+    cal = qs_extra.get("calendar")
+    if cal and isinstance(cal, str):
+        try:
+            cal = json.loads(cal)
+        except Exception:
+            cal = None
+    return build_desk_brief(
+        sig, SYMBOLS[sym],
+        secondary=qs_extra.get("secondary"),
+        calendar=cal,
+        open_positions=qs_extra.get("open_positions"),
+        account_balance=qs_extra.get("account_balance"),
+        risk_settings=qs_extra.get("risk_settings"),
+    )
 
 
 # ---------------------------------------------------------------- copilot
@@ -1728,6 +1785,20 @@ class Handler(BaseHTTPRequestHandler):
             ans = copilot_answer(sym, q)
             self._send(json.dumps({"answer": ans}).encode(),
                        "application/json")
+        elif parsed.path == "/api/desk/brief":
+            extra = {
+                "calendar": (qs.get("calendar") or [None])[0],
+                "open_positions": (qs.get("open_positions") or [None])[0],
+                "account_balance": (qs.get("account_balance") or [None])[0],
+                "secondary": (qs.get("secondary") or [None])[0],
+            }
+            text = precifarm_brief_for(sym, extra)
+            fmt = (qs.get("format") or ["text"])[0]
+            if fmt == "json":
+                body = json.dumps({"sym": sym, "brief": text}).encode()
+                self._send(body, "application/json")
+            else:
+                self._send(text.encode("utf-8"), "text/plain; charset=utf-8")
         elif parsed.path == "/api/roster":
             with state_lock:
                 rows = []

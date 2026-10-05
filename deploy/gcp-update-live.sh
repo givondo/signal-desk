@@ -30,7 +30,7 @@ else
   git clone https://github.com/givondo/signal-desk.git /opt/signaldesk-src
 fi
 mkdir -p /opt/signaldesk/data
-cp /opt/signaldesk-src/xauusd_trader.py /opt/signaldesk-src/dashboard.html /opt/signaldesk/
+cp /opt/signaldesk-src/xauusd_trader.py /opt/signaldesk-src/precifarm_analyst.py /opt/signaldesk-src/dashboard.html /opt/signaldesk/
 cp /opt/signaldesk-src/deploy/signaldesk.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl restart signaldesk
