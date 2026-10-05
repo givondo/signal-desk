@@ -79,10 +79,22 @@ Stop local PC duplicate (optional): remove any SignalDesk autostart batch from W
 
 ---
 
-## Custom HTTPS domain (Precifarm)
+## Custom HTTPS domain (Precifarm, GCP + Caddy)
 
-Fixed URL **`https://desktrading-today.precifarm.com`** via Cloudflare Named Tunnel:  
-see [README-CLOUDFLARE-DOMAIN.md](./README-CLOUDFLARE-DOMAIN.md).
+**`https://desktrading-today.precifarm.com`** — DNS A record to the VM IP, **Caddy** on the VM for TLS (no Cloudflare tunnel).
+
+1. **Firewall** (once), Cloud Shell or PC with gcloud:
+   ```bash
+   bash <(curl -fsSL https://raw.githubusercontent.com/givondo/signal-desk/master/deploy/gcp-firewall-https.sh)
+   ```
+2. **DNS** at your precifarm.com host:  
+   `desktrading-today` → **A** → VM external IP (e.g. `34.72.93.156`).
+3. **On the VM** (after DNS propagates):
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/givondo/signal-desk/master/deploy/gcp-custom-domain.sh | sudo bash
+   ```
+
+Optional Cloudflare tunnel path: [README-CLOUDFLARE-DOMAIN.md](./README-CLOUDFLARE-DOMAIN.md).
 
 ---
 
