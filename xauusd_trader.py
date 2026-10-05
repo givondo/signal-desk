@@ -1570,9 +1570,21 @@ class Handler(BaseHTTPRequestHandler):
         self._send(json.dumps(resp).encode(), "application/json")
 
     def do_GET(self):
+        parsed = urllib.parse.urlparse(self.path)
+        # Render/platform health probes must not require HTTP Basic auth.
+        if parsed.path == "/api/health":
+            with state_lock:
+                ok = sum(1 for s in SYMBOLS
+                         if latest.get(s, {}).get("status") == "ok")
+            self._send(json.dumps({
+                "status": "ok", "engine": "4.2", "symbols_ok": ok,
+                "symbols_total": len(SYMBOLS),
+                "macro_ts": macro_cache.get("ts"),
+                "port": PORT,
+            }).encode(), "application/json")
+            return
         if not self._authorized():
             return self._deny()
-        parsed = urllib.parse.urlparse(self.path)
         qs = urllib.parse.parse_qs(parsed.query)
         sym = (qs.get("sym") or ["XAUUSD"])[0]
         if sym not in SYMBOLS:
@@ -1604,15 +1616,6 @@ class Handler(BaseHTTPRequestHandler):
             self._send(json.dumps({"ts": time.strftime("%H:%M:%S"),
                                      "symbols": rows}).encode(),
                        "application/json")
-        elif parsed.path == "/api/health":
-            with state_lock:
-                ok = sum(1 for s in SYMBOLS if latest.get(s, {}).get("status") == "ok")
-            self._send(json.dumps({
-                "status": "ok", "engine": "4.2", "symbols_ok": ok,
-                "symbols_total": len(SYMBOLS),
-                "macro_ts": macro_cache.get("ts"),
-                "port": PORT,
-            }).encode(), "application/json")
         elif parsed.path == "/" or parsed.path.startswith("/index"):
             try:
                 with open(DASH_FILE, "rb") as f:
@@ -1630,8 +1633,9 @@ def main():
         # 0.0.0.0 so the dashboard is reachable over Tailscale / LAN.
         # The Windows Firewall rule limits inbound to the Tailscale range.
         srv = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
-    except OSError:
-        sys.exit(0)
+    except OSError as e:
+        print(f"FATAL: cannot bind 0.0.0.0:{PORT} — {e}", file=sys.stderr)
+        sys.exit(1)
     load_auth()
     threading.Thread(target=poller, daemon=True).start()
     print(f"Signal Desk v4.2 -> http://localhost:{PORT} (and Tailscale devices)")

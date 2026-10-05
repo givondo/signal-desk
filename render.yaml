@@ -2,16 +2,17 @@ services:
   - type: web
     name: signal-desk
     runtime: python
-    plan: free
     branch: master
     repo: https://github.com/givondo/signal-desk
     healthCheckPath: /api/health
-    buildCommand: "echo 'stdlib only - nothing to build'"
-    startCommand: "python xauusd_trader.py"
+    buildCommand: "true"
+    startCommand: python xauusd_trader.py
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
       - key: SIGNALDESK_USER
         value: trader
       - key: SIGNALDESK_PASS
-        sync: false   # set in Render dashboard — REQUIRED on the public URL
+        generateValue: true
       - key: PYTHONUNBUFFERED
         value: "1"
