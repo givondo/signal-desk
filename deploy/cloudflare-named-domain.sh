@@ -20,12 +20,13 @@ if [ "${EUID:-$(id -u)}" -ne 0 ]; then
   exit 1
 fi
 
-if [ -z "${CLOUDFLARE_TUNNEL_TOKEN:-}" ] && [ -f "$ENV_FILE" ]; then
+if [ -z "${CLOUDFLARE_TUNNEL_TOKEN:-}${TUNNEL_TOKEN:-}" ] && [ -f "$ENV_FILE" ]; then
   # shellcheck disable=SC1090
   set -a && source "$ENV_FILE" && set +a
 fi
+TOKEN="${TUNNEL_TOKEN:-${CLOUDFLARE_TUNNEL_TOKEN:-}}"
 
-if [ -z "${CLOUDFLARE_TUNNEL_TOKEN:-}" ]; then
+if [ -z "$TOKEN" ]; then
   cat <<EOF
 Missing CLOUDFLARE_TUNNEL_TOKEN.
 
@@ -38,7 +39,7 @@ Cloudflare dashboard (one time):
   4. Copy the install token (long eyJ... string)
 
 On this VM:
-  echo 'CLOUDFLARE_TUNNEL_TOKEN=PASTE_TOKEN' | tee $ENV_FILE
+  echo 'TUNNEL_TOKEN=PASTE_TOKEN' | tee $ENV_FILE
   chmod 600 $ENV_FILE
   bash $(basename "$0")
 
@@ -47,9 +48,9 @@ EOF
   exit 1
 fi
 
-if ! grep -q '^CLOUDFLARE_TUNNEL_TOKEN=' "$ENV_FILE" 2>/dev/null; then
+if ! grep -qE '^(TUNNEL_TOKEN|CLOUDFLARE_TUNNEL_TOKEN)=' "$ENV_FILE" 2>/dev/null; then
   umask 077
-  printf 'CLOUDFLARE_TUNNEL_TOKEN=%s\n' "$CLOUDFLARE_TUNNEL_TOKEN" >"$ENV_FILE"
+  printf 'TUNNEL_TOKEN=%s\n' "$TOKEN" >"$ENV_FILE"
   chmod 600 "$ENV_FILE"
 fi
 

@@ -32,7 +32,7 @@ Cloudflare creates the DNS record for `desktrading-today.precifarm.com` automati
 On the VM:
 
 ```bash
-sudo bash -c 'echo CLOUDFLARE_TUNNEL_TOKEN=PASTE_EYJ_TOKEN_HERE > /etc/cloudflared-signaldesk.env'
+sudo bash -c 'echo TUNNEL_TOKEN=PASTE_EYJ_TOKEN_HERE > /etc/cloudflared-signaldesk.env'
 sudo chmod 600 /etc/cloudflared-signaldesk.env
 curl -fsSL https://raw.githubusercontent.com/givondo/signal-desk/master/deploy/cloudflare-named-domain.sh | sudo bash
 ```
