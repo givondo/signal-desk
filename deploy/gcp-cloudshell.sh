@@ -82,8 +82,13 @@ cp /opt/signaldesk-src/deploy/signaldesk.service /etc/systemd/system/
 for f in /opt/signaldesk-src/predictions*.json; do
   [ -f "$f" ] && cp "$f" /opt/signaldesk/data/ || true
 done
-mv /tmp/signaldesk.env /etc/signaldesk.env
-chmod 600 /etc/signaldesk.env
+if [ -f /etc/signaldesk.env ]; then
+  echo "   keeping existing /etc/signaldesk.env"
+else
+  mv /tmp/signaldesk.env /etc/signaldesk.env
+  chmod 600 /etc/signaldesk.env
+fi
+rm -f /tmp/signaldesk.env
 systemctl daemon-reload
 systemctl enable signaldesk
 systemctl restart signaldesk

@@ -1,36 +1,57 @@
 #!/usr/bin/env bash
-# Signal Desk - Oracle Always Free VM setup (Ubuntu 22.04/24.04)
-# Run from the directory containing: xauusd_trader.py dashboard.html
-#                                    signaldesk.service (+ optional *.json state)
+# Signal Desk - Oracle Always Free VM (Ubuntu 22.04/24.04) + Tailscale
+# Run from ~ after scp: xauusd_trader.py dashboard.html signaldesk.service setup.sh
 set -euo pipefail
 
-echo "== [1/4] System packages =="
+echo "== [1/5] System packages =="
 sudo apt-get update -y
 sudo apt-get install -y python3 curl
 
-echo "== [2/4] Install app to /opt/signaldesk =="
-sudo mkdir -p /opt/signaldesk
+echo "== [2/5] Install app to /opt/signaldesk =="
+sudo mkdir -p /opt/signaldesk/data
 sudo cp xauusd_trader.py dashboard.html /opt/signaldesk/
-# carry over prediction history + TradingView session if provided
 for f in predictions*.json tv_auth.json; do
-  [ -f "$f" ] && sudo cp "$f" /opt/signaldesk/ && echo "   carried $f"
+  [ -f "$f" ] && sudo cp "$f" /opt/signaldesk/data/ && echo "   carried $f → data/"
 done
 sudo chown -R root:root /opt/signaldesk
-sudo chmod 600 /opt/signaldesk/tv_auth.json 2>/dev/null || true
 
-echo "== [3/4] systemd service (auto-start + auto-restart) =="
+echo "== [3/5] Environment (persistent journal + optional auth) =="
+if [ ! -f /etc/signaldesk.env ]; then
+  read -rsp "Optional Basic auth password (Enter = skip, Tailscale-only): " PW
+  echo
+  if [ -n "${PW}" ]; then
+    sudo tee /etc/signaldesk.env >/dev/null <<EOF
+SIGNALDESK_USER=trader
+SIGNALDESK_PASS=${PW}
+DATA_DIR=/opt/signaldesk/data
+EOF
+  else
+    sudo tee /etc/signaldesk.env >/dev/null <<EOF
+DATA_DIR=/opt/signaldesk/data
+EOF
+    echo "   No password — reachable on tailnet without login prompt."
+  fi
+  sudo chmod 600 /etc/signaldesk.env
+else
+  echo "   Keeping existing /etc/signaldesk.env"
+  grep -q DATA_DIR /etc/signaldesk.env || echo 'DATA_DIR=/opt/signaldesk/data' | sudo tee -a /etc/signaldesk.env >/dev/null
+fi
+
+echo "== [4/5] systemd service =="
 sudo cp signaldesk.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now signaldesk
 sleep 3
-sudo systemctl --no-pager status signaldesk | head -5
+sudo systemctl --no-pager status signaldesk | head -6
 
-echo "== [4/4] Tailscale (private access, no public exposure) =="
-curl -fsSL https://tailscale.com/install.sh | sh
+echo "== [5/5] Tailscale (private access — do NOT open port 8899 publicly) =="
+if ! command -v tailscale >/dev/null; then
+  curl -fsSL https://tailscale.com/install.sh | sh
+fi
 echo
-echo ">>> Now run:  sudo tailscale up"
-echo ">>> Open the printed login URL in any browser, sign in with the SAME"
-echo ">>> account as your PC/phone, then the desk is at:"
-echo ">>>   http://<this-vm-tailscale-name>:8899"
+echo ">>> Run:  sudo tailscale up"
+echo ">>> Sign in with the SAME Tailscale account as your PC/phone."
+echo ">>> Then open:  http://<vm-hostname>:8899   (MagicDNS, e.g. http://signaldesk:8899)"
 echo
-echo "Done. Check the app:  curl -s localhost:8899/api/signal?sym=XAUUSD | head -c 200"
+curl -s localhost:8899/api/health | head -c 200 || true
+echo

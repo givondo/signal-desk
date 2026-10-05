@@ -1498,23 +1498,37 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
+    def _auth_creds(self):
+        user = os.environ.get("SIGNALDESK_USER") or AUTH_USER
+        passwd = os.environ.get("SIGNALDESK_PASS")
+        if passwd is None:
+            passwd = AUTH_PASS
+        return user, passwd
+
     def _authorized(self):
-        if not AUTH_PASS:
+        user, passwd = self._auth_creds()
+        if not passwd:
             return True
         h = self.headers.get("Authorization", "")
         if h.startswith("Basic "):
             try:
                 u, _, p = base64.b64decode(h[6:]).decode().partition(":")
-                return u == AUTH_USER and p == AUTH_PASS
+                return u == user and p == passwd
             except Exception:
                 return False
         return False
 
     def _deny(self):
+        body = (b"<html><body><h3>Signal Desk</h3>"
+                b"<p>Login required. User: <b>trader</b> (unless you changed "
+                b"SIGNALDESK_USER). Cancel and retry if the password failed."
+                b"</p></body></html>")
         self.send_response(401)
         self.send_header("WWW-Authenticate", 'Basic realm="Signal Desk"')
-        self.send_header("Content-Length", "0")
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
+        self.wfile.write(body)
 
     def _send(self, body, ctype):
         self.send_response(200)

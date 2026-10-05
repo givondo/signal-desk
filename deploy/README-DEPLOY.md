@@ -24,11 +24,19 @@ via Tailscale. No public exposure, no port opening, no domain needed.
 7. Create. Note the **public IP** shown on the instance page.
 
 ## 3. Deploy (from this Windows PC)
-Open PowerShell in `C:\Users\DAVID\XAUUSD-Trader` and copy the app + state up
-(replace VM_IP and the key path):
+Project folder: `C:\Users\DAVID\Desktop\06 - Trading`
 
+**Option A — helper script** (after the VM has a public IP and you downloaded the `.key`):
+
+    cd "C:\Users\DAVID\Desktop\06 - Trading\deploy"
+    .\push-oracle.ps1 -VmIp YOUR_VM_PUBLIC_IP -KeyPath "C:\path\to\ssh-key.key"
+
+**Option B — manual `scp`**:
+
+    cd "C:\Users\DAVID\Desktop\06 - Trading"
     scp -i C:\path\to\ssh-key.key xauusd_trader.py dashboard.html `
-        predictions*.json tv_auth.json deploy\setup.sh deploy\signaldesk.service `
+        deploy\setup.sh deploy\signaldesk.service `
+        predictions*.json tv_auth.json `
         ubuntu@VM_IP:~
 
 Then connect and run setup:
@@ -36,6 +44,8 @@ Then connect and run setup:
     ssh -i C:\path\to\ssh-key.key ubuntu@VM_IP
     chmod +x setup.sh && ./setup.sh
     sudo tailscale up     # open the printed URL, sign in (same account)
+
+Journal + TV session persist under **`/opt/signaldesk/data`** (`DATA_DIR`).
 
 ## 4. Point your phone at the VM
 After `tailscale up`, the VM appears in your tailnet (e.g. `signaldesk`).
@@ -55,7 +65,18 @@ to stay on.
 - Logs on the VM: `journalctl -u signaldesk -f`
 - Update the app later: `scp` the new .py/.html up, then
   `sudo cp ~/xauusd_trader.py ~/dashboard.html /opt/signaldesk/ && sudo systemctl restart signaldesk`
-- Extra lock (optional): uncomment `SIGNALDESK_PASS` in
-  `/etc/systemd/system/signaldesk.service`, then
-  `sudo systemctl daemon-reload && sudo systemctl restart signaldesk`
-  → browser will ask user/password even inside the tailnet.
+- Extra lock (optional): edit `/etc/signaldesk.env` and add
+  `SIGNALDESK_USER=trader` and `SIGNALDESK_PASS=...`, then
+  `sudo systemctl restart signaldesk` → Basic auth even on the tailnet.
+- Update after git pull: run `push-oracle.ps1` again, then on the VM:
+  `sudo cp ~/xauusd_trader.py ~/dashboard.html /opt/signaldesk/ && sudo systemctl restart signaldesk`
+
+## Oracle vs GCP?
+| | **Oracle + Tailscale** (this doc) | **GCP e2-micro** (`README-GCP.md`) |
+|--|--|--|
+| Access | Private tailnet only | Public IP :8899 |
+| Sleep | Never | Never |
+| Journal | `/opt/signaldesk/data` | Same |
+| Best for | Personal desk, phone via Tailscale | Quick public URL |
+
+You can install **Tailscale on GCP too** and skip opening port 8899 — same privacy as Oracle.
