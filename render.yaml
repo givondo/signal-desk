@@ -3,10 +3,13 @@ services:
     name: signal-desk
     runtime: python
     plan: free
+    healthCheckPath: /api/health
     buildCommand: "echo 'stdlib only - nothing to build'"
     startCommand: "python xauusd_trader.py"
     envVars:
       - key: SIGNALDESK_USER
         value: trader
       - key: SIGNALDESK_PASS
-        sync: false   # set this in the Render dashboard - REQUIRED, site is public
+        sync: false   # set in Render dashboard — REQUIRED on the public URL
+      - key: PYTHONUNBUFFERED
+        value: "1"

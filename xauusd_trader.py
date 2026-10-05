@@ -1,5 +1,5 @@
 """
-Signal Desk v4 - institutional-grade terminal backend
+Signal Desk v4.2 - institutional-grade terminal backend
 -----------------------------------------------------
 Serves http://localhost:8899 (dashboard.html) and a JSON API:
 
@@ -127,6 +127,16 @@ CLASS_MACRO = {
                 "spx": "equity strength signals demand-side confidence", "ndq": "risk context",
                 "gcf": "gold and oil rising together can flag a geopolitical shock"},
     },
+}
+
+# Per asset-class composite blend (remainder implicit in structure/news/pivot)
+CLASS_BLEND = {
+    "metal":    {"tech": 0.64, "macro": 0.31},
+    "crypto":   {"tech": 0.73, "macro": 0.22},
+    "anti_usd": {"tech": 0.58, "macro": 0.34},
+    "pro_usd":  {"tech": 0.58, "macro": 0.34},
+    "index":    {"tech": 0.71, "macro": 0.24},
+    "energy":   {"tech": 0.67, "macro": 0.28},
 }
 
 
@@ -405,7 +415,8 @@ def refresh_macro():
         if k in items:
             items[k]["chg_bps"] = round(items[k]["chg_net"] * 100, 1)
     macro_cache.update({"source": source, "items": items,
-                        "ts": time.strftime("%H:%M:%S")})
+                        "ts": time.strftime("%H:%M:%S"),
+                        "epoch": int(time.time())})
 
 
 def macro_score_for(weights):
@@ -640,22 +651,127 @@ def build_scores(sym, d, matrix, macro, session, regime, structure_s, conf):
     ]
 
 
-def grade_for(conf, aligned, regime, macro, score):
+def grade_for(conf, aligned, regime, macro, score, direction):
+    if direction == "NEUTRAL":
+        return "-"
     agree = (score > 0) == (macro > 0) or abs(macro) < 0.05
-    if conf >= 75 and aligned and regime.get("state") == "TRENDING" and agree:
+    state = regime.get("state", "")
+    if conf >= 72 and aligned and state == "TRENDING" and agree:
         return "A+"
-    if conf >= 65 and (aligned or regime.get("state") == "TRENDING"):
+    if conf >= 62 and aligned and state in ("TRENDING", "MILD TREND") and agree:
         return "A"
-    if conf >= 50:
+    if conf >= 52 and (aligned or state == "TRENDING"):
         return "B"
-    if conf >= 35:
-        return "C"
+    if conf >= 38:
+        return "C" if state != "RANGING" else "D"
     return "D"
 
 
-def entry_models(sym, direction, px, atr, cc, conf, ema20h):
+_MTF_W = {"1m": 0.4, "5m": 0.6, "15m": 1.0, "30m": 1.0,
+          "1h": 1.6, "4h": 1.6, "1D": 1.0}
+
+
+def mtf_agreement_pct(matrix, direction):
+    if direction == "NEUTRAL":
+        return 0
+    target = 1 if direction == "LONG" else -1
+    num = den = 0.0
+    for r in matrix:
+        s = r["rating"]["s"]
+        if s == 0:
+            continue
+        w = _MTF_W.get(r["tf"], 1.0)
+        den += w
+        if s == target:
+            num += w
+    return round(num / den * 100) if den else 0
+
+
+def structure_strength(cc):
+    """Gradated -100..100 structure vs recent 15m swings."""
+    hi, lo = cc.get("hi_off"), cc.get("lo_off")
+    if hi is not None and hi < 0:
+        return round(min(100, 55 + min(45, abs(hi) * 12)))
+    if lo is not None and lo < 0:
+        return round(max(-100, -55 - min(45, abs(lo) * 12)))
+    if hi is not None and lo is not None and hi > 0 and lo > 0:
+        span = hi + lo
+        if span > 0:
+            return round((lo / span - 0.5) * 60)
+    return 0
+
+
+def news_sentiment(sym):
+    items = news_cache.get(sym) or []
+    if not items:
+        return 0.0, {"bull": 0, "bear": 0, "n": 0}
+    bull = sum(1 for n in items if n.get("impact") == "BULLISH")
+    bear = sum(1 for n in items if n.get("impact") == "BEARISH")
+    raw = (bull - bear) / max(len(items), 2)
+    return round(clamp(raw * 1.2), 3), {"bull": bull, "bear": bear, "n": len(items)}
+
+
+def pivot_nudge(d, px, dp):
+    s1, r1 = d.get("Pivot.M.Classic.S1"), d.get("Pivot.M.Classic.R1")
+    if px is None:
+        return 0.0
+    tol = max(px * 0.001, 10 ** (-min(dp, 5)))
+    if s1 is not None and abs(px - s1) <= tol:
+        return 0.035
+    if r1 is not None and abs(px - r1) <= tol:
+        return -0.035
+    return 0.0
+
+
+def apply_direction_hysteresis(sym, score, band, direction):
+    """Require extra score margin to flip vs previous published direction."""
+    prev = prev_state[sym].get("direction")
+    pad = 0.045
+    if not prev or prev == "NEUTRAL" or direction == prev:
+        return direction
+    if prev == "LONG" and direction == "SHORT" and score > -band - pad:
+        if score >= band:
+            return "LONG"
+        return "NEUTRAL"
+    if prev == "SHORT" and direction == "LONG" and score < band + pad:
+        if score <= -band:
+            return "SHORT"
+        return "NEUTRAL"
+    return direction
+
+
+def desk_action(direction, tradeable, grade, confidence, regime, session, aligned,
+                mtf_pct=0):
+    if direction == "NEUTRAL":
+        return {"mode": "WAIT", "title": "Stand aside",
+                "detail": "Composite score is inside the neutral band — no directional edge."}
+    blockers = []
+    if regime.get("state") == "RANGING":
+        blockers.append("ranging chop (ADX filter)")
+    if session.get("liq") == "low":
+        blockers.append("low-liquidity session")
+    if not aligned:
+        blockers.append("15m/1h/4h not aligned")
+    if grade in ("D", "C"):
+        blockers.append(f"grade {grade}")
+    if confidence < 52:
+        blockers.append("confidence below 52%")
+    if mtf_pct < 55 and direction != "NEUTRAL":
+        blockers.append(f"MTF agreement {mtf_pct}%")
+    if not tradeable:
+        detail = "Bias only — " + ", ".join(blockers) if blockers else "filters blocking auto-journal"
+        return {"mode": "CAUTION", "title": f"{direction} observation", "detail": detail}
+    if grade in ("A+", "A") and confidence >= 60:
+        return {"mode": "EXECUTE", "title": "Actionable setup",
+                "detail": f"Grade {grade} · auto-journal ON · size via risk engine."}
+    return {"mode": "PREPARE", "title": "Plan staged entries",
+            "detail": f"Grade {grade} · use pullback/breakout models · confirm on 15m close."}
+
+
+def entry_models(sym, direction, px, atr, cc, conf, ema20h, regime_state=None):
     if direction == "NEUTRAL":
         return []
+    regime_state = regime_state or ""
     dp = SYMBOLS[sym]["dp"]
     sgn = 1 if direction == "LONG" else -1
     lo_off, hi_off = cc.get("lo_off"), cc.get("hi_off")
@@ -665,10 +781,13 @@ def entry_models(sym, direction, px, atr, cc, conf, ema20h):
     def mk(name, entry, sl_dist, prob, note):
         sl_dist = round(max(sl_dist, 0.4 * atr), dp)
         tps = [round(entry + sgn * sl_dist * m, dp) for m in (1, 2, 3)]
+        reward = abs(tps[1] - entry)
+        rr = round(reward / sl_dist, 1) if sl_dist else 2.0
         return {"name": name, "entry": round(entry, dp),
                 "sl": round(entry - sgn * sl_dist, dp), "sl_dist": sl_dist,
                 "tp1": tps[0], "tp2": tps[1], "tp3": tps[2],
-                "rr": 2.0, "prob": min(90, max(15, prob)), "note": note}
+                "rr": rr, "prob": min(90, max(15, prob)), "note": note,
+                "recommended": False}
 
     structure_sl = (struct_off + 0.3 * atr) if (struct_off and struct_off > 0
                     and 0.6 * atr <= struct_off + 0.3 * atr <= 2.5 * atr) else None
@@ -687,11 +806,21 @@ def entry_models(sym, direction, px, atr, cc, conf, ema20h):
                      "tight stop, higher RR, lower hit rate"))
     models.append(mk("CONSERVATIVE", pull, base_sl + 0.5 * atr, conf + 8,
                      "widest stop, survives noise, smallest size"))
+    if models:
+        if regime_state == "RANGING":
+            pref = next((i for i, m in enumerate(models) if m["name"] == "CONSERVATIVE"), None)
+        elif regime_state == "MILD TREND":
+            pref = next((i for i, m in enumerate(models) if m["name"] == "PULLBACK"), None)
+        else:
+            pref = next((i for i, m in enumerate(models) if m["name"] == "MARKET"), None)
+        best_i = pref if pref is not None else max(range(len(models)),
+                                                   key=lambda i: models[i]["prob"])
+        models[best_i]["recommended"] = True
     return models
 
 
 def build_reasons(sym, direction, d, matrix, macro_contribs, regime, session,
-                  structure_s, macd_hist, cc, px, atr):
+                  structure_s, macd_hist, cc, px, atr, news_adj=0.0):
     """Deterministic evidence list + invalidation levels (rule-based)."""
     if direction == "NEUTRAL":
         return {"headline": "WHY NO TRADE", "items": [
@@ -733,6 +862,8 @@ def build_reasons(sym, direction, d, matrix, macro_contribs, regime, session,
                                else "intact"))
     add(session.get("liq") != "low",
         f"{session.get('name')} session - {session.get('liq')} liquidity")
+    if abs(news_adj) >= 0.2:
+        add(news_adj > 0, f"RSS headline skew {'bullish' if news_adj > 0 else 'bearish'}")
 
     dp = SYMBOLS[sym]["dp"]
     inv = []
@@ -742,7 +873,7 @@ def build_reasons(sym, direction, d, matrix, macro_contribs, regime, session,
         inv.append(f"Break below swing low {round(px - cc['lo_off'], dp)}")
     inv.append(f"{'Reclaim' if bear else 'Loss'} of 1h EMA20")
     inv.append("Macro score flipping sign (dollar/yields reversal)")
-    inv.append("Composite score re-entering the neutral band (±0.18)")
+    inv.append("Composite score re-entering the neutral band")
     return {"headline": f"WHY {'SHORT' if bear else 'LONG'}?",
             "items": items, "invalidate": inv}
 
@@ -829,9 +960,52 @@ def build_signal(sym, d):
         tech += 0.06 if macd_hist > 0 else -0.06
 
     macro, macro_contribs = macro_score_for(cfg["macro_w"])
-    score = 0.72 * tech + 0.28 * macro
+    macro_age = time.time() - macro_cache.get("epoch", 0)
+    macro_scale = 1.0 if macro_age < 150 else 0.55
+    if macro_age >= 150:
+        warn.append("Macro feed stale — macro weight reduced")
+    blend = CLASS_BLEND.get(cfg["cls"], {"tech": 0.68, "macro": 0.27})
+    score = blend["tech"] * tech + blend["macro"] * macro * macro_scale
+    stack = 0
+    if e20h and e50h and e200h:
+        if px > e20h > e50h > e200h:
+            stack = 1
+        elif px < e20h < e50h < e200h:
+            stack = -1
+    if stack != 0:
+        score += 0.045 * stack
+        if stack > 0 and tech < 0:
+            warn.append("Price above EMA stack but TA negative — mixed")
+        if stack < 0 and tech > 0:
+            warn.append("Price below EMA stack but TA positive — mixed")
     if tech * macro < -0.03:
         warn.append("Macro and technicals disagree - reduced conviction")
+
+    cc = candle_cache[sym]
+    structure_s = structure_strength(cc)
+    score += 0.12 * (structure_s / 100.0)
+
+    news_adj, news_meta = news_sentiment(sym)
+    if abs(news_adj) >= 0.15:
+        score += 0.05 * news_adj
+        if news_adj > 0.15:
+            warn.append(f"News flow skews bullish ({news_meta['bull']} headlines)")
+        elif news_adj < -0.15:
+            warn.append(f"News flow skews bearish ({news_meta['bear']} headlines)")
+
+    dp_pre = cfg["dp"]
+    score += pivot_nudge(d, px, dp_pre)
+
+    vol, avg_vol = d.get("volume"), d.get("average_volume_10d_calc")
+    vol_confirm = False
+    if vol and avg_vol and avg_vol > 0:
+        vr = vol / avg_vol
+        if vr >= 1.2 and abs(score) >= 0.08:
+            push = 0.025 if score > 0 else -0.025
+            score += push
+            vol_confirm = True
+        elif vr >= 1.8:
+            warn.append("Volume spike — check for climax / news shock")
 
     adx = d.get("ADX|60") if intraday else d.get("ADX")
     atr_h = d.get("ATR|60") or d.get("ATR|15") or (d.get("ATR", 0) / 4) \
@@ -872,40 +1046,73 @@ def build_signal(sym, d):
     signs = [1 if r > 0.1 else (-1 if r < -0.1 else 0)
              for r in (rec15, rec60, rec240)]
     aligned = abs(sum(signs)) == 3 and 0 not in signs
-    if score >= 0.18:
+    state = regime.get("state", "")
+    if state == "TRENDING":
+        band = 0.15
+    elif state == "RANGING":
+        band = 0.24
+    else:
+        band = 0.18
+    if score >= band:
         direction = "LONG"
-    elif score <= -0.18:
+    elif score <= -band:
         direction = "SHORT"
     else:
         direction = "NEUTRAL"
-    confidence = min(95, round(abs(score) * 130 + (12 if aligned else 0)))
-
-    cc = candle_cache[sym]
-    structure_s = 0
-    if cc.get("hi_off") is not None and cc["hi_off"] < 0:
-        structure_s = 70        # trading above the last swing high
-    elif cc.get("lo_off") is not None and cc["lo_off"] < 0:
-        structure_s = -70       # trading below the last swing low
+    direction = apply_direction_hysteresis(sym, score, band, direction)
+    confidence = min(95, round(abs(score) * 130 + (12 if aligned else 0)
+                               + (6 if structure_s > 0 and direction == "LONG"
+                                  or structure_s < 0 and direction == "SHORT"
+                                  else 0)))
+    if direction == "LONG" and rec240 > 0.12:
+        confidence = min(95, confidence + 4)
+    elif direction == "SHORT" and rec240 < -0.12:
+        confidence = min(95, confidence + 4)
+    elif direction != "NEUTRAL" and abs(rec240) > 0.12:
+        sgn_d = 1 if direction == "LONG" else -1
+        if rec240 * sgn_d < 0:
+            confidence = max(20, confidence - 7)
+            warn.append("4h flow disagrees with bias — reduced confidence")
 
     matrix = build_matrix(d)
+    stoch_k = d.get("Stoch.K|15")
+    if stoch_k is not None and direction == "LONG" and stoch_k > 85:
+        confidence = max(20, confidence - 8)
+        warn.append("15m Stoch overbought — late long risk")
+    elif stoch_k is not None and direction == "SHORT" and stoch_k < 15:
+        confidence = max(20, confidence - 8)
+        warn.append("15m Stoch oversold — late short risk")
+    if tech * macro < -0.03 and direction != "NEUTRAL":
+        confidence = max(20, round(confidence * 0.88))
+
+    mtf_pct = mtf_agreement_pct(matrix, direction)
+    if direction != "NEUTRAL":
+        if mtf_pct >= 75:
+            confidence = min(95, confidence + 5)
+        elif mtf_pct < 45:
+            confidence = max(20, confidence - 6)
+            warn.append(f"MTF agreement weak ({mtf_pct}%)")
+
     scores = build_scores(sym, d, matrix, macro, session, regime,
                           structure_s, confidence)
-    grade = grade_for(confidence, aligned, regime, macro, score) \
-        if direction != "NEUTRAL" else "-"
-    models = entry_models(sym, direction, px, atr_h, cc, confidence, e20h)
-    stoch_k = d.get("Stoch.K|15")
+    grade = grade_for(confidence, aligned, regime, macro, score, direction)
+    models = entry_models(sym, direction, px, atr_h, cc, confidence, e20h,
+                          regime.get("state"))
 
-    sl_dist = models[0]["sl_dist"] if models else round(1.5 * atr_h, 2)
-    sl_basis = "structure/ATR hybrid"
+    rec = next((m for m in models if m.get("recommended")), None)
+    m0 = rec or (models[0] if models else None)
+    sl_dist = m0["sl_dist"] if m0 else round(1.5 * atr_h, 2)
+    sl_basis = f"{m0['name']} stop (structure/ATR)" if m0 else "structure/ATR hybrid"
     levels = None
-    if models:
-        m0 = models[0]
-        levels = {"entry": m0["entry"], "pullback": models[1]["entry"],
+    if m0:
+        pb = next((m for m in models if m["name"] == "PULLBACK"), m0)
+        levels = {"entry": m0["entry"], "pullback": pb["entry"],
                   "sl": m0["sl"], "tp1": m0["tp1"], "tp2": m0["tp2"],
-                  "tp3": m0["tp3"]}
+                  "tp3": m0["tp3"], "model": m0["name"]}
 
     reasons = build_reasons(sym, direction, d, matrix, macro_contribs, regime,
-                            session, structure_s, macd_hist, cc, px, atr_h)
+                            session, structure_s, macd_hist, cc, px, atr_h,
+                            news_adj)
 
     hold_est = "2-6h" if regime["state"] == "TRENDING" else "1-3h"
     dp = cfg["dp"]
@@ -940,6 +1147,28 @@ def build_signal(sym, d):
                            "strength": min(3, int(abs(chg or 0) /
                                            (3 if unit == "bps" else 0.7)) + 1)})
 
+    tradeable = (
+        direction != "NEUTRAL"
+        and regime["state"] in ("TRENDING", "MILD TREND")
+        and confidence >= 52
+        and grade in ("A+", "A", "B")
+        and session.get("liq") != "low"
+        and (aligned or regime["state"] == "TRENDING")
+        and mtf_pct >= 55
+    )
+
+    engine = {
+        "v": "4.2",
+        "band": round(band, 3),
+        "blend": blend,
+        "macro_scale": macro_scale,
+        "news_adj": news_adj,
+        "vol_confirm": vol_confirm,
+        "structure_s": structure_s,
+        "ema_stack": stack,
+        "hysteresis": prev_state[sym].get("direction"),
+    }
+
     return {
         "status": "ok", "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
         "epoch": int(time.time()),
@@ -959,7 +1188,13 @@ def build_signal(sym, d):
         "sl_basis": sl_basis, "atr_1h": round(atr_h, dp),
         "atr_d": round(atr_d, dp), "macd_hist": macd_hist, "stoch_k": stoch_k,
         "hold_est": hold_est, "exp_dd": exp_dd,
-        "tradeable": direction != "NEUTRAL" and regime["state"] != "RANGING",
+        "mtf_agreement": mtf_pct,
+        "tradeable": tradeable,
+        "desk_action": desk_action(
+            direction, tradeable, grade, confidence, regime, session, aligned,
+            mtf_pct),
+        "engine": engine,
+        "news_sentiment": news_meta,
         "tv_user": tv_auth.get("username"),
         "ema": {"h1_20": e20h, "h1_50": e50h, "h1_200": e200h},
         "pivots": {"r2": d.get("Pivot.M.Classic.R2"),
@@ -1051,6 +1286,7 @@ class Tracker:
             return
         if d in ("LONG", "SHORT") and sig.get("levels") \
                 and sig.get("tradeable", True) \
+                and sig.get("grade") in ("A+", "A", "B") \
                 and now - self.last_activity >= COOLDOWN_S:
             lv = sig["levels"]
             self.active = {"id": self.next_id, "opened": int(now),
@@ -1165,17 +1401,18 @@ def copilot_answer(sym, q):
         return (f"{d} with {conf}% confidence. Evidence: {evidence()}. "
                 f"Invalidation: {sig['reasons']['invalidate'][0] if sig['reasons']['invalidate'] else 'n/a'}.")
     if "wait" in ql or "should i" in ql:
+        act = sig.get("desk_action") or {}
+        if act.get("mode") == "WAIT":
+            return act.get("detail", "Wait — no edge in the neutral band.")
         if not sig["tradeable"]:
-            return ("Yes - wait. " + ("Market is RANGING (ADX "
-                    f"{sig['regime']['adx']}), chop filter is active."
-                    if sig["regime"]["state"] == "RANGING"
-                    else "Signal is neutral."))
+            return (f"Yes — wait. {act.get('detail', 'Filters blocking a live ticket.')} "
+                    f"MTF agreement {sig.get('mtf_agreement', 0)}%.")
         g = sig["grade"]
-        return (f"Setup is grade {g}, {conf}% confidence, {sig['regime']['state']}. "
-                + ("Acceptable to act with proper size."
-                   if g in ("A+", "A", "B") else
-                   "Low grade - waiting costs nothing."))
-    if "trend" in ql and "strong" in ql or "how strong" in ql:
+        return (f"Desk says {act.get('mode', 'PREPARE')}: grade {g}, {conf}% confidence, "
+                f"{sig['regime']['state']}. "
+                + ("Actionable with risk-engine sizing."
+                   if g in ("A+", "A", "B") else "Low grade — waiting costs nothing."))
+    if ("trend" in ql and "strong" in ql) or "how strong" in ql:
         r = sig["regime"]
         al = "aligned" if sig["aligned"] else "mixed"
         return (f"ADX(1h) {r['adx']} = {r['state']}. Timeframes {al}. "
@@ -1195,17 +1432,23 @@ def copilot_answer(sym, q):
                 "there before reversals.")
     if "safe" in ql or "entry" in ql:
         ms = sig.get("models") or []
-        c = next((m for m in ms if m["name"] == "CONSERVATIVE"), None)
+        rec = next((m for m in ms if m.get("recommended")), None)
+        c = rec or next((m for m in ms if m["name"] == "CONSERVATIVE"), None)
         if not c:
             return "No trade - signal is neutral."
-        return (f"Safest: CONSERVATIVE {d} - entry {c['entry']}, stop {c['sl']}, "
-                f"TP1 {c['tp1']} ({c['prob']}% est). Smallest size, widest stop.")
+        return (f"Desk pick: {c['name']} {d} — entry {c['entry']}, stop {c['sl']}, "
+                f"TP2 {c['tp2']} (RR 1:{c.get('rr', 2)}, {c['prob']}% est). {c.get('note', '')}")
+    if "risk" in ql or "size" in ql:
+        return (f"Use the risk engine: {conf}% confidence, stop distance {sig.get('sl_dist')}, "
+                f"grade {sig['grade']}. Journal {'ON' if sig.get('tradeable') else 'PAUSED'} — "
+                f"{(sig.get('desk_action') or {}).get('detail', '')}")
     # default: summary
+    act = (sig.get("desk_action") or {}).get("mode", "")
     return (f"{sig['sym_name']}: {sig['price']} ({sig['change_pct']:+.2f}%). "
-            f"Bias {d} {conf}%, grade {sig['grade']}. "
-            f"Regime {sig['regime']['state']}, vol {sig['regime']['vol']}, "
-            f"{sig['session']['name']}. Macro {sig['macro_score']:+.2f}. "
-            f"Evidence: {evidence()}.")
+            f"Bias {d} {conf}%, grade {sig['grade']}, desk {act}. "
+            f"MTF {sig.get('mtf_agreement', 0)}% aligned. "
+            f"Regime {sig['regime']['state']}, {sig['session']['name']}. "
+            f"Macro {sig['macro_score']:+.2f}. Evidence: {evidence()}.")
 
 
 # ---------------------------------------------------------------- loop
@@ -1343,6 +1586,33 @@ class Handler(BaseHTTPRequestHandler):
             ans = copilot_answer(sym, q)
             self._send(json.dumps({"answer": ans}).encode(),
                        "application/json")
+        elif parsed.path == "/api/roster":
+            with state_lock:
+                rows = []
+                for s, c in SYMBOLS.items():
+                    st = latest.get(s) or {}
+                    rows.append({
+                        "sym": s, "grp": c.get("grp"), "name": c.get("name"),
+                        "status": st.get("status", "starting"),
+                        "direction": st.get("direction"),
+                        "price": st.get("price"),
+                        "grade": st.get("grade"),
+                        "confidence": st.get("confidence"),
+                        "tradeable": st.get("tradeable"),
+                        "mode": (st.get("desk_action") or {}).get("mode"),
+                    })
+            self._send(json.dumps({"ts": time.strftime("%H:%M:%S"),
+                                     "symbols": rows}).encode(),
+                       "application/json")
+        elif parsed.path == "/api/health":
+            with state_lock:
+                ok = sum(1 for s in SYMBOLS if latest.get(s, {}).get("status") == "ok")
+            self._send(json.dumps({
+                "status": "ok", "engine": "4.2", "symbols_ok": ok,
+                "symbols_total": len(SYMBOLS),
+                "macro_ts": macro_cache.get("ts"),
+                "port": PORT,
+            }).encode(), "application/json")
         elif parsed.path == "/" or parsed.path.startswith("/index"):
             try:
                 with open(DASH_FILE, "rb") as f:
@@ -1364,7 +1634,7 @@ def main():
         sys.exit(0)
     load_auth()
     threading.Thread(target=poller, daemon=True).start()
-    print(f"Signal Desk v4 -> http://localhost:{PORT} (and Tailscale devices)")
+    print(f"Signal Desk v4.2 -> http://localhost:{PORT} (and Tailscale devices)")
     srv.serve_forever()
 
 
