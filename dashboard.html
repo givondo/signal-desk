@@ -374,6 +374,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
           <span class="big" :class="dirClass">{{ marketScore }}<small>/100</small></span>
         </div></div>
       <div><span class="lb">Bias</span><span class="big" :class="dirClass">{{ d.direction||'--' }}</span></div>
+      <div><span class="lb">Quality</span><span class="v" :class="(d.signal_quality||0)>=65?'dirL':(d.signal_quality||0)>=50?'dirN':'dirS'">{{ d.signal_quality!=null?d.signal_quality+'/100':(d.confidence!=null?d.confidence+'%':'--') }}</span></div>
       <div><span class="lb">Confidence</span><span class="v">{{ d.confidence!=null?d.confidence+'%':'--' }}</span></div>
       <div><span class="lb">Grade</span><span class="big" :style="{color:gradeColor}">{{ d.grade||'-' }}</span></div>
       <div><span class="lb">MTF agree</span><span class="v" :class="(d.mtf_agreement||0)>=70?'dirL':(d.mtf_agreement||0)>=45?'dirN':'dirS'">{{ d.mtf_agreement!=null?d.mtf_agreement+'%':'--' }}</span></div>
@@ -453,6 +454,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
           <div class="kv"><span class="k">TREND REGIME</span><span :class="d.regime.state==='TRENDING'?'up':d.regime.state==='RANGING'?'dn':'nt'">{{ d.regime.state }} <span class="mut num">ADX {{ d.regime.adx }}</span></span></div>
           <div class="kv"><span class="k">15M CANDLE CLOSE</span><span class="num">{{ countdown }}</span></div>
           <div class="kv"><span class="k">MTF AGREEMENT</span><span class="num" :class="d.mtf_agreement>=70?'up':d.mtf_agreement>=45?'nt':'dn'">{{ d.mtf_agreement!=null?d.mtf_agreement+'%':'--' }}</span></div>
+          <div class="kv" v-if="d.signal_quality!=null"><span class="k">SIGNAL QUALITY</span><span class="num" :class="d.signal_quality>=65?'up':d.signal_quality>=52?'nt':'dn'">{{ d.signal_quality }}/100</span></div>
           <div class="kv"><span class="k">TICKET LOGGING</span><span :class="d.tradeable?'up':'dn'">{{ d.tradeable?'ACTIVE':'PAUSED' }}</span></div>
           <div class="kv" v-if="d.engine"><span class="k">ENGINE</span><span class="mono mut">v{{ d.engine.v }} · neutral ±{{ d.engine.band }}</span></div>
           <div class="kv" v-if="d.levels && d.levels.model"><span class="k">PRIMARY MODEL</span><span class="mono">{{ d.levels.model }}</span></div>
@@ -780,6 +782,7 @@ createApp({
     clock(){ const d=new Date(this.now); return d.toUTCString().slice(17,25) },
     countdown(){ const s=900-Math.floor(this.now/1000)%900; return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0') },
     marketScore(){
+      if(this.d.signal_quality!=null) return this.d.signal_quality;
       const sc=this.d.scores||[]; if(!sc.length) return '--';
       const get=k=>{const s=sc.find(x=>x.k===k);return s?s.v:0};
       const dir=Math.abs(get('TREND')*0.3+get('MOMENTUM')*0.2+get('STRUCTURE')*0.15+get('MACRO')*0.15+get('FLOW (proxy)')*0.2);

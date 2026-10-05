@@ -1,5 +1,5 @@
 """
-Signal Desk v4.2 - institutional-grade terminal backend
+Signal Desk v4.3 - institutional-grade terminal backend
 -----------------------------------------------------
 Serves http://localhost:8899 (dashboard.html) and a JSON API:
 
@@ -651,24 +651,99 @@ def build_scores(sym, d, matrix, macro, session, regime, structure_s, conf):
     ]
 
 
-def grade_for(conf, aligned, regime, macro, score, direction):
+def grade_for(conf, aligned, regime, macro, score, direction, mtf_pct=0,
+              daily_ok=True, extension_atr=0.0, quality=0):
     if direction == "NEUTRAL":
         return "-"
     agree = (score > 0) == (macro > 0) or abs(macro) < 0.05
     state = regime.get("state", "")
-    if conf >= 72 and aligned and state == "TRENDING" and agree:
+    if (conf >= 70 and quality >= 72 and aligned and state == "TRENDING"
+            and agree and mtf_pct >= 68 and daily_ok and extension_atr < 2.0):
         return "A+"
-    if conf >= 62 and aligned and state in ("TRENDING", "MILD TREND") and agree:
+    if (conf >= 62 and quality >= 62 and aligned
+            and state in ("TRENDING", "MILD TREND") and agree
+            and mtf_pct >= 58 and daily_ok and extension_atr < 2.3):
         return "A"
-    if conf >= 52 and (aligned or state == "TRENDING"):
+    if conf >= 52 and quality >= 52 and (aligned or state == "TRENDING") and mtf_pct >= 48:
         return "B"
     if conf >= 38:
         return "C" if state != "RANGING" else "D"
     return "D"
 
 
-_MTF_W = {"1m": 0.4, "5m": 0.6, "15m": 1.0, "30m": 1.0,
-          "1h": 1.6, "4h": 1.6, "1D": 1.0}
+_MTF_W = {"1m": 0.25, "5m": 0.55, "15m": 0.95, "30m": 1.0,
+          "1h": 1.55, "4h": 1.85, "1D": 1.35}
+
+
+def price_extension_atr(px, ema_ref, atr):
+    """How stretched price is from 1h EMA20 in ATR units (chase filter)."""
+    if not px or not ema_ref or not atr or atr <= 0:
+        return 0.0
+    return round(abs(px - ema_ref) / atr, 2)
+
+
+def daily_bias_ok(direction, rec1d):
+    if direction == "NEUTRAL" or rec1d is None:
+        return True
+    if abs(rec1d) < 0.08:
+        return True
+    sgn = 1 if direction == "LONG" else -1
+    return rec1d * sgn > 0
+
+
+def tf_chop_penalty(rec15, rec60, rec240):
+    """Penalize when intraday timeframes disagree (whipsaw risk)."""
+    vals = [r for r in (rec15, rec60, rec240) if r is not None]
+    if len(vals) < 2:
+        return 0.0, False
+    signs = [1 if v > 0.12 else (-1 if v < -0.12 else 0) for v in vals]
+    nz = [s for s in signs if s != 0]
+    if len(nz) >= 2 and len(set(nz)) > 1:
+        spread = max(vals) - min(vals)
+        return min(0.12, 0.04 + spread * 0.15), True
+    return 0.0, False
+
+
+def compute_signal_quality(direction, confidence, aligned, mtf_pct, regime, session,
+                           macro, score, structure_s, extension_atr, daily_ok):
+    """0–100 desk quality score (confluence, not just raw confidence)."""
+    if direction == "NEUTRAL":
+        return 0
+    macro_ok = (score > 0) == (macro > 0) or abs(macro) < 0.05
+    regime_pts = {"TRENDING": 88, "MILD TREND": 72, "RANGING": 38, "UNKNOWN": 50}.get(
+        regime.get("state"), 50)
+    liq_pts = {"high": 88, "normal": 68, "low": 28}.get(session.get("liq"), 50)
+    struct_ok = (
+        (structure_s >= 20 and direction == "LONG")
+        or (structure_s <= -20 and direction == "SHORT")
+    )
+    struct_pts = 82 if struct_ok else (55 if abs(structure_s) < 12 else 38)
+    ext_pts = 85
+    if extension_atr >= 2.2:
+        ext_pts = 25
+    elif extension_atr >= 1.6:
+        ext_pts = 48
+    elif extension_atr >= 1.2:
+        ext_pts = 65
+    daily_pts = 84 if daily_ok else 32
+    vol = regime.get("vol", "NORMAL")
+    vol_pts = {"LOW": 58, "NORMAL": 72, "HIGH": 55, "EXTREME": 22}.get(vol, 60)
+    raw = (
+        0.24 * mtf_pct
+        + 0.18 * confidence
+        + 0.14 * regime_pts
+        + 0.12 * (88 if macro_ok else 30)
+        + 0.10 * struct_pts
+        + 0.08 * liq_pts
+        + 0.08 * daily_pts
+        + 0.06 * ext_pts
+        + 0.06 * vol_pts
+    )
+    if aligned:
+        raw += 4
+    if vol == "EXTREME":
+        raw -= 8
+    return int(round(clamp(raw, 0, 100)))
 
 
 def mtf_agreement_pct(matrix, direction):
@@ -741,7 +816,7 @@ def apply_direction_hysteresis(sym, score, band, direction):
 
 
 def desk_action(direction, tradeable, grade, confidence, regime, session, aligned,
-                mtf_pct=0):
+                mtf_pct=0, quality=0):
     if direction == "NEUTRAL":
         return {"mode": "WAIT", "title": "Stand aside",
                 "detail": "Composite score is inside the neutral band — no directional edge."}
@@ -758,14 +833,16 @@ def desk_action(direction, tradeable, grade, confidence, regime, session, aligne
         blockers.append("confidence below 52%")
     if mtf_pct < 55 and direction != "NEUTRAL":
         blockers.append(f"MTF agreement {mtf_pct}%")
+    if quality and quality < 58:
+        blockers.append(f"signal quality {quality}/100")
     if not tradeable:
         detail = "Bias only — " + ", ".join(blockers) if blockers else "filters blocking auto-journal"
         return {"mode": "CAUTION", "title": f"{direction} observation", "detail": detail}
-    if grade in ("A+", "A") and confidence >= 60:
+    if grade in ("A+", "A") and confidence >= 60 and quality >= 62:
         return {"mode": "EXECUTE", "title": "Actionable setup",
-                "detail": f"Grade {grade} · auto-journal ON · size via risk engine."}
+                "detail": f"Grade {grade} · quality {quality}/100 · auto-journal ON · size via risk engine."}
     return {"mode": "PREPARE", "title": "Plan staged entries",
-            "detail": f"Grade {grade} · use pullback/breakout models · confirm on 15m close."}
+            "detail": f"Grade {grade} · quality {quality}/100 · favor pullback/breakout · confirm 15m close."}
 
 
 def entry_models(sym, direction, px, atr, cc, conf, ema20h, regime_state=None):
@@ -848,6 +925,8 @@ def build_reasons(sym, direction, d, matrix, macro_contribs, regime, session,
     if a1d:
         add(a1d["trend"]["s"] == (-1 if bear else 1),
             f"Daily trend {'bearish' if bear else 'bullish'}")
+        add(a1d["rating"]["s"] == (-1 if bear else 1) or a1d["rating"]["s"] == 0,
+            "Daily rating supports bias (or neutral)")
     if a15 and a1h:
         both = a15["rating"]["s"] == a1h["rating"]["s"] == (-1 if bear else 1)
         add(both, "15m and 1h aligned")
@@ -981,6 +1060,11 @@ def build_signal(sym, d):
     if tech * macro < -0.03:
         warn.append("Macro and technicals disagree - reduced conviction")
 
+    chop_mult, is_chop = tf_chop_penalty(rec15, rec60, rec240)
+    if is_chop:
+        score *= (1.0 - chop_mult)
+        warn.append("15m/1h/4h mixed — chop filter applied")
+
     cc = candle_cache[sym]
     structure_s = structure_strength(cc)
     score += 0.12 * (structure_s / 100.0)
@@ -1074,6 +1158,20 @@ def build_signal(sym, d):
             confidence = max(20, confidence - 7)
             warn.append("4h flow disagrees with bias — reduced confidence")
 
+    daily_ok = daily_bias_ok(direction, rec1d)
+    if direction != "NEUTRAL" and not daily_ok:
+        confidence = max(20, confidence - 9)
+        score *= 0.92
+        warn.append("Daily timeframe opposes intraday bias — stand down or reduce size")
+
+    extension_atr = price_extension_atr(px, e20h, atr_h)
+    if direction == "LONG" and extension_atr >= 1.6:
+        confidence = max(20, confidence - int(min(14, (extension_atr - 1.2) * 8)))
+        warn.append(f"Price extended {extension_atr}× ATR above 1h EMA20 — late long")
+    elif direction == "SHORT" and extension_atr >= 1.6:
+        confidence = max(20, confidence - int(min(14, (extension_atr - 1.2) * 8)))
+        warn.append(f"Price extended {extension_atr}× ATR below 1h EMA20 — late short")
+
     matrix = build_matrix(d)
     stoch_k = d.get("Stoch.K|15")
     if stoch_k is not None and direction == "LONG" and stoch_k > 85:
@@ -1095,7 +1193,13 @@ def build_signal(sym, d):
 
     scores = build_scores(sym, d, matrix, macro, session, regime,
                           structure_s, confidence)
-    grade = grade_for(confidence, aligned, regime, macro, score, direction)
+    macro_ok = (score > 0) == (macro > 0) or abs(macro) < 0.05
+    signal_quality = compute_signal_quality(
+        direction, confidence, aligned, mtf_pct, regime, session,
+        macro, score, structure_s, extension_atr, daily_ok)
+    grade = grade_for(
+        confidence, aligned, regime, macro, score, direction,
+        mtf_pct, daily_ok, extension_atr, signal_quality)
     models = entry_models(sym, direction, px, atr_h, cc, confidence, e20h,
                           regime.get("state"))
 
@@ -1150,15 +1254,21 @@ def build_signal(sym, d):
     tradeable = (
         direction != "NEUTRAL"
         and regime["state"] in ("TRENDING", "MILD TREND")
-        and confidence >= 52
+        and confidence >= 54
+        and signal_quality >= 58
         and grade in ("A+", "A", "B")
         and session.get("liq") != "low"
         and (aligned or regime["state"] == "TRENDING")
-        and mtf_pct >= 55
+        and mtf_pct >= 58
+        and daily_ok
+        and extension_atr < 2.35
+        and regime.get("vol") != "EXTREME"
+        and macro_ok
+        and not is_chop
     )
 
     engine = {
-        "v": "4.2",
+        "v": "4.3",
         "band": round(band, 3),
         "blend": blend,
         "macro_scale": macro_scale,
@@ -1167,6 +1277,11 @@ def build_signal(sym, d):
         "structure_s": structure_s,
         "ema_stack": stack,
         "hysteresis": prev_state[sym].get("direction"),
+        "signal_quality": signal_quality,
+        "extension_atr": extension_atr,
+        "daily_ok": daily_ok,
+        "macro_ok": macro_ok,
+        "chop": is_chop,
     }
 
     return {
@@ -1189,10 +1304,11 @@ def build_signal(sym, d):
         "atr_d": round(atr_d, dp), "macd_hist": macd_hist, "stoch_k": stoch_k,
         "hold_est": hold_est, "exp_dd": exp_dd,
         "mtf_agreement": mtf_pct,
+        "signal_quality": signal_quality,
         "tradeable": tradeable,
         "desk_action": desk_action(
             direction, tradeable, grade, confidence, regime, session, aligned,
-            mtf_pct),
+            mtf_pct, signal_quality),
         "engine": engine,
         "news_sentiment": news_meta,
         "tv_user": tv_auth.get("username"),
@@ -1591,7 +1707,7 @@ class Handler(BaseHTTPRequestHandler):
                 ok = sum(1 for s in SYMBOLS
                          if latest.get(s, {}).get("status") == "ok")
             self._send(json.dumps({
-                "status": "ok", "engine": "4.2", "symbols_ok": ok,
+                "status": "ok", "engine": "4.3", "symbols_ok": ok,
                 "symbols_total": len(SYMBOLS),
                 "macro_ts": macro_cache.get("ts"),
                 "port": PORT,
@@ -1652,7 +1768,7 @@ def main():
         sys.exit(1)
     load_auth()
     threading.Thread(target=poller, daemon=True).start()
-    print(f"Signal Desk v4.2 -> http://localhost:{PORT} (and Tailscale devices)")
+    print(f"Signal Desk v4.3 -> http://localhost:{PORT} (and Tailscale devices)")
     srv.serve_forever()
 
 
