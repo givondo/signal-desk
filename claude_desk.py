@@ -43,7 +43,7 @@ SNAPSHOT_KEYS = (
     "day_low", "dp", "direction", "confidence", "score", "grade", "aligned",
     "tradeable", "mtf_agreement", "regime", "session", "macro", "macro_score",
     "matrix", "scores", "engine", "levels", "models", "sl_dist", "pivots",
-    "reasons", "desk_action", "quality", "news", "perf",
+    "reasons", "desk_action", "governor", "quality", "news", "perf",
 )
 
 ASK_RULES = """

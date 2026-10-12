@@ -27,7 +27,6 @@ RISK_DEFAULTS = {
     "per_trade_pct": float(os.environ.get("DESK_RISK_PER_TRADE_PCT", "0.5")),
     "daily_loss_pct": float(os.environ.get("DESK_DAILY_LOSS_PCT", "2.0")),
     "max_spread_points": float(os.environ.get("DESK_MAX_SPREAD_POINTS", "35")),
-    "contract_size": float(os.environ.get("DESK_XAU_CONTRACT_OZ", "100")),
     "account_balance": float(os.environ.get("DESK_ACCOUNT_BALANCE", "0")),
     "publish_threshold": int(os.environ.get("DESK_PUBLISH_THRESHOLD", "7")),
 }
@@ -41,8 +40,7 @@ def _load_desk_state():
         with open(DESK_STATE_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
-        return {"daily_losses_r": 0.0, "consecutive_losses_today": 0,
-                "desk_closed_date": None, "signal_seq": 0}
+        return {"signal_seq": 0, "last_signal_key": None, "last_signal_id": None}
 
 
 def _save_desk_state(st):
@@ -149,9 +147,9 @@ def _key_levels(sig, max_levels=5) -> list[tuple[str, str]]:
         levels.append((f"{dh}", "Session/day high"))
     if dl is not None:
         levels.append((f"{dl}", "Session/day low"))
-    if px is not None:
+    if px is not None and sig.get("sym") == "XAUUSD":
         handle = round(px / 25) * 25
-        levels.append((f"{handle:.2f}", f"Nearest $25 handle"))
+        levels.append((f"{handle:.2f}", "Nearest $25 handle"))
     out, seen = [], set()
     for price, why in levels:
         if price in seen:
@@ -183,6 +181,18 @@ def _infer_setup_type(sig) -> str | None:
     if rname == "BREAKOUT":
         return "D"
     return "A"
+
+
+def _clear_path_to_tp1(sig) -> bool:
+    """True when no pivot or day extreme sits between entry and TP1."""
+    lv = sig.get("levels") or {}
+    entry, tp1 = lv.get("entry"), lv.get("tp1")
+    if entry is None or tp1 is None:
+        return False
+    lo, hi = sorted((entry, tp1))
+    obstacles = [v for v in (sig.get("pivots") or {}).values() if v is not None]
+    obstacles += [v for v in (sig.get("day_high"), sig.get("day_low")) if v is not None]
+    return not any(lo < v < hi for v in obstacles)
 
 
 def confluence_score_10(sig, calendar_ok: bool, session_favourable: bool) -> tuple[int, dict]:
@@ -218,10 +228,8 @@ def confluence_score_10(sig, calendar_ok: bool, session_favourable: bool) -> tup
     br["confirmation"] = min(2, conf_pts)
     # Macro 0-1
     br["macro"] = 1 if sig.get("engine", {}).get("macro_ok") else 0
-    # Clean path TP1 0-1
-    rec = next((m for m in (sig.get("models") or []) if m.get("recommended")), None)
-    rr = (rec or {}).get("rr") or 0
-    br["path_tp1"] = 1 if rr >= 1.5 else 0
+    # Clean path TP1 0-1: no pivot / day extreme in the way
+    br["path_tp1"] = 1 if _clear_path_to_tp1(sig) else 0
     # Session 0-1
     br["session"] = 1 if session_favourable else 0
     # Event blackout 0-1
@@ -230,17 +238,29 @@ def confluence_score_10(sig, calendar_ok: bool, session_favourable: bool) -> tup
     return total, br
 
 
-def _position_size_lots(balance, risk_pct, sl_dist, contract_oz, px):
+def _position_size_lots(balance, risk_pct, sl_dist, per_point):
+    """Lots so that a stop-out costs risk_pct of balance. per_point is the
+    USD value of a 1.0 price move on one lot (gold 100, EURUSD 100000)."""
     if not balance or balance <= 0 or not sl_dist or sl_dist <= 0:
         return None, "Set DESK_ACCOUNT_BALANCE for lot calculation."
+    if not per_point:
+        return None, "Contract value unknown for this symbol."
     risk_usd = balance * (risk_pct / 100.0)
-    # XAU: ~$1 move per oz per lot (100 oz) → risk ≈ sl_dist * contract_oz
-    risk_per_lot = sl_dist * contract_oz
-    lots = risk_usd / risk_per_lot
-    lots = round(max(0.01, min(lots, 50.0)), 2)
-    calc = (f"{risk_usd:.2f} USD risk ({risk_pct}% of {balance:.0f}) ÷ "
-            f"({sl_dist} × {contract_oz} oz/lot) ≈ {lots} lots")
+    lots = risk_usd / (sl_dist * per_point)
+    if lots < 0.01:
+        return None, (f"{risk_usd:.2f} USD risk is below one micro lot at this "
+                      "stop distance: skip the trade or widen the account.")
+    lots = round(min(lots, 50.0), 2)
+    calc = (f"{risk_usd:.2f} USD risk ({risk_pct}% of {balance:.0f}) / "
+            f"({sl_dist} x {per_point} USD per point per lot) = {lots} lots")
     return lots, calc
+
+
+def _r_mult(lv, key, sl_dist) -> str:
+    try:
+        return f"{abs(lv[key] - lv['entry']) / sl_dist:.1f}R"
+    except (KeyError, TypeError, ZeroDivisionError):
+        return "n/a"
 
 
 def _spread_points(sig, cfg_spread_est) -> float:
@@ -260,8 +280,10 @@ def build_desk_brief(sig, sym_cfg, *, secondary=None, calendar=None,
         risk["account_balance"] = float(account_balance)
     st = _load_desk_state()
     today = eat_now().strftime("%Y-%m-%d")
-    if st.get("desk_closed_date") == today:
-        return "1. DESK STATUS: CLOSED — daily loss limit reached.\n"
+    gov = sig.get("governor") or {}
+    if gov.get("halted"):
+        return (f"1. DESK STATUS: CLOSED — daily loss limit reached "
+                f"({gov.get('day_r', 0):+.2f}R today, limit -{gov.get('daily_stop_r', 0):g}R).\n")
 
     missing = []
     epoch = sig.get("epoch") or 0
@@ -273,7 +295,7 @@ def build_desk_brief(sig, sym_cfg, *, secondary=None, calendar=None,
         missing.append("account_balance (optional for sizing)")
 
     threshold = risk["publish_threshold"]
-    if st.get("consecutive_losses_today", 0) >= 2:
+    if gov.get("tightened"):
         threshold = max(threshold, 8)
 
     spread_pts = _spread_points(sig, sym_cfg.get("spread_est"))
@@ -341,27 +363,32 @@ def build_desk_brief(sig, sym_cfg, *, secondary=None, calendar=None,
     lines.append("4. SIGNALS:")
     setup = _infer_setup_type(sig)
     if desk_status == "OPEN" and setup and sig.get("levels"):
-        st["signal_seq"] = st.get("signal_seq", 0) + 1
-        sid = f"{today}-{st['signal_seq']:03d}"
-        _save_desk_state(st)
         lv = sig["levels"]
+        # one ID per distinct setup, not per page refresh
+        key = f"{today}|{sig.get('sym')}|{direction}|{lv.get('entry')}|{lv.get('sl')}"
+        if st.get("last_signal_key") != key:
+            st["signal_seq"] = st.get("signal_seq", 0) + 1
+            st["last_signal_key"] = key
+            st["last_signal_id"] = f"{today}-{st['signal_seq']:03d}"
+            _save_desk_state(st)
+        sid = st["last_signal_id"]
         rec = next((m for m in (sig.get("models") or []) if m.get("recommended")), lv)
         sl_d = sig.get("sl_dist") or 0
         lots, lcalc = _position_size_lots(
             risk["account_balance"], risk["per_trade_pct"], sl_d,
-            risk["contract_size"], sig.get("price"))
+            sig.get("per_point"))
         order = "Market" if rec.get("name") == "MARKET" else "Buy Limit" if direction == "LONG" else "Sell Limit"
         br_s = ", ".join(f"{k}={v}" for k, v in breakdown.items())
         valid_until = (now + timedelta(hours=4)).strftime("%H:%M EAT")
         lines.append(f"""
    SIGNAL ID: {sid}
-   Instrument: XAU/USD
+   Instrument: {sig.get('sym_name') or sig.get('sym')}
    Direction: {"BUY" if direction == "LONG" else "SELL"}
    Setup type: {setup}
    Order type: {order}
    Entry: {lv.get('entry')} (primary model {lv.get('model', rec.get('name'))})
    Stop loss: {lv.get('sl')} ({sl_d} price distance)
-   TP1: {lv.get('tp1')} (1R) | TP2: {lv.get('tp2')} (2R)
+   TP1: {lv.get('tp1')} ({_r_mult(lv, 'tp1', sl_d)}) | TP2: {lv.get('tp2')} ({_r_mult(lv, 'tp2', sl_d)})
    Position size: {lots if lots else 'n/a'} lots — {lcalc}
    Confluence score: {score10}/10 ({br_s})
    Valid until: {valid_until}
@@ -382,13 +409,14 @@ def build_desk_brief(sig, sym_cfg, *, secondary=None, calendar=None,
             trig.append("MTF agreement ≥65%")
         if not sig.get("tradeable"):
             trig.append("desk tradeable flag ON (regime/quality/chop)")
-        lines.append("   XAU/USD — upgrade if: " + "; ".join(trig) or "filters clear.")
+        lines.append(f"   {sig.get('sym_name') or sig.get('sym')} — upgrade if: "
+                     + ("; ".join(trig) or "filters clear."))
     else:
         lines.append("   (empty)")
 
     lines.append("6. NO-TRADE NOTES:")
     if desk_status != "OPEN" or direction == "NEUTRAL":
-        lines.append(f"   {status_reason if direction == 'NEUTRAL' else status_reason}")
+        lines.append(f"   {status_reason}")
     else:
         lines.append("   Signal published above.")
 

@@ -130,6 +130,12 @@ border-radius:999px;flex-shrink:0;margin-top:2px}
 .actionbar.PREPARE .mode{color:var(--b);background:var(--bt);border:1px solid rgba(37,99,235,.2)}
 .actionbar.CAUTION .mode{color:var(--a);background:var(--at);border:1px solid rgba(184,134,11,.25)}
 .actionbar.WAIT .mode{color:var(--dim);background:var(--p2);border:1px solid var(--bd)}
+.actionbar.HALT .inner{border-color:rgba(208,68,56,.45);background:linear-gradient(90deg,var(--rt),var(--p1) 60%)}
+.actionbar.HALT .mode{color:#fff;background:var(--r);border:1px solid var(--r)}
+.actionbar.CLOSED .mode{color:var(--dim);background:var(--p3);border:1px solid var(--bd2)}
+.govbar{height:5px;background:var(--p3);border-radius:99px;overflow:hidden;margin:8px 0 2px}
+.govbar i{display:block;height:100%;transition:width .5s;border-radius:99px}
+.pill.pp{color:var(--b);border-color:var(--b);background:var(--bt)}
 .splitbar{display:flex;height:8px;border-radius:999px;overflow:hidden;background:var(--p3);margin:10px 0 4px;gap:1px}
 .splitbar i{height:100%;transition:width .5s ease;min-width:0}
 .splitbar .tech{background:var(--b)}.splitbar .macro{background:var(--gold)}
@@ -258,8 +264,8 @@ padding:3px 0;border-bottom:1px solid var(--p2);font-size:10.5px}
 
 /* ---------- analytics ---------- */
 .wide{grid-column:1/-1}
-.tilerow{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:1px;background:var(--bd)}
-.tilerow>div{background:var(--p1);padding:7px 10px}
+.tilerow{display:flex;flex-wrap:wrap;gap:1px;background:var(--bd)}
+.tilerow>div{background:var(--p1);padding:7px 10px;flex:1 1 96px}
 .tilerow .lb{font-size:8.5px;color:var(--dim);letter-spacing:.8px;text-transform:uppercase}
 .tilerow .vv{font-size:15px;font-weight:800;margin-top:1px}
 .anal{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
@@ -379,6 +385,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
       <div><span class="lb">Grade</span><span class="big" :style="{color:gradeColor}">{{ d.grade||'-' }}</span></div>
       <div><span class="lb">MTF agree</span><span class="v" :class="(d.mtf_agreement||0)>=70?'dirL':(d.mtf_agreement||0)>=45?'dirN':'dirS'">{{ d.mtf_agreement!=null?d.mtf_agreement+'%':'--' }}</span></div>
       <div><span class="lb">Aligned</span><span class="v" :class="d.aligned?'dirL':'mut'">{{ d.aligned?'YES':'NO' }}</span></div>
+      <div v-if="gov.daily_stop_r"><span class="lb">Desk day</span><span class="v" :class="gov.halted?'dirS':rClass(gov.day_r)">{{ signed(gov.day_r) }}R <small class="mut" style="font-size:10px">/ -{{ gov.daily_stop_r }}R</small></span></div>
     </div>
     <div class="symchips" v-if="flatSyms.length">
       <button type="button" class="symchip" v-for="s in flatSyms" :key="s[0]" :class="{on:sym===s[0]}"
@@ -456,6 +463,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
           <div class="kv"><span class="k">MTF AGREEMENT</span><span class="num" :class="d.mtf_agreement>=70?'up':d.mtf_agreement>=45?'nt':'dn'">{{ d.mtf_agreement!=null?d.mtf_agreement+'%':'--' }}</span></div>
           <div class="kv" v-if="d.signal_quality!=null"><span class="k">SIGNAL QUALITY</span><span class="num" :class="d.signal_quality>=65?'up':d.signal_quality>=52?'nt':'dn'">{{ d.signal_quality }}/100</span></div>
           <div class="kv"><span class="k">TICKET LOGGING</span><span :class="d.tradeable?'up':'dn'">{{ d.tradeable?'ACTIVE':'PAUSED' }}</span></div>
+          <div class="kv" v-if="gov.daily_stop_r"><span class="k">DESK GOVERNOR</span><span class="mono" :class="gov.halted?'dn':gov.tightened||gov.full?'nt':'up'">{{ gov.halted?'HALTED':gov.tightened?'A-GRADE ONLY':gov.full?'RISK CAP FULL':'ARMED' }}</span></div>
           <div class="kv" v-if="d.engine"><span class="k">ENGINE</span><span class="mono mut">v{{ d.engine.v }} · neutral ±{{ d.engine.band }}</span></div>
           <div class="kv" v-if="d.levels && d.levels.model"><span class="k">PRIMARY MODEL</span><span class="mono">{{ d.levels.model }}</span></div>
         </div>
@@ -652,12 +660,15 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
           <div class="riskgrid num">
             <div><div class="lb">Position Size</div><div class="vv">{{ risk.lots }} lots</div></div>
             <div><div class="lb">$ Risk</div><div class="vv dn">${{ risk.usd }}</div></div>
-            <div><div class="lb">Exp. Loss / Gain</div><div class="vv">-${{ risk.usd }} / +${{ risk.gain }}</div></div>
+            <div><div class="lb">Loss / Gain @TP2</div><div class="vv">-${{ risk.usd }} / +${{ risk.gain }}</div></div>
             <div><div class="lb">Kelly %</div><div class="vv">{{ perf.kelly!=null?perf.kelly+'%':'n/a' }}</div></div>
-            <div><div class="lb">Daily Risk Left</div><div class="vv" :class="risk.dayLeft<=1?'dn':''">{{ risk.dayLeft }}R of 3R</div></div>
+            <div><div class="lb">Desk Risk Left</div><div class="vv" :class="risk.dayLeft<=1?'dn':''">{{ risk.dayLeft }}R of {{ risk.dayStop }}R</div></div>
             <div><div class="lb">Exposure</div><div class="vv">{{ risk.expo }}% of acct</div></div>
+            <div><div class="lb">Open Tickets</div><div class="vv" :class="gov.full?'nt':''">{{ gov.open??0 }} / {{ gov.max_open??'--' }}</div></div>
+            <div><div class="lb">Loss Streak Today</div><div class="vv" :class="gov.tightened?'dn':''">{{ gov.loss_streak??0 }}{{ gov.tightened?' · A only':'' }}</div></div>
           </div>
-          <div style="font-size:9px;color:var(--dim2);margin-top:5px">{{ d.size_note }} · Kelly from tracked history · 3R daily stop is a default guardrail</div>
+          <div class="govbar" :title="'Desk day '+signed(gov.day_r)+'R'"><i :style="{width:riskUsedPct+'%',background:riskUsedPct>=75?'var(--r)':riskUsedPct>=40?'var(--a)':'var(--g)'}"></i></div>
+          <div style="font-size:9px;color:var(--dim2);margin-top:5px">{{ d.size_note }} · Kelly from tracked history · desk governor: daily stop, max open tickets, A-grade only after {{ gov.tighten_after||2 }} straight losses</div>
         </div>
       </div>
 
@@ -665,7 +676,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
 
     <!-- ============ ANALYTICS (FULL WIDTH) ============ -->
     <div class="panel wide">
-      <div class="ph">Performance Analytics<span class="mono">{{ perf.n||0 }} TRACKED PREDICTIONS · AUTO-JOURNALED</span></div>
+      <div class="ph">Performance Analytics<span class="mono">{{ perf.n||0 }} TRADES · {{ (perf.basis||'net of costs').toUpperCase() }}</span></div>
       <div class="pb">
         <div class="tilerow num">
           <div><div class="lb">Win Rate</div><div class="vv" :class="(perf.win_rate||0)>=50?'up':'dn'">{{ perf.win_rate!=null?perf.win_rate+'%':'--' }}</div></div>
@@ -678,9 +689,13 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
           <div><div class="lb">Avg Hold</div><div class="vv">{{ perf.avg_hold!=null?perf.avg_hold+'m':'--' }}</div></div>
           <div><div class="lb">Win Streak</div><div class="vv up">{{ perf.streak_w||0 }}</div></div>
           <div><div class="lb">Loss Streak</div><div class="vv dn">{{ perf.streak_l||0 }}</div></div>
+          <div><div class="lb">Avg MFE / MAE</div><div class="vv" style="font-size:12px"><span class="up">{{ signed(perf.avg_mfe) }}</span> / <span class="dn">{{ signed(perf.avg_mae) }}</span></div></div>
+          <div><div class="lb">Fill Rate</div><div class="vv">{{ perf.fill_rate!=null?perf.fill_rate+'%':'--' }}</div></div>
+          <div><div class="lb">Costs Paid</div><div class="vv dn">{{ perf.cost_r?'-'+perf.cost_r+'R':'--' }}</div></div>
           <div><div class="lb">Today</div><div class="vv" :class="rClass(perf.today_r)">{{ signed(perf.today_r) }}R</div></div>
           <div><div class="lb">Active</div><div class="vv" style="font-size:11px">
-            <template v-if="perf.active">#{{ perf.active.id }} {{ perf.active.dir }} <span :class="rClass(perf.active.mtm_r)">{{ signed(perf.active.mtm_r) }}R</span></template>
+            <template v-if="perf.active && perf.active.state==='pending'">#{{ perf.active.id }} {{ perf.active.dir }} <span class="pill pp">{{ perf.active.order }} {{ fmt(perf.active.entry) }}</span></template>
+            <template v-else-if="perf.active">#{{ perf.active.id }} {{ perf.active.dir }}{{ perf.active.state==='runner'?' runner':'' }} <span :class="rClass(perf.active.mtm_r)">{{ signed(perf.active.mtm_r) }}R</span></template>
             <template v-else>none</template></div></div>
         </div>
         <div class="anal">
@@ -699,9 +714,9 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
         </div>
         <div style="overflow-x:auto;margin-top:8px">
           <table class="led num"><thead><tr>
-            <th>#</th><th>OPENED</th><th>DIR</th><th>GRADE</th><th>ENTRY</th><th>STOP</th><th>TP1</th><th>TP2</th><th>EXIT</th><th>OUTCOME</th><th>R</th><th>MIN</th>
+            <th>#</th><th>OPENED</th><th>DIR</th><th>GRADE</th><th>ENTRY</th><th>STOP</th><th>TP1</th><th>TP2</th><th>EXIT</th><th>OUTCOME</th><th>MFE</th><th>MAE</th><th>NET R</th><th>MIN</th>
           </tr></thead><tbody>
-            <tr v-if="!(perf.recent||[]).length"><td colspan="12" style="text-align:left" class="mut">Collecting — every tradeable signal is auto-logged, managed (TP1→BE→TP2) and scored.</td></tr>
+            <tr v-if="!(perf.recent||[]).length"><td colspan="14" style="text-align:left" class="mut">Collecting. Every tradeable signal is paper-executed: limits wait for a fill, 50% banked at TP1, runner to TP2 with the stop at entry, spread charged.</td></tr>
             <tr v-for="p in perf.recent" :key="p.id">
               <td>{{ p.id }}</td><td>{{ tstr(p.opened) }}</td>
               <td style="text-align:left"><span class="pill" :class="p.dir==='LONG'?'pl':'ps'">{{ p.dir }}</span></td>
@@ -709,7 +724,8 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
               <td>{{ fmt(p.entry) }}</td><td>{{ fmt(p.sl) }}</td><td>{{ fmt(p.tp1) }}</td><td>{{ fmt(p.tp2) }}</td>
               <td>{{ fmt(p.exit) }}</td>
               <td style="text-align:left"><span class="pill" :class="p.r>0.05?'pl':p.r<-0.05?'ps':'pn'">{{ p.outcome }}</span></td>
-              <td :class="rClass(p.r)" style="font-weight:700">{{ signed(p.r) }}</td><td>{{ p.dur_min }}</td>
+              <td class="up">{{ signed(p.mfe_r) }}</td><td class="dn">{{ signed(p.mae_r) }}</td>
+              <td :class="rClass(p.r)" style="font-weight:700" :title="p.gross_r!=null?'gross '+signed(p.gross_r)+'R, cost '+p.cost_r+'R':''">{{ signed(p.r) }}</td><td>{{ p.dur_min }}</td>
             </tr>
           </tbody></table>
         </div>
@@ -718,7 +734,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
   </div>
 
   <footer class="foot">15 instruments · Metals, Crypto, FX, Indices, Energy · hotkeys <kbd>1</kbd>–<kbd>9</kbd> · refresh 15s · TradingView + Yahoo<br>
-  Copilot: Claude when configured, rule-based otherwise; both answer from live state only. <strong style="font-weight:600;color:var(--dim)">Educational only — not financial advice.</strong></footer>
+  Copilot: Claude when configured, rule-based otherwise; both answer from live state only. All R figures net of estimated spread. <strong style="font-weight:600;color:var(--dim)">Educational only — not financial advice.</strong></footer>
 
   <!-- auth modal -->
   <div class="overlay" v-if="authOpen" @click.self="closeAuth">
@@ -773,6 +789,14 @@ createApp({
   }},
   computed:{
     perf(){ return this.d.perf||{} },
+    gov(){ return this.d.governor||{} },
+    tp2PayoffR(){  // 50% banked at TP1, runner to TP2
+      const l=this.d.levels, sl=this.d.sl_dist;
+      if(!l||!sl) return 2.25;
+      return 0.5*Math.abs(l.tp1-l.entry)/sl + 0.5*Math.abs(l.tp2-l.entry)/sl;
+    },
+    riskUsedPct(){ const g=this.gov; if(!g.daily_stop_r) return 0;
+      return Math.round(Math.min(100,Math.max(0,-(g.day_r||0))/g.daily_stop_r*100)) },
     macroSource(){ return (this.d.macro||{}).source||'--' },
     flatSyms(){ return this.symGroups.flatMap(g=>g[1]) },
     assetWord(){ return this.d.word || 'the asset' },
@@ -805,7 +829,7 @@ createApp({
     bestRr(){
       const m=this.d.models||[];
       const rec=m.find(x=>x.recommended)||m[0];
-      return rec&&rec.rr!=null?rec.rr:2;
+      return rec&&rec.rr!=null?rec.rr:3;
     },
     techPct(){
       const t=Math.abs(this.d.tech_score||0), m=Math.abs(this.d.macro_score||0), s=t+m||1;
@@ -823,9 +847,10 @@ createApp({
       const usd=this.acct*this.riskpct/100;
       const lots=sl?usd/(sl*pp):0;
       const expo=this.d.price?Math.round(lots*this.d.price*pp/this.acct*100):0;
-      const dayLeft=Math.max(0,(3+Math.min(0,this.perf.today_r||0))).toFixed(1);
-      return {lots:lots?lots.toFixed(2):'--', usd:Math.round(usd), gain:Math.round(usd*2),
-              expo, dayLeft};
+      const g=this.gov, dayStop=g.daily_stop_r||4;
+      const dayLeft=(g.risk_left_r!=null?g.risk_left_r:dayStop).toFixed(1);
+      return {lots:lots?lots.toFixed(2):'--', usd:Math.round(usd), gain:Math.round(usd*this.tp2PayoffR),
+              expo, dayLeft, dayStop};
     },
   },
   methods:{
