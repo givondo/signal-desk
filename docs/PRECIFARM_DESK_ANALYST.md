@@ -54,6 +54,8 @@ The live engine now enforces the risk framework itself rather than leaving it to
 
 Desk governor, across all instruments, on the EAT trading day: a daily stop of 4R (2% at 0.5% per trade) halts every new ticket; a cap of 4 open tickets (2% concurrent risk); after 2 consecutive losses the desk publishes A-grade only and the brief threshold rises to 8/10. Override with `DESK_DAILY_STOP_R`, `DESK_MAX_OPEN`, `DESK_LOSS_STREAK_TIGHTEN`, `DESK_TZ`.
 
+Targets: TP1 at 1.5R (the protocol minimum), TP2 at 3R, TP3 at 4.5R. With the 50% scale-out a full winner pays 2.25R gross.
+
 Paper execution: pullback and conservative entries are working limit orders that must trade through to fill and are cancelled if the signal dies or after 2 hours. Management follows this protocol: 50% banked at TP1, runner stop to entry, runner to TP2. Stops that gap are booked at the actual mark. The estimated spread is charged on every fill, so every R figure is net. Records journaled by v4.3 are restated on load to the same basis.
 
 Sessions are derived from London and New York local clocks, so they follow daylight saving. Non-crypto instruments show MARKET CLOSED from Friday 17:00 to Sunday 17:00 New York time and log no tickets.

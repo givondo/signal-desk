@@ -256,6 +256,13 @@ def _position_size_lots(balance, risk_pct, sl_dist, per_point):
     return lots, calc
 
 
+def _r_mult(lv, key, sl_dist) -> str:
+    try:
+        return f"{abs(lv[key] - lv['entry']) / sl_dist:.1f}R"
+    except (KeyError, TypeError, ZeroDivisionError):
+        return "n/a"
+
+
 def _spread_points(sig, cfg_spread_est) -> float:
     """Approx spread in 'points' using symbol dp (gold ~0.01 point = 1 pip)."""
     est = cfg_spread_est or 0.30
@@ -381,7 +388,7 @@ def build_desk_brief(sig, sym_cfg, *, secondary=None, calendar=None,
    Order type: {order}
    Entry: {lv.get('entry')} (primary model {lv.get('model', rec.get('name'))})
    Stop loss: {lv.get('sl')} ({sl_d} price distance)
-   TP1: {lv.get('tp1')} (1R) | TP2: {lv.get('tp2')} (2R)
+   TP1: {lv.get('tp1')} ({_r_mult(lv, 'tp1', sl_d)}) | TP2: {lv.get('tp2')} ({_r_mult(lv, 'tp2', sl_d)})
    Position size: {lots if lots else 'n/a'} lots — {lcalc}
    Confluence score: {score10}/10 ({br_s})
    Valid until: {valid_until}

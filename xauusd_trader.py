@@ -279,6 +279,7 @@ EXPIRY_S = 6 * 3600
 COOLDOWN_S = 300
 PENDING_TTL_S = 2 * 3600   # unfilled limit/stop orders are cancelled after this
 SCALE_OUT = 0.5            # fraction banked at TP1; runner stop moves to entry
+TP_R = (1.5, 3.0, 4.5)     # TP1/TP2/TP3 in R; protocol minimum is 1.5R to TP1
 
 # Desk risk governor (all instruments combined, desk-timezone trading day).
 # Defaults follow the analyst protocol: 0.5% per trade, 2% daily stop = 4R,
@@ -921,9 +922,9 @@ def entry_models(sym, direction, px, atr, cc, conf, ema20h, regime_state=None):
 
     def mk(name, entry, sl_dist, prob, note):
         sl_dist = round(max(sl_dist, 0.4 * atr), dp)
-        tps = [round(entry + sgn * sl_dist * m, dp) for m in (1, 2, 3)]
+        tps = [round(entry + sgn * sl_dist * m, dp) for m in TP_R]
         reward = abs(tps[1] - entry)
-        rr = round(reward / sl_dist, 1) if sl_dist else 2.0
+        rr = round(reward / sl_dist, 1) if sl_dist else TP_R[1]
         return {"name": name, "entry": round(entry, dp),
                 "sl": round(entry - sgn * sl_dist, dp), "sl_dist": sl_dist,
                 "tp1": tps[0], "tp2": tps[1], "tp3": tps[2],
@@ -1456,17 +1457,26 @@ class Tracker:
     def _cost_r(self, sl_dist):
         return round(self.spread / sl_dist, 3) if sl_dist else 0.0
 
+    @staticmethod
+    def _target_r(p, key, default):
+        """A ticket's own target in R (v4.3 tickets used 1R / 2R)."""
+        try:
+            return abs(p[key] - p["entry"]) / p["sl_dist"]
+        except (KeyError, TypeError, ZeroDivisionError):
+            return default
+
     def _restate(self, p):
         """Bring v4.3 records onto the v4.4 basis. v4.3 booked a TP1 touch
         that returned to entry as +1R at full size, ignored the TP1 bank on
         runner exits and charged no spread."""
         if p.get("acct") == 2:
             return p
-        gross = {"SL": -1.0, "TP1-BE": SCALE_OUT,
-                 "TP2": SCALE_OUT + (1 - SCALE_OUT) * 2.0}.get(p.get("outcome"))
+        t1, t2 = self._target_r(p, "tp1", 1.0), self._target_r(p, "tp2", 2.0)
+        gross = {"SL": -1.0, "TP1-BE": SCALE_OUT * t1,
+                 "TP2": SCALE_OUT * t1 + (1 - SCALE_OUT) * t2}.get(p.get("outcome"))
         if gross is None:                    # FLIP / EXPIRY at the mark
             m = p.get("r", 0.0)
-            gross = SCALE_OUT + (1 - SCALE_OUT) * m if p.get("tp1_ts") else m
+            gross = SCALE_OUT * t1 + (1 - SCALE_OUT) * m if p.get("tp1_ts") else m
         cost = self._cost_r(p.get("sl_dist"))
         p.update({"gross_r": round(gross, 2), "cost_r": cost,
                   "r": round(gross - cost, 2), "acct": 2})
@@ -1519,6 +1529,7 @@ class Tracker:
             p = self.active
             sgn = 1 if p["dir"] == "LONG" else -1
             mtm = sgn * (px - p["entry"]) / p["sl_dist"]
+            bank = SCALE_OUT * self._target_r(p, "tp1", 1.0)
             p["mtm_r"] = round(mtm, 2)
             p["mfe_r"] = round(max(p.get("mfe_r", 0.0), mtm), 2)
             p["mae_r"] = round(min(p.get("mae_r", 0.0), mtm), 2)
@@ -1532,15 +1543,16 @@ class Tracker:
                     self.save()
             if self.active and p["state"] == "runner":
                 if sgn * (px - p["tp2"]) >= 0:
-                    closed = self._close("TP2", SCALE_OUT + (1 - SCALE_OUT) * 2.0,
-                                         px, now)
+                    closed = self._close(
+                        "TP2", bank + (1 - SCALE_OUT) * self._target_r(p, "tp2", 2.0),
+                        px, now)
                 elif sgn * (px - p["entry"]) <= 0:
                     closed = self._close("TP1-BE",
-                                         SCALE_OUT + (1 - SCALE_OUT) * min(0.0, mtm),
+                                         bank + (1 - SCALE_OUT) * min(0.0, mtm),
                                          px, now)
             if self.active:
                 runner = p["state"] == "runner"
-                gross = SCALE_OUT + (1 - SCALE_OUT) * mtm if runner else mtm
+                gross = bank + (1 - SCALE_OUT) * mtm if runner else mtm
                 if d != "NEUTRAL" and d != p["dir"]:
                     closed = self._close("FLIP", gross, px, now)
                 elif now - p.get("filled", p["opened"]) > EXPIRY_S:
@@ -1808,7 +1820,7 @@ def copilot_answer(sym, q):
         if not c:
             return "No trade - signal is neutral."
         return (f"Desk pick: {c['name']} {d} — entry {c['entry']}, stop {c['sl']}, "
-                f"TP2 {c['tp2']} (RR 1:{c.get('rr', 2)}, {c['prob']}% est). {c.get('note', '')}")
+                f"TP2 {c['tp2']} (RR 1:{c.get('rr', TP_R[1])}, {c['prob']}% est). {c.get('note', '')}")
     if "risk" in ql or "size" in ql:
         return (f"Use the risk engine: {conf}% confidence, stop distance {sig.get('sl_dist')}, "
                 f"grade {sig['grade']}. Journal {'ON' if sig.get('tradeable') else 'PAUSED'} — "

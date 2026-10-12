@@ -27,8 +27,8 @@ def sig(px, direction="LONG", entry=None, model="MARKET", sl_dist=10.0,
             "tradeable": tradeable, "grade": grade, "confidence": 70,
             "sl_dist": sl_dist,
             "levels": {"entry": entry, "sl": entry - sgn * sl_dist,
-                       "tp1": entry + sgn * sl_dist,
-                       "tp2": entry + sgn * 2 * sl_dist, "model": model}}
+                       "tp1": entry + sgn * sd.TP_R[0] * sl_dist,
+                       "tp2": entry + sgn * sd.TP_R[1] * sl_dist, "model": model}}
 
 
 def tracker():
@@ -37,23 +37,28 @@ def tracker():
 
 
 class TrackerExecution(unittest.TestCase):
-    def test_tp1_then_breakeven_books_half_r_net_of_spread(self):
+    def test_tp1_then_breakeven_banks_half_of_tp1_net_of_spread(self):
         t = tracker()
         t.update(SYM, sig(2000), now=T)
-        t.update(SYM, sig(2010.5), now=T + 60)        # TP1: bank 50%
+        t.update(SYM, sig(2015.5), now=T + 60)        # TP1 at 1.5R: bank 50%
         self.assertEqual(t.active["state"], "runner")
         t.update(SYM, sig(1999.0), now=T + 120)       # back through entry
         p = t.resolved[-1]
         self.assertEqual(p["outcome"], "TP1-BE")
-        self.assertEqual(p["gross_r"], 0.45)      # 0.5 + 0.5 * -0.1 slippage
-        self.assertEqual(p["r"], round(0.45 - 0.03, 2))
+        self.assertEqual(p["gross_r"], 0.70)      # 0.5*1.5 + 0.5 * -0.1 slippage
+        self.assertEqual(p["r"], round(0.70 - 0.03, 2))
 
-    def test_tp2_is_one_and_a_half_r(self):
+    def test_tp2_pays_two_and_a_quarter_r(self):
         t = tracker()
         t.update(SYM, sig(2000), now=T)
-        t.update(SYM, sig(2021), now=T + 60)
+        t.update(SYM, sig(2031), now=T + 60)
         self.assertEqual(t.resolved[-1]["outcome"], "TP2")
-        self.assertEqual(t.resolved[-1]["gross_r"], 1.5)
+        self.assertEqual(t.resolved[-1]["gross_r"], 2.25)   # 0.5*1.5 + 0.5*3
+
+    def test_targets_follow_protocol_minimum(self):
+        models = sd.entry_models(SYM, "LONG", 2000.0, 8.0, {}, 70, None, "TRENDING")
+        for m in models:
+            self.assertAlmostEqual(abs(m["tp1"] - m["entry"]) / m["sl_dist"], 1.5, delta=0.01)
 
     def test_stop_gap_books_actual_loss_not_minus_one(self):
         t = tracker()
