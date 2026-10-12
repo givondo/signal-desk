@@ -1,5 +1,5 @@
 """
-Signal Desk v4.3 - institutional-grade terminal backend
+Signal Desk v4.4 - institutional-grade terminal backend
 -----------------------------------------------------
 Serves http://localhost:8899 (dashboard.html) and a JSON API:
 
@@ -8,6 +8,7 @@ Serves http://localhost:8899 (dashboard.html) and a JSON API:
                                   alerts, performance analytics
   /api/ask?sym=..&q=..            rule-based copilot answers from live state
   /api/desk/brief?sym=XAUUSD      Precifarm analyst brief (plain text)
+  /api/roster                     every instrument + desk risk governor
   /api/tv_login (POST)            TradingView account session
 
 Data: TradingView scanner (multi-timeframe technicals), Yahoo (macro complex,
@@ -16,6 +17,7 @@ Educational tool - NOT financial advice.  Stdlib only.
 """
 
 import base64
+import hmac
 import json
 import os
 import re
@@ -26,6 +28,7 @@ import time
 import urllib.request
 import urllib.parse
 from collections import deque
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 # Optional HTTP Basic auth: set SIGNALDESK_PASS (and optionally
@@ -34,6 +37,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 AUTH_USER = os.environ.get("SIGNALDESK_USER", "trader")
 AUTH_PASS = os.environ.get("SIGNALDESK_PASS")
 
+ENGINE_V = "4.4"
 PORT = int(os.environ.get("PORT", 8899))   # PaaS hosts inject PORT
 POLL_SECONDS = 15
 MACRO_EVERY = 4          # macro/candles every 60s
@@ -273,6 +277,24 @@ MACRO_ASSET_WHY = {s: CLASS_MACRO[c["cls"]]["why"] for s, c in SYMBOLS.items()}
 
 EXPIRY_S = 6 * 3600
 COOLDOWN_S = 300
+PENDING_TTL_S = 2 * 3600   # unfilled limit/stop orders are cancelled after this
+SCALE_OUT = 0.5            # fraction banked at TP1; runner stop moves to entry
+TP_R = (1.5, 3.0, 4.5)     # TP1/TP2/TP3 in R; protocol minimum is 1.5R to TP1
+
+# Desk risk governor (all instruments combined, desk-timezone trading day).
+# Defaults follow the analyst protocol: 0.5% per trade, 2% daily stop = 4R,
+# max 2% concurrent risk = 4 open tickets, A-grade only after 2 straight losses.
+DAILY_STOP_R = float(os.environ.get("DESK_DAILY_STOP_R", "4"))
+MAX_OPEN = int(os.environ.get("DESK_MAX_OPEN", "4"))
+LOSS_STREAK_TIGHTEN = int(os.environ.get("DESK_LOSS_STREAK_TIGHTEN", "2"))
+
+try:
+    from zoneinfo import ZoneInfo
+    _LON = ZoneInfo("Europe/London")
+    _NY = ZoneInfo("America/New_York")
+    DESK_TZ = ZoneInfo(os.environ.get("DESK_TZ", "Africa/Nairobi"))
+except Exception:          # no tzdata: fall back to fixed UTC session hours
+    _LON = _NY = DESK_TZ = None
 AUTH_FILE = os.path.join(DATA_DIR, "tv_auth.json")
 DASH_FILE = os.path.join(BASE_DIR, "dashboard.html")   # read-only shipped asset
 
@@ -289,6 +311,42 @@ tv_auth = {"sessionid": None, "sessionid_sign": None, "username": None}
 
 def clamp(x, lo=-1.0, hi=1.0):
     return max(lo, min(hi, x))
+
+
+def desk_day(epoch=None):
+    """Trading-day key (mm-dd) in the desk timezone (EAT by default)."""
+    epoch = time.time() if epoch is None else epoch
+    if DESK_TZ is None:
+        return time.strftime("%m-%d", time.gmtime(epoch))
+    return datetime.fromtimestamp(epoch, DESK_TZ).strftime("%m-%d")
+
+
+def market_session(cfg, now=None):
+    """Session name + liquidity tier from London/New York local clocks, so
+    the windows follow UK and US daylight saving. Non-crypto markets are
+    closed from Friday 17:00 to Sunday 17:00 New York time."""
+    if not cfg.get("session_filter"):
+        return {"name": "CRYPTO 24/7", "liq": "normal", "open": True}
+    now = now or datetime.now(timezone.utc)
+    if _NY is None:
+        h, wd = now.hour, now.weekday()
+        if wd == 5 or (wd == 4 and h >= 21) or (wd == 6 and h < 21):
+            return {"name": "MARKET CLOSED", "liq": "closed", "open": False}
+        lon_on, ny_on = 7 <= h < 16, 12 <= h < 21
+    else:
+        ny = now.astimezone(_NY)
+        wd = ny.weekday()
+        if wd == 5 or (wd == 4 and ny.hour >= 17) or (wd == 6 and ny.hour < 17):
+            return {"name": "MARKET CLOSED", "liq": "closed", "open": False}
+        lon_on = 8 <= now.astimezone(_LON).hour < 17
+        ny_on = 8 <= ny.hour < 17
+    if lon_on and ny_on:
+        return {"name": "LDN/NY OVERLAP", "liq": "high", "open": True}
+    if lon_on:
+        return {"name": "LONDON", "liq": "high", "open": True}
+    if ny_on:
+        return {"name": "NEW YORK", "liq": "normal", "open": True}
+    return {"name": "ASIA/PACIFIC", "liq": "low", "open": True}
 
 
 def load_auth():
@@ -634,7 +692,8 @@ def build_scores(sym, d, matrix, macro, session, regime, structure_s, conf):
         volu_s = clamp((ratio - 1) * 1.2) * 100 * (1 if trend_s >= 0 else -1)
     vola_s = {"LOW": 20, "NORMAL": 50, "HIGH": -20, "EXTREME": -60}.get(
         regime.get("vol", ""), 0)
-    liq_s = {"high": 60, "normal": 20, "low": -50}.get(session.get("liq"), 0)
+    liq_s = {"high": 60, "normal": 20, "low": -50,
+             "closed": -100}.get(session.get("liq"), 0)
     # flow proxy: 1h+4h weighted TV rating = where systematic flow points
     rec60 = d.get("Recommend.All|60") or 0
     rec240 = d.get("Recommend.All|240") or 0
@@ -713,7 +772,8 @@ def compute_signal_quality(direction, confidence, aligned, mtf_pct, regime, sess
     macro_ok = (score > 0) == (macro > 0) or abs(macro) < 0.05
     regime_pts = {"TRENDING": 88, "MILD TREND": 72, "RANGING": 38, "UNKNOWN": 50}.get(
         regime.get("state"), 50)
-    liq_pts = {"high": 88, "normal": 68, "low": 28}.get(session.get("liq"), 50)
+    liq_pts = {"high": 88, "normal": 68, "low": 28,
+               "closed": 0}.get(session.get("liq"), 50)
     struct_ok = (
         (structure_s >= 20 and direction == "LONG")
         or (structure_s <= -20 and direction == "SHORT")
@@ -818,6 +878,10 @@ def apply_direction_hysteresis(sym, score, band, direction):
 
 def desk_action(direction, tradeable, grade, confidence, regime, session, aligned,
                 mtf_pct=0, quality=0):
+    if not session.get("open", True):
+        return {"mode": "CLOSED", "title": "Market closed",
+                "detail": "Weekend break: quotes are stale and no tickets are "
+                          "logged until the Sunday 17:00 New York open."}
     if direction == "NEUTRAL":
         return {"mode": "WAIT", "title": "Stand aside",
                 "detail": "Composite score is inside the neutral band — no directional edge."}
@@ -858,9 +922,9 @@ def entry_models(sym, direction, px, atr, cc, conf, ema20h, regime_state=None):
 
     def mk(name, entry, sl_dist, prob, note):
         sl_dist = round(max(sl_dist, 0.4 * atr), dp)
-        tps = [round(entry + sgn * sl_dist * m, dp) for m in (1, 2, 3)]
+        tps = [round(entry + sgn * sl_dist * m, dp) for m in TP_R]
         reward = abs(tps[1] - entry)
-        rr = round(reward / sl_dist, 1) if sl_dist else 2.0
+        rr = round(reward / sl_dist, 1) if sl_dist else TP_R[1]
         return {"name": name, "entry": round(entry, dp),
                 "sl": round(entry - sgn * sl_dist, dp), "sl_dist": sl_dist,
                 "tp1": tps[0], "tp2": tps[1], "tp3": tps[2],
@@ -940,7 +1004,7 @@ def build_reasons(sym, direction, d, matrix, macro_contribs, regime, session,
         "Market structure " + ("broken down" if structure_s < 0
                                else "broken up" if structure_s > 0
                                else "intact"))
-    add(session.get("liq") != "low",
+    add(session.get("liq") in ("high", "normal"),
         f"{session.get('name')} session - {session.get('liq')} liquidity")
     if abs(news_adj) >= 0.2:
         add(news_adj > 0, f"RSS headline skew {'bullish' if news_adj > 0 else 'bearish'}")
@@ -1113,20 +1177,12 @@ def build_signal(sym, d):
         warn.append(f"1h ADX {adx:.0f} - ranging, chop filter active")
     score *= regime["mult"]
 
-    if not cfg["session_filter"]:
-        session = {"name": "CRYPTO 24/7", "liq": "normal"}
-    else:
-        h = time.gmtime().tm_hour
-        if 12 <= h < 16:
-            session = {"name": "LDN/NY OVERLAP", "liq": "high"}
-        elif 7 <= h < 12:
-            session = {"name": "LONDON", "liq": "high"}
-        elif 16 <= h < 21:
-            session = {"name": "NEW YORK", "liq": "normal"}
-        else:
-            session = {"name": "ASIA/PACIFIC", "liq": "low"}
-            score *= 0.85
-            warn.append("Low-liquidity session - signals less reliable")
+    session = market_session(cfg)
+    if not session["open"]:
+        warn.append("Market closed - weekend quotes are stale")
+    elif session["liq"] == "low":
+        score *= 0.85
+        warn.append("Low-liquidity session - signals less reliable")
 
     signs = [1 if r > 0.1 else (-1 if r < -0.1 else 0)
              for r in (rec15, rec60, rec240)]
@@ -1258,7 +1314,7 @@ def build_signal(sym, d):
         and confidence >= 54
         and signal_quality >= 58
         and grade in ("A+", "A", "B")
-        and session.get("liq") != "low"
+        and session.get("liq") in ("high", "normal")
         and (aligned or regime["state"] == "TRENDING")
         and mtf_pct >= 58
         and daily_ok
@@ -1278,6 +1334,10 @@ def build_signal(sym, d):
                        "structure_s": structure_s},
             "levels": levels, "models": models, "macro_score": macro,
             "grade": grade, "reasons": reasons, "sym_name": cfg["name"],
+            "pivots": {"r1": d.get("Pivot.M.Classic.R1"),
+                       "s1": d.get("Pivot.M.Classic.S1"),
+                       "p": d.get("Pivot.M.Classic.Middle")},
+            "day_high": d.get("high"), "day_low": d.get("low"),
         }
         c10, c10b = confluence_score_10(
             _pf_sig, calendar_ok=False, session_favourable=session_fav)
@@ -1288,7 +1348,7 @@ def build_signal(sym, d):
             pass
 
     engine = {
-        "v": "4.3",
+        "v": ENGINE_V,
         "band": round(band, 3),
         "blend": blend,
         "macro_scale": macro_scale,
@@ -1353,10 +1413,21 @@ def build_signal(sym, d):
 # ---------------------------------------------------------------- tracker
 
 class Tracker:
-    def __init__(self, path):
+    """Paper-execution journal for one instrument.
+
+    Execution is simulated conservatively so the stats can be trusted:
+    limit/stop entries wait for price to trade through them, 50% is banked
+    at TP1 with the runner stop moved to entry, losses gapping past a stop
+    are booked at the actual mark, and the estimated spread is charged on
+    every fill. All R figures are net of that cost.
+    """
+
+    def __init__(self, path, spread=0.0):
         self.path = path
+        self.spread = spread or 0.0
         self.resolved = []
         self.active = None
+        self.cancelled = 0
         self.last_activity = 0
         self.next_id = 1
         self.load()
@@ -1365,8 +1436,9 @@ class Tracker:
         try:
             with open(self.path, "r") as f:
                 d = json.load(f)
-            self.resolved = d.get("resolved", [])
+            self.resolved = [self._restate(p) for p in d.get("resolved", [])]
             self.active = d.get("active")
+            self.cancelled = d.get("cancelled", 0)
             self.next_id = d.get("next_id", len(self.resolved) + 1)
             self.last_activity = d.get("last_activity", 0)
         except Exception:
@@ -1376,71 +1448,146 @@ class Tracker:
         try:
             with open(self.path, "w") as f:
                 json.dump({"resolved": self.resolved[-500:],
-                           "active": self.active, "next_id": self.next_id,
+                           "active": self.active, "cancelled": self.cancelled,
+                           "next_id": self.next_id,
                            "last_activity": self.last_activity}, f)
         except Exception:
             pass
 
-    def _close(self, outcome, r, px):
+    def _cost_r(self, sl_dist):
+        return round(self.spread / sl_dist, 3) if sl_dist else 0.0
+
+    @staticmethod
+    def _target_r(p, key, default):
+        """A ticket's own target in R (v4.3 tickets used 1R / 2R)."""
+        try:
+            return abs(p[key] - p["entry"]) / p["sl_dist"]
+        except (KeyError, TypeError, ZeroDivisionError):
+            return default
+
+    def _restate(self, p):
+        """Bring v4.3 records onto the v4.4 basis. v4.3 booked a TP1 touch
+        that returned to entry as +1R at full size, ignored the TP1 bank on
+        runner exits and charged no spread."""
+        if p.get("acct") == 2:
+            return p
+        t1, t2 = self._target_r(p, "tp1", 1.0), self._target_r(p, "tp2", 2.0)
+        gross = {"SL": -1.0, "TP1-BE": SCALE_OUT * t1,
+                 "TP2": SCALE_OUT * t1 + (1 - SCALE_OUT) * t2}.get(p.get("outcome"))
+        if gross is None:                    # FLIP / EXPIRY at the mark
+            m = p.get("r", 0.0)
+            gross = SCALE_OUT * t1 + (1 - SCALE_OUT) * m if p.get("tp1_ts") else m
+        cost = self._cost_r(p.get("sl_dist"))
+        p.update({"gross_r": round(gross, 2), "cost_r": cost,
+                  "r": round(gross - cost, 2), "acct": 2})
+        return p
+
+    def _close(self, outcome, gross, px, now):
         p = self.active
-        p.update({"outcome": outcome, "r": round(r, 2), "exit": round(px, 2),
-                  "closed": int(time.time()),
-                  "dur_min": round((time.time() - p["opened"]) / 60)})
+        cost = self._cost_r(p["sl_dist"])
+        start = p.get("filled", p["opened"])
+        p.update({"outcome": outcome, "gross_r": round(gross, 2),
+                  "cost_r": cost, "r": round(gross - cost, 2),
+                  "exit": px, "closed": int(now), "acct": 2,
+                  "dur_min": round((now - start) / 60)})
         self.resolved.append(p)
         self.active = None
-        self.last_activity = time.time()
+        self.last_activity = now
         self.save()
         return p
 
-    def update(self, sym, sig):
+    def _cancel(self, sym, why, now):
+        p = self.active
+        self.active = None
+        self.cancelled += 1
+        self.last_activity = now
+        self.save()
+        push_alert(sym, "TICKET", f"#{p['id']} {p['dir']} {p['order'].lower()} "
+                                  f"@ {p['entry']} cancelled ({why})")
+
+    def update(self, sym, sig, now=None):
         if sig.get("status") != "ok":
             return
-        px, now = sig["price"], time.time()
+        px, now = sig["price"], (time.time() if now is None else now)
         d = sig["direction"]
+        p = self.active
+        if p and p["state"] == "pending":
+            sgn = 1 if p["dir"] == "LONG" else -1
+            touched = (sgn * (px - p["entry"]) <= 0 if p["order"] == "LIMIT"
+                       else sgn * (px - p["entry"]) >= 0)
+            if touched:
+                p.update({"state": "open", "filled": int(now)})
+                push_alert(sym, "TICKET", f"#{p['id']} {p['dir']} filled @ {p['entry']}")
+                self.save()
+            elif d != p["dir"]:
+                return self._cancel(sym, "signal gone", now)
+            elif now - p["opened"] > PENDING_TTL_S:
+                return self._cancel(sym, "not filled in time", now)
+            else:
+                return
         if self.active:
             p = self.active
             sgn = 1 if p["dir"] == "LONG" else -1
-            mtm_r = sgn * (px - p["entry"]) / p["sl_dist"]
-            p["mtm_r"] = round(mtm_r, 2)
+            mtm = sgn * (px - p["entry"]) / p["sl_dist"]
+            bank = SCALE_OUT * self._target_r(p, "tp1", 1.0)
+            p["mtm_r"] = round(mtm, 2)
+            p["mfe_r"] = round(max(p.get("mfe_r", 0.0), mtm), 2)
+            p["mae_r"] = round(min(p.get("mae_r", 0.0), mtm), 2)
             closed = None
             if p["state"] == "open":
                 if sgn * (px - p["sl"]) <= 0:
-                    closed = self._close("SL", -1.0, px)
+                    closed = self._close("SL", min(-1.0, mtm), px, now)
                 elif sgn * (px - p["tp1"]) >= 0:
                     p["state"] = "runner"
                     p["tp1_ts"] = int(now)
                     self.save()
             if self.active and p["state"] == "runner":
                 if sgn * (px - p["tp2"]) >= 0:
-                    closed = self._close("TP2", 2.0, px)
+                    closed = self._close(
+                        "TP2", bank + (1 - SCALE_OUT) * self._target_r(p, "tp2", 2.0),
+                        px, now)
                 elif sgn * (px - p["entry"]) <= 0:
-                    closed = self._close("TP1-BE", 1.0, px)
-            if self.active and d != "NEUTRAL" and d != p["dir"]:
-                closed = self._close("FLIP", mtm_r, px)
-            if self.active and now - p["opened"] > EXPIRY_S:
-                closed = self._close("EXPIRY", mtm_r, px)
+                    closed = self._close("TP1-BE",
+                                         bank + (1 - SCALE_OUT) * min(0.0, mtm),
+                                         px, now)
+            if self.active:
+                runner = p["state"] == "runner"
+                gross = bank + (1 - SCALE_OUT) * mtm if runner else mtm
+                if d != "NEUTRAL" and d != p["dir"]:
+                    closed = self._close("FLIP", gross, px, now)
+                elif now - p.get("filled", p["opened"]) > EXPIRY_S:
+                    closed = self._close("EXPIRY", gross, px, now)
             if closed:
                 push_alert(sym, "TICKET",
                            f"#{closed['id']} {closed['dir']} closed "
-                           f"{closed['outcome']} {closed['r']:+.2f}R")
+                           f"{closed['outcome']} {closed['r']:+.2f}R net")
             return
         if d in ("LONG", "SHORT") and sig.get("levels") \
                 and sig.get("tradeable", True) \
                 and sig.get("grade") in ("A+", "A", "B") \
                 and now - self.last_activity >= COOLDOWN_S:
             lv = sig["levels"]
+            sgn = 1 if d == "LONG" else -1
+            gap = sgn * (lv["entry"] - px)
+            order = ("MARKET" if lv.get("model") == "MARKET" or abs(gap) < 1e-9
+                     else "LIMIT" if gap < 0 else "STOP")
             self.active = {"id": self.next_id, "opened": int(now),
-                           "dir": d, "entry": lv["entry"], "sl": lv["sl"],
+                           "dir": d, "order": order, "model": lv.get("model"),
+                           "entry": lv["entry"], "sl": lv["sl"],
                            "tp1": lv["tp1"], "tp2": lv["tp2"],
                            "sl_dist": sig["sl_dist"],
                            "conf": sig["confidence"],
                            "grade": sig.get("grade", "-"),
-                           "state": "open", "mtm_r": 0.0}
+                           "state": "open" if order == "MARKET" else "pending",
+                           "mtm_r": 0.0, "mfe_r": 0.0, "mae_r": 0.0}
+            if order == "MARKET":
+                self.active["filled"] = int(now)
             self.next_id += 1
             self.last_activity = now
             self.save()
+            verb = "opened" if order == "MARKET" else f"{order.lower()} working"
             push_alert(sym, "TICKET",
-                       f"#{self.active['id']} {d} opened @ {lv['entry']}")
+                       f"#{self.active['id']} {d} {verb} @ {lv['entry']}")
 
     def perf(self):
         rs = [p["r"] for p in self.resolved]
@@ -1476,10 +1623,8 @@ class Tracker:
             streak_l = max(streak_l, cl)
         daily = {}
         for p in self.resolved:
-            day = time.strftime("%m-%d", time.localtime(p.get("closed",
-                                                             p["opened"])))
+            day = desk_day(p.get("closed", p["opened"]))
             daily[day] = round(daily.get(day, 0) + p["r"], 2)
-        today = time.strftime("%m-%d")
         outcomes = {}
         for p in self.resolved:
             outcomes[p["outcome"]] = outcomes.get(p["outcome"], 0) + 1
@@ -1497,6 +1642,10 @@ class Tracker:
         if wr is not None and avg_w and avg_l:
             b = avg_w / avg_l
             kelly = round(max(0.0, (wr / 100) - (1 - wr / 100) / b) * 100, 1)
+        filled = len(rs) + (1 if self.active and self.active["state"] != "pending" else 0)
+        placed = filled + self.cancelled
+        mfe = [p["mfe_r"] for p in self.resolved if "mfe_r" in p]
+        mae = [p["mae_r"] for p in self.resolved if "mae_r" in p]
         return {"n": len(rs), "wins": len(wins), "losses": len(losses),
                 "win_rate": wr, "total_r": round(sum(rs), 2),
                 "avg_r": round(statistics.mean(rs), 2) if rs else None,
@@ -1507,13 +1656,74 @@ class Tracker:
                     [p["dur_min"] for p in self.resolved]), 0) if rs else None,
                 "streak_w": streak_w, "streak_l": streak_l,
                 "kelly": kelly, "avg_win": avg_w, "avg_loss": avg_l,
-                "daily": daily, "today_r": daily.get(today, 0.0),
+                "cost_r": round(sum(p.get("cost_r", 0) for p in self.resolved), 2),
+                "cancelled": self.cancelled,
+                "fill_rate": round(100 * filled / placed) if placed else None,
+                "avg_mfe": round(statistics.mean(mfe), 2) if mfe else None,
+                "avg_mae": round(statistics.mean(mae), 2) if mae else None,
+                "basis": f"net of est. spread, {int(SCALE_OUT * 100)}% banked at TP1",
+                "daily": daily, "today_r": daily.get(desk_day(), 0.0),
                 "curve": curve, "outcomes": outcomes, "by_dir": by_dir,
                 "active": self.active,
                 "recent": list(reversed(self.resolved[-20:]))}
 
 
-trackers = {s: Tracker(SYMBOLS[s]["pred_file"]) for s in SYMBOLS}
+trackers = {s: Tracker(SYMBOLS[s]["pred_file"], SYMBOLS[s]["spread_est"])
+            for s in SYMBOLS}
+governor_state = {}
+
+
+def desk_governor(now=None):
+    """Desk-wide risk state across every instrument for today (desk tz)."""
+    today = desk_day(now)
+    closed = sorted((p for t in trackers.values() for p in t.resolved
+                     if desk_day(p.get("closed", p["opened"])) == today),
+                    key=lambda p: p.get("closed", p["opened"]))
+    day_r = round(sum(p["r"] for p in closed), 2)
+    streak = 0
+    for p in reversed(closed):
+        if p["r"] >= -0.05:
+            break
+        streak += 1
+    open_n = sum(1 for t in trackers.values() if t.active)
+    halted = day_r <= -DAILY_STOP_R
+    tight = streak >= LOSS_STREAK_TIGHTEN
+    return {"day": today, "day_r": day_r, "trades_today": len(closed),
+            "daily_stop_r": DAILY_STOP_R,
+            "risk_left_r": round(max(0.0, DAILY_STOP_R + min(0.0, day_r)), 2),
+            "loss_streak": streak, "tighten_after": LOSS_STREAK_TIGHTEN,
+            "open": open_n, "max_open": MAX_OPEN,
+            "halted": halted, "tightened": tight, "full": open_n >= MAX_OPEN,
+            "grades": ["A+", "A"] if tight else ["A+", "A", "B"]}
+
+
+def apply_governor(sym, sig, gov):
+    """Desk risk rules override a single instrument's tradeable flag."""
+    sig["governor"] = gov
+    if sig.get("status") != "ok" or not sig["session"].get("open", True):
+        return
+    if gov["halted"]:
+        sig["tradeable"] = False
+        sig["desk_action"] = {
+            "mode": "HALT", "title": "Desk halted for the day",
+            "detail": f"Daily stop hit: {gov['day_r']:+.2f}R against a "
+                      f"-{gov['daily_stop_r']:g}R limit. No new tickets until the "
+                      "desk day resets. Review the journal; do not chase losses."}
+        return
+    if sig["direction"] == "NEUTRAL" or not sig.get("tradeable"):
+        return
+    if sig.get("grade") not in gov["grades"]:
+        sig["tradeable"] = False
+        sig["desk_action"] = {
+            "mode": "CAUTION", "title": f"{sig['direction']} observation",
+            "detail": f"{gov['loss_streak']} straight losses today: desk is A-grade "
+                      f"only until a winner. This is grade {sig.get('grade')}."}
+    elif gov["full"] and not trackers[sym].active:
+        sig["tradeable"] = False
+        sig["desk_action"] = {
+            "mode": "CAUTION", "title": f"{sig['direction']} observation",
+            "detail": f"{gov['open']}/{gov['max_open']} tickets already open "
+                      "across the desk: concurrent risk cap reached."}
 
 
 # ---------------------------------------------------------------- Precifarm desk brief
@@ -1610,7 +1820,7 @@ def copilot_answer(sym, q):
         if not c:
             return "No trade - signal is neutral."
         return (f"Desk pick: {c['name']} {d} — entry {c['entry']}, stop {c['sl']}, "
-                f"TP2 {c['tp2']} (RR 1:{c.get('rr', 2)}, {c['prob']}% est). {c.get('note', '')}")
+                f"TP2 {c['tp2']} (RR 1:{c.get('rr', TP_R[1])}, {c['prob']}% est). {c.get('note', '')}")
     if "risk" in ql or "size" in ql:
         return (f"Use the risk engine: {conf}% confidence, stop distance {sig.get('sl_dist')}, "
                 f"grade {sig['grade']}. Journal {'ON' if sig.get('tradeable') else 'PAUSED'} — "
@@ -1647,6 +1857,8 @@ def poller():
                     except Exception:
                         pass
                 sig = build_signal(sym, fetch_tv(SYMBOLS[sym]["tv"]))
+                gov = desk_governor()
+                apply_governor(sym, sig, gov)
                 if sig.get("price"):
                     price_history[sym].append([int(time.time()), sig["price"]])
                     trackers[sym].update(sym, sig)
@@ -1654,8 +1866,10 @@ def poller():
                     sig["alerts"] = list(alerts[sym])
                 sig["history"] = list(price_history[sym])
                 sig["perf"] = trackers[sym].perf()
+                sig["governor"] = desk_governor()
                 with state_lock:
                     latest[sym] = sig
+                    governor_state.update(sig["governor"])
             except Exception as e:
                 with state_lock:
                     latest[sym] = {"status": "error", "error": str(e),
@@ -1686,7 +1900,8 @@ class Handler(BaseHTTPRequestHandler):
         if h.startswith("Basic "):
             try:
                 u, _, p = base64.b64decode(h[6:]).decode().partition(":")
-                return u == user and p == passwd
+                return (hmac.compare_digest(u.encode(), user.encode())
+                        & hmac.compare_digest(p.encode(), passwd.encode()))
             except Exception:
                 return False
         return False
@@ -1764,7 +1979,7 @@ class Handler(BaseHTTPRequestHandler):
                 ok = sum(1 for s in SYMBOLS
                          if latest.get(s, {}).get("status") == "ok")
             self._send(json.dumps({
-                "status": "ok", "engine": "4.3", "symbols_ok": ok,
+                "status": "ok", "engine": ENGINE_V, "symbols_ok": ok,
                 "symbols_total": len(SYMBOLS),
                 "macro_ts": macro_cache.get("ts"),
                 "port": PORT,
@@ -1814,8 +2029,9 @@ class Handler(BaseHTTPRequestHandler):
                         "tradeable": st.get("tradeable"),
                         "mode": (st.get("desk_action") or {}).get("mode"),
                     })
+                gov = dict(governor_state)
             self._send(json.dumps({"ts": time.strftime("%H:%M:%S"),
-                                     "symbols": rows}).encode(),
+                                   "symbols": rows, "governor": gov}).encode(),
                        "application/json")
         elif parsed.path == "/" or parsed.path.startswith("/index"):
             try:
@@ -1839,7 +2055,7 @@ def main():
         sys.exit(1)
     load_auth()
     threading.Thread(target=poller, daemon=True).start()
-    print(f"Signal Desk v4.3 -> http://localhost:{PORT} (and Tailscale devices)")
+    print(f"Signal Desk v{ENGINE_V} -> http://localhost:{PORT} (and Tailscale devices)")
     srv.serve_forever()
 
 
