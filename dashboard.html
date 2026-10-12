@@ -534,7 +534,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
       </div>
 
       <div class="panel">
-        <div class="ph">Desk Copilot<span style="font-size:8.5px;letter-spacing:.5px">RULE-BASED · LIVE STATE ONLY</span></div>
+        <div class="ph">Desk Copilot<span style="font-size:8.5px;letter-spacing:.5px">{{ cpEngine==='claude' ? 'CLAUDE' : 'RULE-BASED' }} · LIVE STATE ONLY</span></div>
         <div class="pb">
           <div class="qrow">
             <button class="qbtn" v-for="q in quickQs" :key="q" @click="ask(q)">{{ q }}</button>
@@ -542,12 +542,12 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
           <div class="cplog" ref="cplog">
             <template v-for="(m,i) in cpLog" :key="i">
               <div class="cpq">▸ {{ m.q }}</div>
-              <div class="cpa">{{ m.a }}</div>
+              <div class="cpa" style="white-space:pre-wrap">{{ m.a }}<span v-if="m.e==='claude'" class="mut" style="font-size:9px"> · claude</span></div>
             </template>
           </div>
           <div class="cpin">
-            <input v-model="cpQ" placeholder="ask the desk…" @keyup.enter="ask(cpQ)">
-            <button @click="ask(cpQ)">ASK</button>
+            <input v-model="cpQ" placeholder="ask the desk…" @keyup.enter="ask(cpQ)" :disabled="cpBusy">
+            <button @click="ask(cpQ)" :disabled="cpBusy">{{ cpBusy ? '…' : 'ASK' }}</button>
           </div>
         </div>
       </div>
@@ -734,7 +734,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
   </div>
 
   <footer class="foot">15 instruments · Metals, Crypto, FX, Indices, Energy · hotkeys <kbd>1</kbd>–<kbd>9</kbd> · refresh 15s · TradingView + Yahoo<br>
-  Rule-based copilot (no LLM). All R figures net of estimated spread. <strong style="font-weight:600;color:var(--dim)">Educational only — not financial advice.</strong></footer>
+  Copilot: Claude when configured, rule-based otherwise; both answer from live state only. All R figures net of estimated spread. <strong style="font-weight:600;color:var(--dim)">Educational only — not financial advice.</strong></footer>
 
   <!-- auth modal -->
   <div class="overlay" v-if="authOpen" @click.self="closeAuth">
@@ -782,7 +782,7 @@ createApp({
     d:{status:'loading'}, flash:'', prevPx:null, prevDir:null, alertSeen:0,
     acct:10000, riskpct:1,
     now:Date.now(), toasts:[], tid:0,
-    cpQ:'', cpLog:[], quickQs:['Why this bias?','Should I wait?','How strong is this trend?','Is this a fake breakout?','Where are institutions positioned?','Safest entry?',"Summarize today's market"],
+    cpQ:'', cpLog:[], cpBusy:false, cpEngine:'rules', quickQs:['Why this bias?','Should I wait?','How strong is this trend?','Is this a fake breakout?','Where are institutions positioned?','Safest entry?',"Summarize today's market"],
     tvu:'',tvp:'',tvsid:'',tvsign:'',tverrMsg:'',authOpen:false,authStep:'signin',authLoading:false,
     tvWidgetSym:null, curvePts:[], macroHelp:false,
     darkMode:false, roster:[], refreshing:false,
@@ -926,10 +926,12 @@ createApp({
       });
     },
     async ask(q){
-      q=(q||'').trim(); if(!q) return; this.cpQ='';
-      const r=await fetch('/api/ask?sym='+this.sym+'&q='+encodeURIComponent(q));
-      const j=await r.json();
-      this.cpLog.push({q, a:j.answer});
+      q=(q||'').trim(); if(!q||this.cpBusy) return; this.cpQ=''; this.cpBusy=true;
+      let j={answer:'Desk unreachable - try again.', engine:'rules'};
+      try{ const r=await fetch('/api/ask?sym='+this.sym+'&q='+encodeURIComponent(q)); j=await r.json(); }
+      catch(e){} finally{ this.cpBusy=false; }
+      this.cpEngine=j.engine||'rules';
+      this.cpLog.push({q, a:j.answer, e:j.engine});
       if(this.cpLog.length>8) this.cpLog.shift();
       this.$nextTick(()=>{const el=this.$refs.cplog; if(el) el.scrollTop=el.scrollHeight});
     },

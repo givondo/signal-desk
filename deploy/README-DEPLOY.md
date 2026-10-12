@@ -80,3 +80,18 @@ to stay on.
 | Best for | Personal desk, phone via Tailscale | Quick public URL |
 
 You can install **Tailscale on GCP too** and skip opening port 8899 — same privacy as Oracle.
+
+## Claude analyst layer (optional)
+
+The copilot (`/api/ask`) and the desk brief can run through Claude. Install the SDK and give the service a key:
+
+    pip install -r requirements.txt
+    export ANTHROPIC_API_KEY=sk-ant-...     # or add to the systemd EnvironmentFile
+
+Without either, the desk runs the rule-based copilot exactly as before. `/api/health` reports `claude.enabled`, the model and the last error.
+
+- Copilot: Claude answers by default when enabled; `engine=rules` forces the rule engine.
+- Brief: `GET /api/desk/brief?sym=XAUUSD&engine=claude` returns the Claude-written brief. The rule engine still decides DESK STATUS and any signal; Claude may not upgrade either.
+- System prompt: `docs/PRECIFARM_DESK_ANALYST.md`. Edit the protocol there.
+- Tuning: `CLAUDE_DESK_MODEL` (default `claude-opus-5-5`), `CLAUDE_DESK_EFFORT` (default `medium`), `CLAUDE_DESK=off` to disable.
+- Refusal fallback is on (`fallbacks: "default"`), so a declined request is retried on another model inside the same call; if the whole chain declines, the desk falls back to the rule answer.
