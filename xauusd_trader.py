@@ -6,13 +6,17 @@ Serves http://localhost:8899 (dashboard.html) and a JSON API:
   /api/signal?sym=XAUUSD|BTCUSD   full state: price, MTF matrix, confluence
                                   scores, entry models, reasons, macro, news,
                                   alerts, performance analytics
-  /api/ask?sym=..&q=..            rule-based copilot answers from live state
-  /api/desk/brief?sym=XAUUSD      Precifarm analyst brief (plain text)
+  /api/ask?sym=..&q=..            copilot answers from live state (Claude when
+                                  configured, rule-based otherwise; engine=rules
+                                  forces the rule engine)
+  /api/desk/brief?sym=XAUUSD      Precifarm analyst brief (plain text); add
+                                  engine=claude for the Claude-written brief
   /api/tv_login (POST)            TradingView account session
 
 Data: TradingView scanner (multi-timeframe technicals), Yahoo (macro complex,
 15m candles, RSS news), optional Bloomberg Terminal via blpapi.
-Educational tool - NOT financial advice.  Stdlib only.
+Educational tool - NOT financial advice.  Stdlib only; the optional Claude
+layer (claude_desk.py) needs `pip install anthropic` and an API key.
 """
 
 import base64
@@ -1524,6 +1528,15 @@ except ImportError:
     build_desk_brief = confluence_score_10 = None
     _EAT = None
 
+try:
+    import claude_desk
+except ImportError:
+    claude_desk = None
+
+
+def claude_on():
+    return bool(claude_desk and claude_desk.available())
+
 
 def precifarm_brief_for(sym, qs_extra=None):
     qs_extra = qs_extra or {}
@@ -1768,6 +1781,8 @@ class Handler(BaseHTTPRequestHandler):
                 "symbols_total": len(SYMBOLS),
                 "macro_ts": macro_cache.get("ts"),
                 "port": PORT,
+                "claude": claude_desk.status() if claude_desk else
+                          {"enabled": False},
             }).encode(), "application/json")
             return
         if not self._authorized():
@@ -1783,7 +1798,16 @@ class Handler(BaseHTTPRequestHandler):
         elif parsed.path == "/api/ask":
             q = (qs.get("q") or [""])[0]
             ans = copilot_answer(sym, q)
-            self._send(json.dumps({"answer": ans}).encode(),
+            engine = "rules"
+            want = (qs.get("engine") or ["auto"])[0]
+            if want != "rules" and q.strip() and claude_on():
+                with state_lock:
+                    sig = dict(latest.get(sym) or {})
+                if sig.get("status") == "ok":
+                    ai = claude_desk.ask(sig, q, ans)
+                    if ai:
+                        ans, engine = ai, "claude"
+            self._send(json.dumps({"answer": ans, "engine": engine}).encode(),
                        "application/json")
         elif parsed.path == "/api/desk/brief":
             extra = {
@@ -1793,9 +1817,18 @@ class Handler(BaseHTTPRequestHandler):
                 "secondary": (qs.get("secondary") or [None])[0],
             }
             text = precifarm_brief_for(sym, extra)
+            engine = "rules"
+            if (qs.get("engine") or ["rules"])[0] == "claude" and claude_on():
+                with state_lock:
+                    sig = dict(latest.get(sym) or {})
+                if sig.get("status") == "ok":
+                    ai = claude_desk.brief(sig, text)
+                    if ai:
+                        text, engine = ai, "claude"
             fmt = (qs.get("format") or ["text"])[0]
             if fmt == "json":
-                body = json.dumps({"sym": sym, "brief": text}).encode()
+                body = json.dumps({"sym": sym, "brief": text,
+                                   "engine": engine}).encode()
                 self._send(body, "application/json")
             else:
                 self._send(text.encode("utf-8"), "text/plain; charset=utf-8")
@@ -1840,6 +1873,8 @@ def main():
     load_auth()
     threading.Thread(target=poller, daemon=True).start()
     print(f"Signal Desk v4.3 -> http://localhost:{PORT} (and Tailscale devices)")
+    print("Copilot engine: " + (f"Claude ({claude_desk.MODEL})" if claude_on()
+                                else "rule-based (no Anthropic credentials)"))
     srv.serve_forever()
 
 

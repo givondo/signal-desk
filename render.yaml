@@ -5,7 +5,7 @@ services:
     branch: master
     repo: https://github.com/givondo/signal-desk
     healthCheckPath: /api/health
-    buildCommand: "true"
+    buildCommand: pip install -r requirements.txt
     startCommand: python xauusd_trader.py
     envVars:
       - key: PYTHON_VERSION
@@ -14,5 +14,7 @@ services:
         value: trader
       - key: SIGNALDESK_PASS
         generateValue: true
+      - key: ANTHROPIC_API_KEY
+        sync: false
       - key: PYTHONUNBUFFERED
         value: "1"

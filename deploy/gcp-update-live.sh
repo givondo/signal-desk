@@ -30,7 +30,11 @@ else
   git clone https://github.com/givondo/signal-desk.git /opt/signaldesk-src
 fi
 mkdir -p /opt/signaldesk/data
-cp /opt/signaldesk-src/xauusd_trader.py /opt/signaldesk-src/precifarm_analyst.py /opt/signaldesk-src/dashboard.html /opt/signaldesk/
+cp /opt/signaldesk-src/xauusd_trader.py /opt/signaldesk-src/precifarm_analyst.py /opt/signaldesk-src/claude_desk.py /opt/signaldesk-src/dashboard.html /opt/signaldesk/
+mkdir -p /opt/signaldesk/docs
+cp /opt/signaldesk-src/docs/PRECIFARM_DESK_ANALYST.md /opt/signaldesk/docs/
+# Optional Claude layer: harmless if pip is missing, the desk falls back to rules.
+python3 -m pip install -q --break-system-packages "anthropic>=1.13" 2>/dev/null || true
 cp /opt/signaldesk-src/deploy/signaldesk.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl restart signaldesk
