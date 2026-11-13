@@ -1,0 +1,40 @@
+{
+  "_comment": "Hard risk limits for GIVONDO Trading OS. Changing a limit requires a dated entry in 13_Decisions_and_Reviews/Trading_Decisions.md. Limits may be tightened at any time; loosening requires 100+ journaled trades showing positive expectancy at the current level.",
+  "version": "1.0",
+  "effective_from": "2026-11-13",
+  "personal": {
+    "max_risk_per_trade_pct": 0.5,
+    "hard_cap_risk_per_trade_pct": 1.0,
+    "max_aggregate_open_risk_pct": 1.0,
+    "max_correlated_risk_pct": 0.75,
+    "max_simultaneous_trades": 2,
+    "daily_loss_limit_pct": 1.5,
+    "weekly_loss_limit_pct": 3.0,
+    "max_consecutive_losses_per_day": 3,
+    "drawdown_review_pct": 8.0,
+    "drawdown_halt_pct": 15.0,
+    "cooling_off_hours_after_daily_limit": 24,
+    "cooling_off_days_after_weekly_limit": 3
+  },
+  "prop": {
+    "max_risk_per_trade_pct_of_initial": 0.5,
+    "hard_cap_risk_per_trade_pct_of_initial": 1.0,
+    "internal_daily_stop_fraction_of_firm_daily": 0.4,
+    "reduce_risk_when_max_loss_used_fraction": 0.5,
+    "reduced_risk_per_trade_pct_of_initial": 0.25,
+    "stop_trading_account_when_max_loss_used_fraction": 0.75,
+    "max_simultaneous_trades": 2,
+    "max_consecutive_losses_per_day": 3,
+    "max_consecutive_failed_evaluations_before_demo_return": 2
+  },
+  "alerts": {
+    "warn_when_allowance_used_fraction": 0.5,
+    "critical_when_allowance_used_fraction": 0.75
+  },
+  "correlation_groups": {
+    "USD_LONG_SIDE": ["XAUUSD:SELL", "EURUSD:SELL", "GBPUSD:SELL", "USDJPY:BUY", "USDCHF:BUY", "USDCAD:BUY"],
+    "USD_SHORT_SIDE": ["XAUUSD:BUY", "EURUSD:BUY", "GBPUSD:BUY", "USDJPY:SELL", "USDCHF:SELL", "USDCAD:SELL"],
+    "US_EQUITY_LONG": ["US100:BUY", "US500:BUY", "US30:BUY"],
+    "US_EQUITY_SHORT": ["US100:SELL", "US500:SELL", "US30:SELL"]
+  }
+}

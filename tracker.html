@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Trading Tracker · Signal Desk</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230b0d10'/%3E%3Ctext x='32' y='44' font-size='30' font-weight='bold' text-anchor='middle' fill='%23c9a227' font-family='Consolas'%3ETR%3C/text%3E%3C/svg%3E">
+<style>
+:root{--bg:#eef1f6;--p1:#fff;--p2:#f4f6f9;--p3:#e8ecf2;--bd:rgba(16,24,40,.08);--bd2:rgba(16,24,40,.14);
+--tx:#101828;--dim:#475467;--dim2:#98a2b3;--g:#0d9b6e;--r:#d04438;--a:#b8860b;--gold:#c9a227;--b:#2563eb;
+--gt:rgba(13,155,110,.12);--rt:rgba(208,68,56,.12);--at:rgba(184,134,11,.14);--bt:rgba(37,99,235,.12);
+--radius:10px;--font:'DM Sans',system-ui,-apple-system,sans-serif;--mono:'JetBrains Mono',Consolas,monospace}
+html[data-theme="dark"]{--bg:#0b0d10;--p1:#12161d;--p2:#181e28;--p3:#222a36;--bd:rgba(255,255,255,.08);--bd2:rgba(255,255,255,.14);
+--tx:#f0f2f5;--dim:#98a2b3;--dim2:#667085;--g:#34d399;--r:#f87171;--a:#fbbf24;--gold:#e4c04a;--b:#60a5fa;
+--gt:rgba(52,211,153,.14);--rt:rgba(248,113,113,.14);--at:rgba(251,191,36,.16);--bt:rgba(96,165,250,.14)}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--tx);font:13px/1.45 var(--font);min-height:100vh}
+.mono,td.n{font-family:var(--mono);font-variant-numeric:tabular-nums}
+header{position:sticky;top:0;z-index:5;background:var(--p1);border-bottom:1px solid var(--bd);padding:10px 18px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.mark{width:34px;height:34px;border-radius:8px;background:#0b0d10;color:var(--gold);font:800 13px var(--mono);display:flex;align-items:center;justify-content:center}
+.ttl{font-weight:800;letter-spacing:.5px}.sub{font-size:10px;color:var(--dim)}
+nav{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto}
+nav button,.btn{background:var(--p2);color:var(--tx);border:1px solid var(--bd2);border-radius:6px;padding:7px 11px;cursor:pointer;font:600 12px var(--font)}
+nav button.on{border-color:var(--gold);color:var(--gold)}
+.btn.pri{background:var(--gold);color:#0b0d10;border-color:var(--gold)}
+a.btn{text-decoration:none;display:inline-block}
+main{max-width:1280px;margin:0 auto;padding:18px}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.card{background:var(--p1);border:1px solid var(--bd);border-radius:var(--radius);padding:14px}
+.card h3{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
+.kv{display:grid;grid-template-columns:1fr auto;gap:4px 10px}.kv span:nth-child(odd){color:var(--dim)}
+.kv span:nth-child(even){font-family:var(--mono);text-align:right}
+.verdict{margin-top:8px;font-size:12px;color:var(--dim)}
+.pill{display:inline-block;padding:2px 8px;border-radius:99px;font:700 10px var(--mono)}
+.OK{background:var(--gt);color:var(--g)}.WARN{background:var(--at);color:var(--a)}.CRITICAL,.BREACHED{background:var(--rt);color:var(--r)}
+.alert{border:1px solid var(--r);background:var(--rt);color:var(--tx);border-radius:8px;padding:10px;margin-bottom:12px}
+.note{border:1px solid var(--bd2);background:var(--p2);border-radius:8px;padding:10px;margin-bottom:12px;color:var(--dim)}
+table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:6px 8px;border-bottom:1px solid var(--bd);text-align:left;white-space:nowrap}
+th{color:var(--dim);font-weight:600;font-size:11px}.scroll{overflow:auto;max-height:65vh}
+form.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--dim)}
+.star{color:var(--gold)}
+input,select,textarea{background:var(--p2);color:var(--tx);border:1px solid var(--bd2);border-radius:6px;padding:7px 8px;font:13px var(--font)}
+textarea{min-height:56px;resize:vertical}.wide{grid-column:1/-1}
+.msg{margin-top:10px;font-size:12px}.ok{color:var(--g)}.err{color:var(--r)}
+.pos{color:var(--g)}.neg{color:var(--r)}
+.hidden{display:none}
+</style></head>
+<body>
+<header>
+  <div class="mark">TR</div>
+  <div><div class="ttl">Trading Tracker</div><div class="sub">GIVONDO Trading OS · append-only records · no orders placed</div></div>
+  <nav id="tabs"></nav>
+  <a class="btn" href="/">Desk</a>
+  <button class="btn" id="theme" type="button">☾</button>
+</header>
+<main id="app"><div class="note">Loading…</div></main>
+
+<script>
+"use strict";
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = v => v === null || v === undefined || v === "" ? "n/a" : (typeof v === "number" ? v.toLocaleString(undefined,{maximumFractionDigits:3}) : esc(v));
+const sel = (opts) => ({type:"select", opts});
+const N = {type:"number"}, DT = {type:"datetime"}, D = {type:"date"}, TA = {type:"textarea"};
+
+// Field definitions mirror the Trading OS CSV templates. * = required.
+const FORMS = {
+  trades: {title:"Log a trade", fields:[
+    ["account_type*", sel(["PERSONAL","PROP","DEMO","PAPER"])], ["account_label"], ["firm_or_broker"], ["instrument*",{def:"XAUUSD"}],
+    ["direction*", sel(["BUY","SELL"])], ["setup"], ["strategy_id",{def:"S-001"}], ["timeframe",{def:"M15"}],
+    ["session", sel(["","Asian","London","Overlap","New York"])], ["entry_time_utc",DT], ["exit_time_utc",DT],
+    ["entry_price*",N], ["stop_loss*",N], ["take_profit",N], ["exit_price*",N], ["volume",N],
+    ["initial_risk_amount*",N], ["currency",{def:"USD"}], ["gross_pl",N], ["commission",N], ["swap",N],
+    ["net_pl*",N], ["rule_compliance*", sel(["FOLLOWED","VIOLATED"])], ["violation_detail"],
+    ["emotional_state", sel(["","Calm","Confident","Fearful","Greedy","Impatient","FOMO","Revenge","Hesitant","Overconfident","Fatigued"])],
+    ["screenshot_before"], ["screenshot_after"], ["market_conditions",TA], ["lessons",TA]]},
+  missed: {title:"Missed trade", fields:[["date_utc",DT],["account_label"],["instrument*",{def:"XAUUSD"}],["direction",sel(["","BUY","SELL"])],
+    ["setup"],["strategy_id"],["planned_entry",N],["planned_stop",N],["planned_target",N],["hypothetical_r",N],
+    ["reason_missed*",TA],["emotional_state"],["lesson",TA]]},
+  violations: {title:"Rule violation", fields:[["date_utc",DT],["trade_id"],["account_label"],["rule_broken*"],["description*",TA],
+    ["cost_amount",N],["currency",{def:"USD"}],["emotional_state"],["trigger"],["corrective_action",TA]]},
+  corrections: {title:"Correct a trade (original row is never edited)", fields:[["trade_id*"],["field*"],["original_value"],["corrected_value*"],["reason*",TA],["evidence"]]},
+  psychology: {title:"Daily psychology log", fields:[["date*",D],["session",sel(["","Asian","London","Overlap","New York"])],["sleep_hours",N],
+    ...["energy","stress","fear","greed","impatience","fomo","overconfidence","fatigue","hesitation"].map(k=>[k+"_1_5",sel(["","1","2","3","4","5"])]),
+    ["overtrading_flag",sel(["","N","Y"])],["revenge_trading_flag",sel(["","N","Y"])],["trades_taken",N],["rule_violations",N],["notes",TA]]},
+  evaluations: {title:"Prop purchase (challenge, reset or add-on)", fields:[["account_label*",{ph:"FTMO-2S-10K-01"}],["firm*"],["programme*"],
+    ["purchase_type*",sel(["CHALLENGE","RESET","ADDON"])],["nominal_size*",N],["platform",{def:"MT5"}],["purchase_date*",D],
+    ["fee_paid*",N],["fee_currency*",sel(["USD","EUR","GBP"])],["fx_rate_to_kes",N],["fee_kes",N],["fx_rate_source",sel(["","ACTUAL","ESTIMATED"])],
+    ["payment_method"],["stage",sel(["","Phase 1","Phase 2","Funded"])],["status*",sel(["PURCHASED","EVALUATION","PASSED","FAILED","FUNDED","CLOSED"])],
+    ["profit_target_pct",N],["daily_loss_pct",N],["max_loss_pct",N],["max_loss_mode",sel(["","static","trailing_eod","trailing_intraday"])],
+    ["closed_date",D],["outcome_reason"],["fee_refund_received",N],["rules_verified_on",D],["notes",TA]]},
+  snapshots: {title:"Prop account snapshot (run before each session)", fields:[["account_label*"],["firm"],["rules_preset*",{type:"preset"}],
+    ["stage*",sel(["EVALUATION","PASSED","FUNDED","PAYOUT ELIGIBLE","FAILED","CLOSED"])],["initial_balance*",N],["equity*",N],
+    ["day_start_balance*",N],["highest_eod_balance",N],["trading_days_completed",N],["profit_target_progress_pct",N],
+    ["consistency_status"],["payout_eligible",sel(["","N","Y"])],["notes",TA]]},
+  payouts: {title:"Payout", fields:[["account_label*"],["firm*"],["requested_date*",D],["gross_simulated_profit",N],["profit_split_pct",N],
+    ["amount_requested*",N],["currency*",sel(["USD","EUR"])],["status*",sel(["REQUESTED","APPROVED","RECEIVED","DENIED"])],["status_date",D],
+    ["amount_received",N],["received_date",D],["method",sel(["","Rise","Bank","Crypto","Wise","Card","Other"])],["payout_fees",N],
+    ["fx_rate_to_kes",N],["kes_received",N],["fx_rate_source",sel(["","ACTUAL","ESTIMATED"])],["reference"],["evidence"],["notes",TA]]},
+  deposits: {title:"Deposit", fields:[["date*",D],["account*"],["transaction_type",{def:"DEPOSIT"}],["amount*",N],["currency*",sel(["USD","KES","EUR"])],
+    ["fx_rate_to_kes",N],["kes_equivalent",N],["fx_rate_source*",sel(["ACTUAL","ESTIMATED"])],["charges",N],["charges_currency",{def:"KES"}],
+    ["payment_method",sel(["","M-Pesa","Bank transfer","Card","Stablecoin","Other"])],["reference"],["evidence"],["notes",TA]]},
+  withdrawals: {title:"Withdrawal", fields:[["date*",D],["account*"],["transaction_type",{def:"WITHDRAWAL"}],["amount*",N],["currency*",sel(["USD","KES","EUR"])],
+    ["fx_rate_to_kes",N],["kes_equivalent",N],["fx_rate_source*",sel(["ACTUAL","ESTIMATED"])],["charges",N],["charges_currency",{def:"KES"}],
+    ["payment_method",sel(["","M-Pesa","Bank transfer","Card","Stablecoin","Other"])],["reference"],["evidence"],["notes",TA]]},
+  accounts: {title:"Personal broker account", fields:[["account*"],["broker*"],["regulator_and_licence"],["account_type",sel(["","Standard","Raw"])],
+    ["base_currency*",sel(["USD","KES","EUR"])],["platform",{def:"MT5"}],["opened_date",D],["opening_capital",N],["status",{def:"OPEN"}],["notes",TA]]},
+  reconciliation: {title:"Monthly reconciliation", fields:[["period_end*",D],["account*"],["currency",{def:"USD"}],["opening_equity*",N],["deposits",N],
+    ["withdrawals",N],["realised_pl",N],["unrealised_pl_change",N],["commissions",N],["swaps",N],["other_charges",N],
+    ["closing_equity_statement*",N],["reconciled",sel(["N","Y"])],["max_drawdown_pct_to_date",N],["notes",TA]]},
+};
+
+const TABS = [["overview","Overview"],["trades","Journal"],["prop","Prop firms"],["capital","Capital"],["psych","Psychology"],["calc","Calculators"],["records","Records"]];
+let S = null, tab = location.hash.slice(1) || "overview";
+
+async function api(path, body){
+  const r = await fetch(path, body ? {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)} : {});
+  const j = await r.json().catch(()=>({ok:false,error:"bad response"}));
+  if(!r.ok && j.ok !== false) j.ok = false;
+  return j;
+}
+async function load(){ S = await api("/api/tracker/summary"); render(); }
+
+function metricsCard(title, m){
+  if(!m || !m.n) return `<div class="card"><h3>${esc(title)}</h3><div class="verdict">No trades recorded yet.</div></div>`;
+  const rows = [["Trades",m.n],["Win rate",(m.win_rate*100).toFixed(1)+"%"],["Expectancy / trade",m.expectancy_per_trade],
+    ["Expectancy (R)",m.expectancy_r],["Lower 95% (R)",m.expectancy_r_lower95],["Profit factor",m.profit_factor],["Net P/L",m.net_pl],
+    ["Max drawdown",m.max_drawdown],["Max losing streak",m.max_consecutive_losses],["Avg hold (h)",m.avg_holding_hours]];
+  return `<div class="card"><h3>${esc(title)}</h3><div class="kv">${rows.map(([k,v])=>`<span>${k}</span><span>${fmt(v)}</span>`).join("")}</div>
+    <div class="verdict">${esc(m.verdict)}</div></div>`;
+}
+function objFmt(v){
+  if(Array.isArray(v)) return v.length ? esc(v.join(", ")) : "n/a";
+  if(v && typeof v==="object"){ const e = Object.entries(v); return e.length ? e.map(([a,b])=>`${esc(a)} ${fmt(b)}`).join(" · ") : "n/a"; }
+  return fmt(v);
+}
+function kvCard(title, obj, skip=[]){
+  return `<div class="card"><h3>${esc(title)}</h3><div class="kv">${Object.entries(obj||{}).filter(([k])=>!skip.includes(k)).map(([k,v])=>
+    `<span>${esc(k.replace(/_/g," "))}</span><span>${objFmt(v)}</span>`).join("")}</div></div>`;
+}
+function propTable(){
+  const a = S.prop_accounts||[];
+  if(!a.length) return `<div class="note">No prop account snapshots yet. Add one under Prop firms before each session.</div>`;
+  return `<div class="card scroll"><h3>Prop accounts (latest snapshot)</h3><table><tr><th>Account</th><th>Preset</th><th>Stage</th><th>Equity</th>
+    <th>Daily floor</th><th>Internal stop</th><th>Max floor</th><th>Remaining</th><th>Status</th><th>As of</th></tr>
+    ${a.map(x=>`<tr><td>${esc(x.account_label)}</td><td>${esc(x.preset)}</td><td>${esc(x.stage)}</td><td class="n">${fmt(x.equity)}</td>
+    <td class="n">${fmt(x.daily_floor)}</td><td class="n">${fmt(x.internal_daily_stop)}</td><td class="n">${fmt(x.max_floor)}</td>
+    <td class="n">${fmt(x.remaining_allowance)}</td><td><span class="pill ${esc(x.status)}">${esc(x.status||x.error)}</span></td><td>${esc(x.as_of)}</td></tr>`).join("")}
+    </table></div>`;
+}
+function alerts(){
+  let h = "";
+  if(S.integrity && S.integrity.length) h += `<div class="alert"><b>Journal integrity:</b> ${S.integrity.map(esc).join(" ")}</div>`;
+  if(S.validation && S.validation.length) h += `<div class="alert"><b>Validation:</b> ${S.validation.slice(0,5).map(esc).join("; ")}</div>`;
+  return h;
+}
+
+function field([nameSpec, spec={}]){
+  const req = nameSpec.endsWith("*"), name = nameSpec.replace("*","");
+  let lab = name.replace(/_/g," ");
+  if(spec.type==="datetime") lab = lab.replace(/ utc$/,"") + " (your time, saved as UTC)";
+  const cls = (spec.type==="textarea" ? "wide " : "") + (req ? "req" : "");
+  let input;
+  if(spec.type==="select") input = `<select name="${name}">${spec.opts.map(o=>`<option>${esc(o)}</option>`).join("")}</select>`;
+  else if(spec.type==="preset") input = `<select name="${name}">${Object.entries(S.presets).map(([k,p])=>`<option value="${esc(k)}">${esc(k)}${p.kenya_eligible===false?" (not for Kenya)":""}</option>`).join("")}</select>`;
+  else if(spec.type==="textarea") input = `<textarea name="${name}"></textarea>`;
+  else input = `<input name="${name}" type="${spec.type==="number"?"number":spec.type==="date"?"date":spec.type==="datetime"?"datetime-local":"text"}"
+     ${spec.type==="number"?'step="any"':""} value="${esc(spec.def||"")}" placeholder="${esc(spec.ph||"")}" data-kind="${spec.type||""}">`;
+  return `<label class="${cls}"><span>${esc(lab)}${req?' <b class="star">*</b>':""}</span>${input}</label>`;
+}
+function formHtml(kind){
+  const f = FORMS[kind];
+  return `<div class="card"><h3>${esc(f.title)}</h3><form class="f" data-kind="${kind}">${f.fields.map(field).join("")}
+    <div class="wide"><button class="btn pri" type="submit">Save (append only)</button><span class="msg"></span></div></form></div>`;
+}
+async function submitForm(e){
+  e.preventDefault();
+  const form = e.target, kind = form.dataset.kind, row = {}, msg = form.querySelector(".msg");
+  for(const el of form.elements){
+    if(!el.name) continue;
+    let v = el.value.trim();
+    if(el.dataset.kind==="datetime" && v) v = new Date(v).toISOString().replace(".000Z","+00:00");
+    if(v !== "") row[el.name] = v;
+  }
+  const r = await api("/api/tracker/append", {kind, row});
+  if(r.ok){ msg.className="msg ok"; msg.textContent = "Saved " + (r.row.trade_id||r.row.record_id||r.row.snapshot_id||r.row.payout_id||r.row.txn_id||""); form.reset(); await load(); }
+  else { msg.className="msg err"; msg.textContent = r.error || "Not saved"; }
+}
+
+const VIEWS = {
+  overview(){
+    const t = S.trades;
+    return alerts() + `<div class="note">Personal, prop and practice results are kept apart. Paper tickets from the desk engine sync automatically and are measured in R. Only received payouts count as cash.</div>
+      <div class="grid">${metricsCard("Personal (live)",t.personal.metrics)}${metricsCard("Prop accounts",t.prop.metrics)}${metricsCard("Practice: paper and demo",t.practice.metrics)}</div><br>
+      ${propTable()}<br><div class="grid">${kvCard("Prop economics (cash only)",S.prop_economics,["note"])}${kvCard("Personal capital",S.capital,["twr_assumption"])}${kvCard("Rule compliance (live)",S.compliance)}</div>
+      <br><div class="card"><button class="btn" id="sync">Sync paper tickets now</button> <a class="btn" href="/api/tracker/backup">Download full backup (.zip)</a>
+      <span class="sub"> Generated ${esc(S.generated_at)}</span></div>`;
+  },
+  trades(){ return alerts() + formHtml("trades") + "<br>" + `<div class="grid">${formHtml("missed")}${formHtml("violations")}</div><br>` + formHtml("corrections"); },
+  prop(){ return propTable() + "<br>" + formHtml("snapshots") + "<br>" + formHtml("evaluations") + "<br>" + formHtml("payouts"); },
+  capital(){ return kvCard("Personal capital",S.capital,[]) + "<br>" + formHtml("accounts") + "<br><div class='grid'>" + formHtml("deposits") + formHtml("withdrawals") + "</div><br>" + formHtml("reconciliation"); },
+  psych(){ return formHtml("psychology"); },
+  calc(){
+    const presets = Object.entries(S.presets).map(([k,p])=>`<option value="${esc(k)}">${esc(k)} · verified ${esc(p.verified_on)}</option>`).join("");
+    return `<div class="grid"><div class="card"><h3>Position size (rounds down, costs included)</h3><form class="f" id="sizeF">
+      <label>equity <b class="star">*</b><input name="equity" type="number" step="any"></label><label>risk pct <b class="star">*</b><input name="risk_pct" type="number" step="any" value="0.5"></label>
+      <label>symbol<select name="symbol"><option>XAUUSD</option><option>EURUSD</option><option>GBPUSD</option><option>USDJPY</option><option>US100</option></select></label>
+      <label>entry <b class="star">*</b><input name="entry" type="number" step="any"></label><label>stop <b class="star">*</b><input name="stop" type="number" step="any"></label>
+      <label>spread (price)<input name="spread" type="number" step="any" value="0.30"></label><label>slippage (price)<input name="slippage" type="number" step="any" value="0.10"></label>
+      <label>commission per lot<input name="commission" type="number" step="any"></label><label>rate quote→account<input name="rate" type="number" step="any"></label>
+      <label>account<select name="kind"><option value="personal">personal</option><option value="prop">prop</option></select></label>
+      <div class="wide"><button class="btn pri">Calculate</button></div></form><div class="kv msg" id="sizeOut"></div></div>
+      <div class="card"><h3>Prop drawdown check</h3><form class="f" id="ddF"><label>preset <b class="star">*</b><select name="preset">${presets}</select></label>
+      <label>initial balance <b class="star">*</b><input name="initial" type="number" step="any"></label><label>equity now <b class="star">*</b><input name="equity" type="number" step="any"></label>
+      <label>day start balance <b class="star">*</b><input name="day_start_balance" type="number" step="any"></label><label>highest EOD balance<input name="highest_eod_balance" type="number" step="any"></label>
+      <div class="wide"><button class="btn pri">Check</button></div></form><div class="kv msg" id="ddOut"></div></div></div>`;
+  },
+  records(){
+    return `<div class="card"><form id="recF" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap"><label>record type<select name="kind">${Object.keys(FORMS).map(k=>`<option>${k}</option>`).join("")}</select></label>
+      <button class="btn">Show</button><a class="btn" id="exp" href="/api/tracker/export?kind=trades">Export CSV</a></form><div id="recOut" class="scroll" style="margin-top:10px"></div></div>`;
+  },
+};
+
+async function calc(form, path, outId){
+  const body = Object.fromEntries([...new FormData(form)].filter(([,v])=>v!==""));
+  const r = await api(path, body), out = document.getElementById(outId);
+  out.innerHTML = r.ok ? Object.entries(r.result).map(([k,v])=>`<span>${esc(k.replace(/_/g," "))}</span><span>${Array.isArray(v)?esc(v.join(" ")):fmt(v)}</span>`).join("")
+                        : `<span class="err">${esc(r.error)}</span><span></span>`;
+}
+async function showRecords(kind){
+  const r = await api(`/api/tracker/records?kind=${encodeURIComponent(kind)}&limit=300`), out = document.getElementById("recOut");
+  document.getElementById("exp").href = `/api/tracker/export?kind=${encodeURIComponent(kind)}`;
+  if(r.ok===false){ out.innerHTML = `<span class="err">${esc(r.error)}</span>`; return; }
+  out.innerHTML = `<div class="sub">${r.total} rows, newest first</div><table><tr>${r.header.map(h=>`<th>${esc(h)}</th>`).join("")}</tr>
+    ${r.rows.map(row=>`<tr>${r.header.map(h=>`<td>${esc(row[h])}</td>`).join("")}</tr>`).join("")}</table>`;
+}
+
+function render(){
+  if(!S || S.ok===false){ document.getElementById("app").innerHTML = `<div class="alert">${esc((S&&S.error)||"Tracker unavailable")}</div>`; return; }
+  document.getElementById("tabs").innerHTML = TABS.map(([k,l])=>`<button type="button" data-t="${k}" class="${k===tab?"on":""}">${l}</button>`).join("");
+  document.getElementById("app").innerHTML = (VIEWS[tab]||VIEWS.overview)();
+  document.querySelectorAll("form.f[data-kind]").forEach(f=>f.addEventListener("submit", submitForm));
+  const s = document.getElementById("sync"); if(s) s.onclick = async()=>{ const r = await api("/api/tracker/sync_paper",{}); s.textContent = `Added ${r.added||0}`; await load(); };
+  const sz = document.getElementById("sizeF"); if(sz) sz.onsubmit = e=>{e.preventDefault(); calc(sz,"/api/tracker/size","sizeOut");};
+  const dd = document.getElementById("ddF"); if(dd) dd.onsubmit = e=>{e.preventDefault(); calc(dd,"/api/tracker/drawdown","ddOut");};
+  const rf = document.getElementById("recF"); if(rf){ rf.onsubmit = e=>{e.preventDefault(); showRecords(rf.kind.value);}; showRecords("trades"); }
+}
+document.getElementById("tabs").addEventListener("click", e=>{ const t = e.target.dataset.t; if(t){ tab = t; location.hash = t; render(); }});
+const themeBtn = document.getElementById("theme");
+function setTheme(t){ document.documentElement.setAttribute("data-theme", t); themeBtn.textContent = t==="dark"?"☀":"☾"; try{localStorage.setItem("sd-theme",t)}catch(e){} }
+themeBtn.onclick = ()=> setTheme(document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark");
+try{ setTheme(localStorage.getItem("sd-theme")||"dark"); }catch(e){ setTheme("dark"); }
+load();
+</script>
+</body></html>

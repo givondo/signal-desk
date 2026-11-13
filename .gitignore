@@ -4,3 +4,7 @@ predictions*.json
 deploy/*.key
 __pycache__/
 *.pyc
+# Trading OS records are personal financial data: never commit them
+trading_os_data/
+.journal_seal.json
+.pytest_cache/
