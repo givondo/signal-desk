@@ -8,11 +8,11 @@ import json
 import os
 import time
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
+from deskzones import get_zone
 
-EAT = ZoneInfo("Africa/Nairobi")
-LON = ZoneInfo("Europe/London")
-NY = ZoneInfo("America/New_York")
+EAT = get_zone("Africa/Nairobi")
+LON = get_zone("Europe/London")
+NY = get_zone("America/New_York")
 
 PRIMARY = "XAUUSD"
 SECONDARY_MAP = {

@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="Signal Desk — multi-asset trading terminal with live confluence scores, macro context, and performance analytics.">
-<meta name="theme-color" content="#0b0d10" id="meta-theme">
+<meta name="theme-color" content="#ffffff" id="meta-theme">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -15,9 +15,9 @@
 <script src="https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.js"></script>
 <style>
 :root{
---bg:#eef1f6;--p1:#ffffff;--p2:#f4f6f9;--p3:#e8ecf2;
---bd:rgba(16,24,40,.08);--bd2:rgba(16,24,40,.14);
---tx:#101828;--dim:#475467;--dim2:#98a2b3;
+--bg:#ffffff;--p1:#ffffff;--p2:#F9FAFB;--p3:#F3F4F6;
+--bd:#E5E7EB;--bd2:#D1D5DB;
+--tx:#111827;--dim:#6B7280;--dim2:#9CA3AF;
 --g:#0d9b6e;--r:#d04438;--a:#b8860b;--gold:#c9a227;--b:#2563eb;
 --gt:rgba(13,155,110,.12);--rt:rgba(208,68,56,.12);--at:rgba(184,134,11,.14);--bt:rgba(37,99,235,.12);
 --shadow:0 1px 2px rgba(16,24,40,.06),0 4px 16px rgba(16,24,40,.06);
@@ -25,7 +25,7 @@
 --radius:10px;--radius-sm:6px;
 --font:'DM Sans',system-ui,-apple-system,sans-serif;--mono:'JetBrains Mono',Consolas,monospace;
 --chart-bg:#ffffff;--spark:#c9a227;--spark-fill:rgba(201,162,39,.12);
---header-bg:rgba(255,255,255,.88)}
+--header-bg:rgba(255,255,255,.94)}
 html[data-theme="dark"]{
 --bg:#0b0d10;--p1:#12161d;--p2:#181e28;--p3:#222a36;
 --bd:rgba(255,255,255,.08);--bd2:rgba(255,255,255,.14);
@@ -66,6 +66,11 @@ padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;font-family:var(-
 .iconbtn{background:var(--p2);border:1px solid var(--bd2);color:var(--dim);width:36px;height:36px;border-radius:var(--radius-sm);
 cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;transition:all .15s}
 .iconbtn:hover{color:var(--tx);border-color:var(--bd2);background:var(--p3)}
+.clusters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:10px}
+.clusters .cl{padding:2px 7px;border-radius:var(--radius-sm);border:1px solid var(--bd);color:var(--dim)}
+.clusters .cl.full{border-color:var(--a);color:var(--a)}
+.clusters .cl small{color:var(--dim2);margin-left:3px}
+.inboxbadge{display:inline-block;margin-left:6px;min-width:16px;padding:0 5px;border-radius:8px;background:var(--a);color:#fff;font-size:10px;line-height:16px;text-align:center;font-weight:600}
 .tvlink{font-size:11px;color:var(--dim);padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--bd);
 background:var(--p2);cursor:pointer;transition:all .15s;white-space:nowrap}
 .tvlink:hover{color:var(--tx);border-color:var(--bd2)}
@@ -367,7 +372,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
         <span class="head-sync"><span class="live" aria-hidden="true"></span>Updated {{ d.ts||'—' }}
           <button type="button" @click="refreshNow" :disabled="refreshing">{{ refreshing?'…':'↻' }}</button></span>
         <span class="clockline">{{ clock }} UTC · 15m {{ countdown }}</span>
-        <a class="tvlink" href="/tracker" title="Trading OS tracker: journal, prop accounts, capital" style="text-decoration:none">Tracker</a>
+        <a class="tvlink" :href="inboxN?'/tracker#journal':'/tracker'" :title="inboxN?inboxN+' TradingView trade(s) waiting in the journal inbox':'Trading OS tracker: journal, prop accounts, capital'" style="text-decoration:none">Tracker<span v-if="inboxN" class="inboxbadge">{{ inboxN }}</span></a>
         <button type="button" class="tvlink" :class="{on:d.tv_user}" @click="openAuth" :title="d.tv_user?'TradingView connected':'Connect TradingView'">
           TV {{ d.tv_user||'Connect' }}
         </button>
@@ -668,8 +673,12 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
             <div><div class="lb">Open Tickets</div><div class="vv" :class="gov.full?'nt':''">{{ gov.open??0 }} / {{ gov.max_open??'--' }}</div></div>
             <div><div class="lb">Loss Streak Today</div><div class="vv" :class="gov.tightened?'dn':''">{{ gov.loss_streak??0 }}{{ gov.tightened?' · A only':'' }}</div></div>
           </div>
+          <div v-if="clusterList.length" class="clusters" title="Open tickets grouped by the risk they really carry. A second ticket in a full group is blocked.">
+            <span class="lb">Correlated exposure</span>
+            <span v-for="c in clusterList" :key="c.name" class="cl" :class="c.full?'full':''">{{ c.name }} {{ c.n }}/{{ gov.max_per_cluster }} <small>{{ c.syms }}</small></span>
+          </div>
           <div class="govbar" :title="'Desk day '+signed(gov.day_r)+'R'"><i :style="{width:riskUsedPct+'%',background:riskUsedPct>=75?'var(--r)':riskUsedPct>=40?'var(--a)':'var(--g)'}"></i></div>
-          <div style="font-size:9px;color:var(--dim2);margin-top:5px">{{ d.size_note }} · Kelly from tracked history · desk governor: daily stop, max open tickets, A-grade only after {{ gov.tighten_after||2 }} straight losses</div>
+          <div style="font-size:9px;color:var(--dim2);margin-top:5px">{{ d.size_note }} · Kelly from tracked history · desk governor: daily stop, max open tickets, {{ gov.max_per_cluster||1 }} per correlated group, A-grade only after {{ gov.tighten_after||2 }} straight losses</div>
         </div>
       </div>
 
@@ -772,7 +781,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
 const {createApp} = Vue;
 createApp({
   data(){return{
-    sym:'XAUUSD',
+    sym:'XAUUSD', inboxN:0,
     symGroups:[
       ['Metals',[['XAUUSD','Gold · XAU/USD'],['XAGUSD','Silver · XAG/USD']]],
       ['Crypto',[['BTCUSD','Bitcoin · BTC'],['ETHUSD','Ethereum · ETH'],['SOLUSD','Solana · SOL'],['XRPUSD','XRP']]],
@@ -791,6 +800,11 @@ createApp({
   computed:{
     perf(){ return this.d.perf||{} },
     gov(){ return this.d.governor||{} },
+    clusterList(){
+      const c=this.gov.clusters||{}, cap=this.gov.max_per_cluster||1;
+      return Object.keys(c).sort().map(k=>({name:k,n:c[k].length,full:c[k].length>=cap,
+        syms:c[k].map(x=>x.split(' ')[0]).join(', ')}));
+    },
     tp2PayoffR(){  // 50% banked at TP1, runner to TP2
       const l=this.d.levels, sl=this.d.sl_dist;
       if(!l||!sl) return 2.25;
@@ -869,6 +883,10 @@ createApp({
       setTimeout(()=>{this.toasts=this.toasts.filter(t=>t.id!==id)},4500) },
     chipDir(s){ const r=this.roster.find(x=>x.sym===s); return r&&r.direction==='LONG'?'dirL':r&&r.direction==='SHORT'?'dirS':'mut' },
     chipDirLabel(s){ const r=this.roster.find(x=>x.sym===s); if(!r||!r.direction)return '·'; return r.direction==='LONG'?'L':r.direction==='SHORT'?'S':'N' },
+    async fetchInbox(){
+      try{ const r=await fetch('/api/tracker/fills/pending'); if(!r.ok) return;
+        const j=await r.json(); this.inboxN=(j.fills||[]).length; }catch(e){}
+    },
     async fetchRoster(){ try{
       const r=await fetch('/api/roster'); this.roster=(await r.json()).symbols||[];
     }catch(e){} },
@@ -879,8 +897,8 @@ createApp({
     applyTheme(){
       document.documentElement.setAttribute('data-theme', this.darkMode?'dark':'light');
       const meta=document.getElementById('meta-theme');
-      if(meta) meta.content=this.darkMode?'#0b0d10':'#eef1f6';
-      try{ localStorage.setItem('sd-theme', this.darkMode?'dark':'light') }catch(e){}
+      if(meta) meta.content=this.darkMode?'#0b0d10':'#ffffff';
+      try{ localStorage.setItem('sd-theme-v2', this.darkMode?'dark':'light') }catch(e){}
       this.tvWidgetSym=null;
       this.$nextTick(()=>this.mountChart());
     },
@@ -1021,12 +1039,13 @@ createApp({
   },
   mounted(){
     try{
-      const saved=localStorage.getItem('sd-theme');
-      if(saved==='dark'||saved==='light') this.darkMode=(saved==='dark');
-      else if(window.matchMedia('(prefers-color-scheme:dark)').matches) this.darkMode=true;
+      // White is the default. Dark only when chosen with the toggle (saved under a new key,
+      // so an older dark preference or the system setting no longer applies).
+      this.darkMode=(localStorage.getItem('sd-theme-v2')==='dark');
     }catch(e){}
     this.applyTheme();
-    this.tick(); this.fetchRoster();
+    this.tick(); this.fetchRoster(); this.fetchInbox();
+    setInterval(()=>this.fetchInbox(),60000);
     setInterval(()=>this.tick(),15000);
     setInterval(()=>this.fetchRoster(),15000);
     setInterval(()=>{this.now=Date.now()},1000);

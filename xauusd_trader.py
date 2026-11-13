@@ -289,18 +289,24 @@ TP_R = (1.5, 3.0, 4.5)     # TP1/TP2/TP3 in R; protocol minimum is 1.5R to TP1
 DAILY_STOP_R = float(os.environ.get("DESK_DAILY_STOP_R", "4"))
 MAX_OPEN = int(os.environ.get("DESK_MAX_OPEN", "4"))
 LOSS_STREAK_TIGHTEN = int(os.environ.get("DESK_LOSS_STREAK_TIGHTEN", "2"))
+# Correlated exposure: three crypto shorts are one bet, not three. Open tickets
+# are capped per risk cluster (crypto, metals, indices, energy, and FX majors by
+# the direction they put on the US dollar).
+MAX_PER_CLUSTER = int(os.environ.get("DESK_MAX_PER_CLUSTER", "1"))
 
 try:
-    from zoneinfo import ZoneInfo
-    _LON = ZoneInfo("Europe/London")
-    _NY = ZoneInfo("America/New_York")
-    DESK_TZ = ZoneInfo(os.environ.get("DESK_TZ", "Africa/Nairobi"))
-except Exception:          # no tzdata: fall back to fixed UTC session hours
+    # ZoneInfo when tz data exists; exact rule-based zones otherwise (Windows
+    # Python ships without tz data unless the tzdata package is installed).
+    from deskzones import get_zone
+    _LON = get_zone("Europe/London")
+    _NY = get_zone("America/New_York")
+    DESK_TZ = get_zone(os.environ.get("DESK_TZ", "Africa/Nairobi"))
+except Exception:          # unknown DESK_TZ without tzdata: fixed UTC session hours
     _LON = _NY = DESK_TZ = None
 AUTH_FILE = os.path.join(DATA_DIR, "tv_auth.json")
 DASH_FILE = os.path.join(BASE_DIR, "dashboard.html")   # read-only shipped asset
 TRACKER_FILE = os.path.join(BASE_DIR, "tracker.html")  # Trading OS tracker page
-TRACKER_MAX_BODY = 64 * 1024
+TRACKER_MAX_BODY = 1024 * 1024  # broker history imports can be large
 
 
 def _tracker_module():
@@ -1691,6 +1697,18 @@ trackers = {s: Tracker(SYMBOLS[s]["pred_file"], SYMBOLS[s]["spread_est"])
 governor_state = {}
 
 
+def risk_cluster(sym, direction):
+    """The risk a ticket really adds. FX majors are grouped by what they do to the
+    US dollar (short EURUSD and long USDJPY are both long USD); everything else
+    by asset group."""
+    cfg = SYMBOLS.get(sym, {})
+    cls = cfg.get("cls")
+    if cls in ("anti_usd", "pro_usd") and direction in ("LONG", "SHORT"):
+        long_usd = (direction == "LONG") == (cls == "pro_usd")
+        return "USD long" if long_usd else "USD short"
+    return cfg.get("grp") or sym
+
+
 def desk_governor(now=None):
     """Desk-wide risk state across every instrument for today (desk tz)."""
     today = desk_day(now)
@@ -1704,6 +1722,11 @@ def desk_governor(now=None):
             break
         streak += 1
     open_n = sum(1 for t in trackers.values() if t.active)
+    clusters = {}
+    for s, t in trackers.items():
+        if t.active:
+            c = risk_cluster(s, t.active.get("dir"))
+            clusters.setdefault(c, []).append(f"{s} {t.active.get('dir')}")
     halted = day_r <= -DAILY_STOP_R
     tight = streak >= LOSS_STREAK_TIGHTEN
     return {"day": today, "day_r": day_r, "trades_today": len(closed),
@@ -1712,6 +1735,7 @@ def desk_governor(now=None):
             "loss_streak": streak, "tighten_after": LOSS_STREAK_TIGHTEN,
             "open": open_n, "max_open": MAX_OPEN,
             "halted": halted, "tightened": tight, "full": open_n >= MAX_OPEN,
+            "clusters": clusters, "max_per_cluster": MAX_PER_CLUSTER,
             "grades": ["A+", "A"] if tight else ["A+", "A", "B"]}
 
 
@@ -1742,6 +1766,15 @@ def apply_governor(sym, sig, gov):
             "mode": "CAUTION", "title": f"{sig['direction']} observation",
             "detail": f"{gov['open']}/{gov['max_open']} tickets already open "
                       "across the desk: concurrent risk cap reached."}
+    elif not trackers[sym].active:
+        c = risk_cluster(sym, sig["direction"])
+        held = (gov.get("clusters") or {}).get(c, [])
+        if len(held) >= gov.get("max_per_cluster", MAX_PER_CLUSTER):
+            sig["tradeable"] = False
+            sig["desk_action"] = {
+                "mode": "CAUTION", "title": f"{sig['direction']} observation",
+                "detail": f"Correlated exposure: {', '.join(held)} already open in "
+                          f"{c}. A second ticket here doubles the same bet."}
 
 
 # ---------------------------------------------------------------- Precifarm desk brief

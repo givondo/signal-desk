@@ -9,7 +9,7 @@ sudo apt-get install -y python3 curl
 
 echo "== [2/5] Install app to /opt/signaldesk =="
 sudo mkdir -p /opt/signaldesk/data
-sudo cp xauusd_trader.py precifarm_analyst.py dashboard.html trading_tracker.py tracker.html /opt/signaldesk/
+sudo cp *.py *.html /opt/signaldesk/
 sudo cp -r trading_os /opt/signaldesk/
 for f in predictions*.json tv_auth.json; do
   [ -f "$f" ] && sudo cp "$f" /opt/signaldesk/data/ && echo "   carried $f → data/"

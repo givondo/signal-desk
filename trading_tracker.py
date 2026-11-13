@@ -55,6 +55,9 @@ KINDS: dict[str, tuple[str, str | None]] = {
     "deposits": ("09_Personal_Capital/Deposits.csv", "txn_id"),
     "withdrawals": ("09_Personal_Capital/Withdrawals.csv", "txn_id"),
     "reconciliation": ("09_Personal_Capital/Account_Reconciliation.csv", None),
+    "networth": ("09_Personal_Capital/Net_Worth.csv", "entry_id"),
+    "fills": ("07_Trading_Journal/Broker_Fills.csv", "fill_id"),
+    "fill_decisions": ("07_Trading_Journal/Fill_Decisions.csv", "decision_id"),
 }
 
 REQUIRED: dict[str, tuple[str, ...]] = {
@@ -74,7 +77,14 @@ REQUIRED: dict[str, tuple[str, ...]] = {
     "deposits": ("date", "account", "amount", "currency", "fx_rate_source"),
     "withdrawals": ("date", "account", "amount", "currency", "fx_rate_source"),
     "reconciliation": ("period_end", "account", "opening_equity", "closing_equity_statement"),
+    "networth": ("date", "item", "category", "amount", "currency"),
+    "fills": ("source", "broker", "broker_trade_id", "instrument", "direction"),
+    "fill_decisions": ("fill_id", "decision"),
 }
+
+ASSET_CATEGORIES = ("CASH", "EMERGENCY_FUND", "INVESTMENTS", "TRADING_ACCOUNT", "BUSINESS_EQUITY",
+                    "PROPERTY", "VEHICLE", "RECEIVABLE", "OTHER_ASSET")
+LIABILITY_CATEGORIES = ("LOAN", "CREDIT_CARD", "MOBILE_LOAN", "OTHER_LIABILITY")
 
 NUMERIC = {
     "entry_price", "stop_loss", "take_profit", "exit_price", "volume", "initial_risk_amount",
@@ -163,7 +173,7 @@ def _now_iso() -> str:
 def _new_id(kind: str, existing: set[str]) -> str:
     prefix = {"trades": "T", "corrections": "C", "missed": "M", "violations": "V",
               "evaluations": "E", "snapshots": "S", "payouts": "P", "deposits": "D",
-              "withdrawals": "W"}.get(kind, "R")
+              "withdrawals": "W", "networth": "NW", "fill_decisions": "FD"}.get(kind, "R")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     n = 1
     while f"{prefix}-{stamp}-{n}" in existing:
@@ -210,6 +220,24 @@ def _validate(kind: str, row: dict, existing: list[dict]) -> None:
             raise TrackerError(dup[-1])
     if kind == "snapshots" and row["rules_preset"] not in dc.PRESETS:
         raise TrackerError(f"rules_preset must be one of {sorted(dc.PRESETS)}")
+    if kind == "fill_decisions" and row["decision"].upper() not in ("IGNORED", "RESTORED"):
+        raise TrackerError("decision must be IGNORED or RESTORED")
+    if kind == "fill_decisions":
+        row["decision"] = row["decision"].upper()
+    if kind == "networth":
+        row["category"] = row["category"].upper().replace(" ", "_")
+        if row["category"] in ASSET_CATEGORIES:
+            row["type"] = "ASSET"
+        elif row["category"] in LIABILITY_CATEGORIES:
+            row["type"] = "LIABILITY"
+        else:
+            raise TrackerError("category must be one of " + ", ".join(ASSET_CATEGORIES + LIABILITY_CATEGORIES))
+        if float(row["amount"]) < 0:
+            raise TrackerError("enter liabilities as positive amounts; the category makes them negative")
+        row["currency"] = row["currency"].upper()
+        if row["currency"] != "KES" and not row.get("fx_rate_to_kes"):
+            raise TrackerError("fx_rate_to_kes is required for non-KES items")
+        row["liquid"] = (row.get("liquid") or "N").upper()[:1]
     if kind == "payouts" and row.get("status") == "RECEIVED" and not row.get("amount_received"):
         raise TrackerError("amount_received is required for a RECEIVED payout")
 
@@ -301,6 +329,117 @@ def _epoch_iso(v) -> str:
         return ""
 
 
+# ----------------------------------------------------------------- broker fills
+FILL_NUMERIC = ("volume", "entry_price", "exit_price", "stop_loss", "take_profit", "gross_pl", "commission", "swap", "net_pl")
+
+
+def _slug(v: str) -> str:
+    return "".join(ch for ch in (v or "").upper() if ch.isalnum() or ch in "-_")[:40] or "X"
+
+
+def fill_key(source: str, broker: str, broker_trade_id: str) -> str:
+    """Deterministic ID shared by the fill and the journal trade created from it."""
+    return f"{_slug(source)[:4]}-{_slug(broker)}-{_slug(broker_trade_id)}"
+
+
+def import_fills(source: str, broker: str, account_label: str, account_type: str, fills: list) -> dict:
+    """Store closed trades read from a broker or TradingView. Idempotent by broker trade id.
+
+    Fills land in an inbox first. A fill becomes a journal trade only when its stop
+    and money at risk are known (sent by the sync, or added by you in the tracker),
+    so no trade enters the journal without a defined risk.
+    """
+    if not isinstance(fills, list):
+        raise TrackerError("fills must be a list")
+    account_type = (account_type or "PERSONAL").upper()
+    if account_type not in ENUMS["account_type"]:
+        raise TrackerError("account_type must be one of " + ", ".join(sorted(ENUMS["account_type"])))
+    if len(fills) > 2000:
+        raise TrackerError("too many fills in one request (max 2000)")
+    existing = {r.get("fill_id") for r in read("fills")}
+    added, dupes, journaled, errors = 0, 0, 0, []
+    for f in fills:
+        if not isinstance(f, dict):
+            errors.append("skipped a fill that is not an object")
+            continue
+        tid = str(f.get("broker_trade_id") or "").strip()
+        if not tid:
+            errors.append("skipped a fill without broker_trade_id")
+            continue
+        fid = fill_key(source, broker, tid)
+        if fid in existing:
+            dupes += 1
+            continue
+        side = str(f.get("direction") or "").upper()
+        side = {"LONG": "BUY", "SHORT": "SELL"}.get(side, side)
+        row = {"fill_id": fid, "source": source, "broker": broker, "account_label": account_label,
+               "account_type": account_type, "broker_trade_id": tid, "instrument": str(f.get("instrument") or "").upper(),
+               "direction": side, "open_time_utc": f.get("open_time_utc") or "", "close_time_utc": f.get("close_time_utc") or "",
+               "currency": f.get("currency") or "USD", "raw": str(f.get("raw") or "")[:600]}
+        for k in FILL_NUMERIC:
+            row[k] = f.get(k, "")
+        try:
+            append("fills", row)
+        except TrackerError as e:
+            errors.append(f"{tid}: {e}")
+            continue
+        existing.add(fid)
+        added += 1
+        risk = ta.num(f.get("initial_risk_amount"))
+        if risk and risk > 0 and row.get("stop_loss") not in ("", None):
+            try:
+                journal_fill(fid, {"initial_risk_amount": risk, "stop_loss": row["stop_loss"],
+                                   "rule_compliance": "FOLLOWED", "lessons": "auto-journaled by sync"})
+                journaled += 1
+            except TrackerError as e:
+                errors.append(f"{tid}: not journaled: {e}")
+    return {"added": added, "duplicates": dupes, "auto_journaled": journaled, "errors": errors[:20]}
+
+
+def pending_fills() -> list[dict]:
+    """Fills not yet in the journal and not ignored, newest first."""
+    journal_ids = {r.get("trade_id") for r in read("trades")}
+    state: dict[str, str] = {}
+    for d in read("fill_decisions"):
+        state[d.get("fill_id")] = d.get("decision")
+    out = [f for f in read("fills") if f["fill_id"] not in journal_ids and state.get(f["fill_id"]) != "IGNORED"]
+    return sorted(out, key=lambda f: f.get("close_time_utc") or f.get("recorded_at_utc") or "", reverse=True)
+
+
+def journal_fill(fill_id: str, extra: dict) -> dict:
+    """Turn one fill into a journal trade, adding the stop, risk and review fields you supply."""
+    fill = next((f for f in read("fills") if f.get("fill_id") == fill_id), None)
+    if fill is None:
+        raise TrackerError("unknown fill")
+    if fill_id in {r.get("trade_id") for r in read("trades")}:
+        raise TrackerError("this fill is already in the journal")
+    extra = extra or {}
+    allowed = {"stop_loss", "take_profit", "initial_risk_amount", "setup", "strategy_id", "timeframe", "session",
+               "rule_compliance", "violation_detail", "emotional_state", "lessons", "market_conditions",
+               "screenshot_before", "screenshot_after", "account_type"}
+    unknown = sorted(set(extra) - allowed)
+    if unknown:
+        raise TrackerError("unknown fields: " + ", ".join(unknown))
+    net = fill.get("net_pl")
+    if net in ("", None) and fill.get("gross_pl") not in ("", None):
+        net = f"{float(fill['gross_pl']) - (ta.num(fill.get('commission')) or 0) - (ta.num(fill.get('swap')) or 0):.2f}"
+    row = {"trade_id": fill_id, "account_type": extra.get("account_type") or fill.get("account_type") or "PERSONAL",
+           "account_label": fill.get("account_label"), "firm_or_broker": f"{fill.get('broker')} via {fill.get('source')}",
+           "instrument": fill.get("instrument"), "direction": fill.get("direction"),
+           "entry_time_utc": fill.get("open_time_utc"), "exit_time_utc": fill.get("close_time_utc"),
+           "entry_price": fill.get("entry_price"), "exit_price": fill.get("exit_price"), "volume": fill.get("volume"),
+           "take_profit": extra.get("take_profit") or fill.get("take_profit"),
+           "stop_loss": extra.get("stop_loss") or fill.get("stop_loss"),
+           "initial_risk_amount": extra.get("initial_risk_amount"), "currency": fill.get("currency"),
+           "gross_pl": fill.get("gross_pl"), "commission": fill.get("commission"), "swap": fill.get("swap"),
+           "net_pl": net, "rule_compliance": extra.get("rule_compliance") or "FOLLOWED"}
+    for k in ("setup", "strategy_id", "timeframe", "session", "violation_detail", "emotional_state", "lessons",
+              "market_conditions", "screenshot_before", "screenshot_after"):
+        if extra.get(k):
+            row[k] = extra[k]
+    return append("trades", {k: v for k, v in row.items() if v not in (None,)})
+
+
 # ----------------------------------------------------------------- summary
 def prop_status() -> list[dict]:
     """Latest snapshot per prop account, run through the firm's drawdown rules."""
@@ -326,6 +465,78 @@ def prop_status() -> list[dict]:
     return out
 
 
+def _latest_fx() -> dict[str, tuple[float, str, str]]:
+    """Most recent known KES rate per currency: (rate, source, date)."""
+    rates: dict[str, tuple[float, str, str]] = {"KES": (1.0, "ACTUAL", "")}
+    pools = [(r, r.get("date") or "") for r in read("networth") + read("deposits") + read("withdrawals")]
+    pools += [(r, r.get("received_date") or r.get("requested_date") or "") for r in read("payouts")]
+    for r, d in sorted(pools, key=lambda x: x[1]):
+        ccy = (r.get("currency") or "").upper()
+        rate = ta.num(r.get("fx_rate_to_kes"))
+        if ccy and rate:
+            rates[ccy] = (rate, (r.get("fx_rate_source") or "ESTIMATED").upper(), d)
+    return rates
+
+
+def net_worth() -> dict:
+    """Personal net worth in KES: latest value of each item, plus broker equity from statements.
+
+    Prop firm nominal balances are never included. Liabilities reduce net worth.
+    """
+    latest: dict[str, dict] = {}
+    for i, r in enumerate(read("networth")):
+        key = (r.get("item") or "").strip().casefold()
+        if key:
+            prev = latest.get(key)
+            if prev is None or (r.get("date") or "", i) >= (prev.get("date") or "", prev["_i"]):
+                latest[key] = dict(r, _i=i)
+    rates = _latest_fx()
+    warnings: list[str] = []
+    lines = []
+    for key, r in latest.items():
+        amount = ta.num(r.get("amount"), 0.0)
+        if amount == 0:
+            continue
+        rate = ta.num(r.get("fx_rate_to_kes")) or rates.get((r.get("currency") or "").upper(), (None,))[0]
+        lines.append({"date": r.get("date"), "item": r.get("item"), "category": r.get("category"),
+                      "type": r.get("type"), "liquid": r.get("liquid") or "N", "amount": amount,
+                      "currency": r.get("currency"), "fx_rate_to_kes": rate,
+                      "fx_rate_source": r.get("fx_rate_source") or ("ACTUAL" if r.get("currency") == "KES" else ""),
+                      "source": "Manual entry", "notes": r.get("notes") or ""})
+    recon_latest: dict[str, dict] = {}
+    for r in sorted(read("reconciliation"), key=lambda x: x.get("period_end") or ""):
+        recon_latest[(r.get("account") or "").strip().casefold()] = r
+    for key, r in recon_latest.items():
+        if not key or key in latest:
+            continue
+        ccy = (r.get("currency") or "USD").upper()
+        fx = rates.get(ccy)
+        if fx is None:
+            warnings.append(f"No KES rate known for {ccy}: broker account {r.get('account')} left out. Add a net worth item or a deposit with an exchange rate.")
+            continue
+        lines.append({"date": r.get("period_end"), "item": r.get("account"), "category": "TRADING_ACCOUNT",
+                      "type": "ASSET", "liquid": "Y", "amount": ta.num(r.get("closing_equity_statement"), 0.0),
+                      "currency": ccy, "fx_rate_to_kes": fx[0], "fx_rate_source": "ESTIMATED" if fx[1] != "ACTUAL" else "ACTUAL",
+                      "source": f"Broker statement {r.get('period_end')}", "notes": f"Rate from {fx[2] or 'latest record'}"})
+    for ln in lines:
+        sign = -1 if ln["type"] == "LIABILITY" else 1
+        ln["kes_value"] = round(sign * ln["amount"] * (ln["fx_rate_to_kes"] or 0), 2)
+    lines.sort(key=lambda x: (x["type"] != "ASSET", x["category"] or "", x["item"] or ""))
+    assets = sum(x["kes_value"] for x in lines if x["type"] == "ASSET")
+    liabilities = -sum(x["kes_value"] for x in lines if x["type"] == "LIABILITY")
+    liquid = sum(x["kes_value"] for x in lines if x["type"] == "ASSET" and x["liquid"] == "Y") - liabilities
+    by_cat: dict[str, float] = {}
+    for x in lines:
+        by_cat[x["category"]] = round(by_cat.get(x["category"], 0.0) + x["kes_value"], 2)
+    nw = assets - liabilities
+    trading = by_cat.get("TRADING_ACCOUNT", 0.0)
+    return {"lines": lines, "assets_kes": round(assets, 2), "liabilities_kes": round(liabilities, 2),
+            "net_worth_kes": round(nw, 2), "liquid_net_worth_kes": round(liquid, 2), "by_category": by_cat,
+            "trading_share_of_net_worth": round(trading / nw, 4) if nw > 0 else None,
+            "warnings": warnings, "estimated_fx_lines": sum(1 for x in lines if x["fx_rate_source"] == "ESTIMATED"),
+            "note": "Prop firm nominal balances are excluded. Liabilities are subtracted."}
+
+
 def summary() -> dict:
     ensure_files()
     trades = read("trades")
@@ -345,6 +556,8 @@ def summary() -> dict:
         "prop_economics": ta.prop_economics(read("evaluations"), read("payouts")),
         "prop_accounts": prop_status(),
         "capital": ta.capital_summary(read("deposits"), read("withdrawals"), read("reconciliation")),
+        "net_worth": net_worth(),
+        "pending_fills": len(pending_fills()),
         "counts": {k: len(read(k)) for k in KINDS},
         "presets": {k: {"firm": r.firm, "programme": r.programme, "verified_on": r.verified_on,
                         "kenya_eligible": r.kenya_eligible} for k, r in dc.PRESETS.items()},
@@ -460,6 +673,11 @@ def handle(method: str, path: str, query: dict, body: dict | None, paper_source=
             name = Path(KINDS[kind][0]).name if kind in KINDS else "export.csv"
             return 200, "text/csv; charset=utf-8", export_csv(kind), {
                 "Content-Disposition": f'attachment; filename="{name}"'}
+        if method == "GET" and path == "/api/tracker/workbook.xlsx":
+            import tracker_workbook
+            stamp = time.strftime("%Y-%m-%d")
+            return 200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", tracker_workbook.build(), {
+                "Content-Disposition": f'attachment; filename="Trading_Tracker_{stamp}.xlsx"'}
         if method == "GET" and path == "/api/tracker/backup":
             stamp = time.strftime("%Y%m%d-%H%M")
             return 200, "application/zip", backup_zip(), {
@@ -472,6 +690,23 @@ def handle(method: str, path: str, query: dict, body: dict | None, paper_source=
             return 200, js, json.dumps({"ok": True, "result": size(body or {})}).encode(), {}
         if method == "POST" and path == "/api/tracker/drawdown":
             return 200, js, json.dumps({"ok": True, "result": drawdown(body or {})}).encode(), {}
+        if method == "GET" and path == "/api/tracker/fills/pending":
+            return 200, js, json.dumps({"ok": True, "fills": pending_fills()}).encode(), {}
+        if method == "POST" and path == "/api/tracker/import/fills":
+            b = body or {}
+            res = import_fills(str(b.get("source") or "tradingview"), str(b.get("broker") or "unknown"),
+                               str(b.get("account_label") or ""), str(b.get("account_type") or "PERSONAL"), b.get("fills") or [])
+            return 200, js, json.dumps({"ok": True, **res}).encode(), {}
+        if method == "POST" and path == "/api/tracker/fills/journal":
+            b = body or {}
+            row = journal_fill(str(b.get("fill_id") or ""), b.get("fields") or {})
+            return 200, js, json.dumps({"ok": True, "row": row}).encode(), {}
+        if method == "POST" and path == "/api/tracker/fills/ignore":
+            b = body or {}
+            if not any(f.get("fill_id") == b.get("fill_id") for f in read("fills")):
+                raise TrackerError("unknown fill")
+            row = append("fill_decisions", {"fill_id": b.get("fill_id"), "decision": "IGNORED", "reason": b.get("reason") or ""})
+            return 200, js, json.dumps({"ok": True, "row": row}).encode(), {}
         if method == "POST" and path == "/api/tracker/sync_paper":
             n = sync_paper(paper_source()) if paper_source else 0
             return 200, js, json.dumps({"ok": True, "added": n}).encode(), {}

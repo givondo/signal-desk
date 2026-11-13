@@ -177,6 +177,52 @@ class Governor(unittest.TestCase):
         self.assertFalse(s["tradeable"])
 
 
+    def open_ticket(self, sym, direction):
+        sd.trackers[sym].active = {"id": 1, "dir": direction, "state": "open",
+                                   "opened": 1_800_000_000}
+
+    def test_risk_clusters(self):
+        self.assertEqual(sd.risk_cluster("BTCUSD", "SHORT"), "Crypto")
+        self.assertEqual(sd.risk_cluster("EURUSD", "SHORT"), "USD long")
+        self.assertEqual(sd.risk_cluster("USDJPY", "LONG"), "USD long")
+        self.assertEqual(sd.risk_cluster("USDCAD", "SHORT"), "USD short")
+        self.assertEqual(sd.risk_cluster("GBPUSD", "LONG"), "USD short")
+
+    def test_second_ticket_in_a_cluster_is_blocked(self):
+        now = 1_800_000_000
+        self.open_ticket("BTCUSD", "SHORT")
+        gov = sd.desk_governor(now)
+        self.assertEqual(gov["clusters"], {"Crypto": ["BTCUSD SHORT"]})
+        s = self.live_sig("A+")
+        s["direction"] = "SHORT"
+        sd.apply_governor("ETHUSD", s, gov)
+        self.assertFalse(s["tradeable"])
+        self.assertIn("Correlated exposure", s["desk_action"]["detail"])
+        s = self.live_sig("A+")                       # gold is a different cluster
+        sd.apply_governor("XAUUSD", s, gov)
+        self.assertTrue(s["tradeable"])
+
+    def test_fx_cluster_follows_the_dollar(self):
+        now = 1_800_000_000
+        self.open_ticket("EURUSD", "SHORT")           # long USD
+        gov = sd.desk_governor(now)
+        s = self.live_sig("A+")                       # long USDJPY is also long USD
+        sd.apply_governor("USDJPY", s, gov)
+        self.assertFalse(s["tradeable"])
+        s = self.live_sig("A+")                       # long GBPUSD is short USD: allowed
+        sd.apply_governor("GBPUSD", s, gov)
+        self.assertTrue(s["tradeable"])
+
+    def test_instrument_with_its_own_open_ticket_is_not_blocked(self):
+        now = 1_800_000_000
+        self.open_ticket("BTCUSD", "SHORT")
+        gov = sd.desk_governor(now)
+        s = self.live_sig("A+")
+        s["direction"] = "SHORT"
+        sd.apply_governor("BTCUSD", s, gov)
+        self.assertTrue(s["tradeable"])
+
+
 class AnalystBrief(unittest.TestCase):
     def test_position_size_uses_symbol_contract_value(self):
         lots, _ = pa._position_size_lots(10_000, 0.5, 0.0020, 100_000)  # 20 pips

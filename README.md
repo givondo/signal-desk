@@ -18,7 +18,7 @@ Tradeable signals are paper-executed and journaled so the statistics are honest:
 - gapped stops are booked at the actual price; estimated spread is charged on every trade
 - MFE and MAE are recorded per ticket
 
-A desk-wide risk governor sits above every instrument: a daily stop in R, a cap on open tickets, and A-grade only after a losing streak. When the daily stop is hit the whole desk shows HALT until the next EAT trading day.
+A desk-wide risk governor sits above every instrument: a daily stop in R, a cap on open tickets, one open ticket per correlated group, and A-grade only after a losing streak. Correlated groups are crypto, metals, indices and energy, with FX majors grouped by the direction they put on the US dollar (short EURUSD and long USDJPY are both long USD), so three crypto shorts cannot fill the desk as if they were three separate bets. When the daily stop is hit the whole desk shows HALT until the next EAT trading day.
 
 ## Trading tracker and Trading OS
 
@@ -35,6 +35,10 @@ Records live in `DATA_DIR/trading_os_data/` (set `TOS_DATA_DIR` to override). Th
 
 The Trading OS documents (prop firm research and scores, risk policy, strategy specs, review templates) are in `trading_os/`; start at `trading_os/00_README.md`. Its calculators and analytics have their own tests: `cd trading_os && python -m pytest -q`.
 
+## TradingView trade sync
+
+Closed trades from TradingView's trading panel (Paper Trading or a connected broker) flow into the tracker's journal inbox every 60 seconds. The reader is read-only: it never places, changes or cancels anything. On TradingView's free plan use `tools/start_tradingview_web.ps1` (the Desktop app asks for a paid plan); keep the panel on **Trade history** for Paper Trading. A trade moves from the inbox into the journal once its stop and money at risk are added. The desk header shows how many are waiting. Setup and settings: `tools/README_TRADINGVIEW.md`.
+
 ## API
 
 | Route | Purpose |
@@ -49,6 +53,8 @@ The Trading OS documents (prop firm research and scores, risk policy, strategy s
 | `/api/tracker/records?kind=` / `export?kind=` / `backup` | read rows, CSV export, zip backup |
 | `/api/tracker/append` (POST) | append one validated row `{kind, row}` |
 | `/api/tracker/size`, `/api/tracker/drawdown` (POST) | position size and prop drawdown calculators |
+| `/api/tracker/import/fills` (POST), `/api/tracker/fills/pending` | closed broker or TradingView trades into the journal inbox |
+| `/api/tracker/workbook.xlsx` | Excel workbook with live formulas, including net worth |
 
 ## Configuration
 
@@ -58,6 +64,7 @@ The Trading OS documents (prop firm research and scores, risk policy, strategy s
 | `DATA_DIR` | app dir | where journals and state persist |
 | `DESK_DAILY_STOP_R` | `4` | desk halts at this daily loss in R |
 | `DESK_MAX_OPEN` | `4` | maximum open or working tickets across the desk |
+| `DESK_MAX_PER_CLUSTER` | `1` | maximum open tickets per correlated group |
 | `DESK_LOSS_STREAK_TIGHTEN` | `2` | consecutive losses before A-grade only |
 | `DESK_TZ` | `Africa/Nairobi` | trading-day boundary |
 | `DESK_ACCOUNT_BALANCE`, `DESK_RISK_PER_TRADE_PCT` | `0`, `0.5` | lot sizing in the analyst brief |
