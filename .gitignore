@@ -8,3 +8,5 @@ __pycache__/
 trading_os_data/
 .journal_seal.json
 .pytest_cache/
+tools/tv_sync.log
+desk_local.log
