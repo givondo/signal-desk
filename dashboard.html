@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="Signal Desk — multi-asset trading terminal with live confluence scores, macro context, and performance analytics.">
-<meta name="theme-color" content="#0b0d10" id="meta-theme">
+<meta name="theme-color" content="#ffffff" id="meta-theme">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -15,9 +15,9 @@
 <script src="https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.js"></script>
 <style>
 :root{
---bg:#eef1f6;--p1:#ffffff;--p2:#f4f6f9;--p3:#e8ecf2;
---bd:rgba(16,24,40,.08);--bd2:rgba(16,24,40,.14);
---tx:#101828;--dim:#475467;--dim2:#98a2b3;
+--bg:#ffffff;--p1:#ffffff;--p2:#F9FAFB;--p3:#F3F4F6;
+--bd:#E5E7EB;--bd2:#D1D5DB;
+--tx:#111827;--dim:#6B7280;--dim2:#9CA3AF;
 --g:#0d9b6e;--r:#d04438;--a:#b8860b;--gold:#c9a227;--b:#2563eb;
 --gt:rgba(13,155,110,.12);--rt:rgba(208,68,56,.12);--at:rgba(184,134,11,.14);--bt:rgba(37,99,235,.12);
 --shadow:0 1px 2px rgba(16,24,40,.06),0 4px 16px rgba(16,24,40,.06);
@@ -25,7 +25,7 @@
 --radius:10px;--radius-sm:6px;
 --font:'DM Sans',system-ui,-apple-system,sans-serif;--mono:'JetBrains Mono',Consolas,monospace;
 --chart-bg:#ffffff;--spark:#c9a227;--spark-fill:rgba(201,162,39,.12);
---header-bg:rgba(255,255,255,.88)}
+--header-bg:rgba(255,255,255,.94)}
 html[data-theme="dark"]{
 --bg:#0b0d10;--p1:#12161d;--p2:#181e28;--p3:#222a36;
 --bd:rgba(255,255,255,.08);--bd2:rgba(255,255,255,.14);
@@ -879,8 +879,8 @@ createApp({
     applyTheme(){
       document.documentElement.setAttribute('data-theme', this.darkMode?'dark':'light');
       const meta=document.getElementById('meta-theme');
-      if(meta) meta.content=this.darkMode?'#0b0d10':'#eef1f6';
-      try{ localStorage.setItem('sd-theme', this.darkMode?'dark':'light') }catch(e){}
+      if(meta) meta.content=this.darkMode?'#0b0d10':'#ffffff';
+      try{ localStorage.setItem('sd-theme-v2', this.darkMode?'dark':'light') }catch(e){}
       this.tvWidgetSym=null;
       this.$nextTick(()=>this.mountChart());
     },
@@ -1021,9 +1021,9 @@ createApp({
   },
   mounted(){
     try{
-      const saved=localStorage.getItem('sd-theme');
-      if(saved==='dark'||saved==='light') this.darkMode=(saved==='dark');
-      else if(window.matchMedia('(prefers-color-scheme:dark)').matches) this.darkMode=true;
+      // White is the default. Dark only when chosen with the toggle (saved under a new key,
+      // so an older dark preference or the system setting no longer applies).
+      this.darkMode=(localStorage.getItem('sd-theme-v2')==='dark');
     }catch(e){}
     this.applyTheme();
     this.tick(); this.fetchRoster();
