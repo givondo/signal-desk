@@ -14,4 +14,14 @@ if ($running -and $running.CommandLine -notmatch "remote-debugging-port") {
 if (-not (Get-CimInstance Win32_Process -Filter "Name='TradingView.exe'")) {
     Start-Process -FilePath $exe -ArgumentList "--remote-debugging-port=9222", "--remote-debugging-address=127.0.0.1"
 }
+# Fit the window to the screen: TradingView can restore a size taller than the display.
+Add-Type @"
+using System; using System.Runtime.InteropServices;
+public class TvWin { [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c); }
+"@
+for ($i = 0; $i -lt 30; $i++) {
+    $w = Get-Process TradingView -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+    if ($w) { [TvWin]::ShowWindow($w.MainWindowHandle, 3) | Out-Null; break }
+    Start-Sleep -Milliseconds 500
+}
 Write-Host "TradingView started with sync access on 127.0.0.1:9222."

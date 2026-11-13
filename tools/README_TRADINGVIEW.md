@@ -37,6 +37,9 @@ Settings: `DESK_URL` (default http://localhost:8899), `TV_ACCOUNT_LABEL`, `TV_AC
 
 TradingView's own MCP server (`https://mcp.tradingview.com/mcp`, Settings → Connectors → Add custom connector) adds market data, watchlists and alerts. It needs the Essential plan or higher, and it does not expose trades.
 
+## If TradingView looks stretched or tiny
+TradingView keeps its own page zoom. If charts look zoomed out, close TradingView, then reset the saved zoom: in `%LOCALAPPDATA%\Packages\TradingView.Desktop_*\LocalCache\Roaming\TradingView\Preferences`, remove the `www.tradingview.com` entry under `partition.per_host_zoom_levels` (back the file up first). The launcher also maximises the window so it fits the screen.
+
 ## Limits
 - The reader uses TradingView Desktop's page structure, which TradingView can change in an update. If the sync reads zero trades after an update, run `--dump` and adjust the column names in `COLS`.
 - Times are read as shown in the panel and converted using this computer's time zone. Keep TradingView's time zone set to Nairobi (or exchange time) consistently.
