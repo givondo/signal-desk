@@ -153,6 +153,61 @@ class PaperSync(TrackerBase):
         self.assertEqual(tt.summary()["trades"]["personal"]["metrics"]["n"], 0)
 
 
+class NetWorthAndWorkbook(TrackerBase):
+    def _seed(self):
+        tt.append("networth", {"date": "2026-11-01", "item": "M-Pesa", "category": "cash", "amount": "25000", "currency": "KES", "liquid": "y"})
+        tt.append("networth", {"date": "2026-11-01", "item": "MMF", "category": "EMERGENCY_FUND", "amount": "300000", "currency": "KES", "liquid": "Y"})
+        tt.append("networth", {"date": "2026-11-10", "item": "MMF", "category": "EMERGENCY_FUND", "amount": "320000", "currency": "KES", "liquid": "Y"})
+        tt.append("networth", {"date": "2026-11-01", "item": "Car loan", "category": "LOAN", "amount": "150000", "currency": "KES"})
+        tt.append("deposits", {"date": "2026-11-02", "account": "Broker KE", "amount": "500", "currency": "USD",
+                               "fx_rate_to_kes": "129", "fx_rate_source": "ACTUAL"})
+        tt.append("reconciliation", {"period_end": "2026-11-30", "account": "Broker KE", "currency": "USD",
+                                     "opening_equity": "0", "deposits": "500", "realised_pl": "40", "closing_equity_statement": "540"})
+        tt.append("snapshots", {"account_label": "FTMO-1", "rules_preset": "FTMO_2STEP", "stage": "EVALUATION",
+                                "initial_balance": "100000", "equity": "99000", "day_start_balance": "100000"})
+
+    def test_net_worth_latest_values_liabilities_and_broker_equity(self):
+        self._seed()
+        nw = tt.net_worth()
+        # 25,000 + 320,000 (latest MMF) + 540 x 129 broker equity - 150,000 loan
+        self.assertEqual(nw["assets_kes"], 25000 + 320000 + 540 * 129)
+        self.assertEqual(nw["liabilities_kes"], 150000)
+        self.assertEqual(nw["net_worth_kes"], 25000 + 320000 + 540 * 129 - 150000)
+        self.assertEqual(nw["liquid_net_worth_kes"], nw["net_worth_kes"])
+        # prop nominal balance (100,000) never enters net worth
+        self.assertLess(nw["assets_kes"], 500000)
+
+    def test_net_worth_rejections(self):
+        with self.assertRaises(tt.TrackerError):
+            tt.append("networth", {"date": "2026-11-01", "item": "X", "category": "CRYPTO_MOON", "amount": "1", "currency": "KES"})
+        with self.assertRaises(tt.TrackerError):
+            tt.append("networth", {"date": "2026-11-01", "item": "X", "category": "LOAN", "amount": "-5", "currency": "KES"})
+        with self.assertRaises(tt.TrackerError):
+            tt.append("networth", {"date": "2026-11-01", "item": "X", "category": "CASH", "amount": "5", "currency": "USD"})
+
+    def test_workbook_has_sheets_and_live_formulas(self):
+        import zipfile, io
+        import tracker_workbook
+        self._seed()
+        data = tracker_workbook.build()
+        z = zipfile.ZipFile(io.BytesIO(data))
+        wbxml = z.read("xl/workbook.xml").decode()
+        for name in ("Summary", "NetWorth", "Trades", "Prop", "Capital", "Reconciliation", "ReadMe"):
+            self.assertIn(f'name="{name}"', wbxml)
+        self.assertIn('fullCalcOnLoad="1"', wbxml)
+        nw_sheet = z.read("xl/worksheets/sheet2.xml").decode()
+        self.assertIn("<f>", nw_sheet)
+        self.assertIn("Car loan", nw_sheet)
+        summary = z.read("xl/worksheets/sheet1.xml").decode()
+        self.assertIn("NetWorth!$I$", summary)
+        try:
+            import openpyxl
+        except ImportError:
+            return
+        wb = openpyxl.load_workbook(io.BytesIO(data))
+        self.assertEqual(wb.sheetnames[0], "Summary")
+
+
 class HttpRoutes(TrackerBase):
     """End to end through the desk's real HTTP handler, without the market poller."""
 
@@ -198,6 +253,9 @@ class HttpRoutes(TrackerBase):
         self.assertEqual(summary["trades"]["practice"]["metrics"]["n"], 1)
         _, ctype, body = self._get("/api/tracker/export?kind=trades")
         self.assertTrue(ctype.startswith("text/csv"))
+        _, ctype, body = self._get("/api/tracker/workbook.xlsx")
+        self.assertTrue(ctype.startswith("application/vnd.openxmlformats"))
+        self.assertEqual(body[:2], b"PK")
         _, ctype, _ = self._get("/api/tracker/backup")
         self.assertEqual(ctype, "application/zip")
 

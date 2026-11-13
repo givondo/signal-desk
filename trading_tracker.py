@@ -55,6 +55,7 @@ KINDS: dict[str, tuple[str, str | None]] = {
     "deposits": ("09_Personal_Capital/Deposits.csv", "txn_id"),
     "withdrawals": ("09_Personal_Capital/Withdrawals.csv", "txn_id"),
     "reconciliation": ("09_Personal_Capital/Account_Reconciliation.csv", None),
+    "networth": ("09_Personal_Capital/Net_Worth.csv", "entry_id"),
 }
 
 REQUIRED: dict[str, tuple[str, ...]] = {
@@ -74,7 +75,12 @@ REQUIRED: dict[str, tuple[str, ...]] = {
     "deposits": ("date", "account", "amount", "currency", "fx_rate_source"),
     "withdrawals": ("date", "account", "amount", "currency", "fx_rate_source"),
     "reconciliation": ("period_end", "account", "opening_equity", "closing_equity_statement"),
+    "networth": ("date", "item", "category", "amount", "currency"),
 }
+
+ASSET_CATEGORIES = ("CASH", "EMERGENCY_FUND", "INVESTMENTS", "TRADING_ACCOUNT", "BUSINESS_EQUITY",
+                    "PROPERTY", "VEHICLE", "RECEIVABLE", "OTHER_ASSET")
+LIABILITY_CATEGORIES = ("LOAN", "CREDIT_CARD", "MOBILE_LOAN", "OTHER_LIABILITY")
 
 NUMERIC = {
     "entry_price", "stop_loss", "take_profit", "exit_price", "volume", "initial_risk_amount",
@@ -163,7 +169,7 @@ def _now_iso() -> str:
 def _new_id(kind: str, existing: set[str]) -> str:
     prefix = {"trades": "T", "corrections": "C", "missed": "M", "violations": "V",
               "evaluations": "E", "snapshots": "S", "payouts": "P", "deposits": "D",
-              "withdrawals": "W"}.get(kind, "R")
+              "withdrawals": "W", "networth": "NW"}.get(kind, "R")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     n = 1
     while f"{prefix}-{stamp}-{n}" in existing:
@@ -210,6 +216,20 @@ def _validate(kind: str, row: dict, existing: list[dict]) -> None:
             raise TrackerError(dup[-1])
     if kind == "snapshots" and row["rules_preset"] not in dc.PRESETS:
         raise TrackerError(f"rules_preset must be one of {sorted(dc.PRESETS)}")
+    if kind == "networth":
+        row["category"] = row["category"].upper().replace(" ", "_")
+        if row["category"] in ASSET_CATEGORIES:
+            row["type"] = "ASSET"
+        elif row["category"] in LIABILITY_CATEGORIES:
+            row["type"] = "LIABILITY"
+        else:
+            raise TrackerError("category must be one of " + ", ".join(ASSET_CATEGORIES + LIABILITY_CATEGORIES))
+        if float(row["amount"]) < 0:
+            raise TrackerError("enter liabilities as positive amounts; the category makes them negative")
+        row["currency"] = row["currency"].upper()
+        if row["currency"] != "KES" and not row.get("fx_rate_to_kes"):
+            raise TrackerError("fx_rate_to_kes is required for non-KES items")
+        row["liquid"] = (row.get("liquid") or "N").upper()[:1]
     if kind == "payouts" and row.get("status") == "RECEIVED" and not row.get("amount_received"):
         raise TrackerError("amount_received is required for a RECEIVED payout")
 
@@ -326,6 +346,78 @@ def prop_status() -> list[dict]:
     return out
 
 
+def _latest_fx() -> dict[str, tuple[float, str, str]]:
+    """Most recent known KES rate per currency: (rate, source, date)."""
+    rates: dict[str, tuple[float, str, str]] = {"KES": (1.0, "ACTUAL", "")}
+    pools = [(r, r.get("date") or "") for r in read("networth") + read("deposits") + read("withdrawals")]
+    pools += [(r, r.get("received_date") or r.get("requested_date") or "") for r in read("payouts")]
+    for r, d in sorted(pools, key=lambda x: x[1]):
+        ccy = (r.get("currency") or "").upper()
+        rate = ta.num(r.get("fx_rate_to_kes"))
+        if ccy and rate:
+            rates[ccy] = (rate, (r.get("fx_rate_source") or "ESTIMATED").upper(), d)
+    return rates
+
+
+def net_worth() -> dict:
+    """Personal net worth in KES: latest value of each item, plus broker equity from statements.
+
+    Prop firm nominal balances are never included. Liabilities reduce net worth.
+    """
+    latest: dict[str, dict] = {}
+    for i, r in enumerate(read("networth")):
+        key = (r.get("item") or "").strip().casefold()
+        if key:
+            prev = latest.get(key)
+            if prev is None or (r.get("date") or "", i) >= (prev.get("date") or "", prev["_i"]):
+                latest[key] = dict(r, _i=i)
+    rates = _latest_fx()
+    warnings: list[str] = []
+    lines = []
+    for key, r in latest.items():
+        amount = ta.num(r.get("amount"), 0.0)
+        if amount == 0:
+            continue
+        rate = ta.num(r.get("fx_rate_to_kes")) or rates.get((r.get("currency") or "").upper(), (None,))[0]
+        lines.append({"date": r.get("date"), "item": r.get("item"), "category": r.get("category"),
+                      "type": r.get("type"), "liquid": r.get("liquid") or "N", "amount": amount,
+                      "currency": r.get("currency"), "fx_rate_to_kes": rate,
+                      "fx_rate_source": r.get("fx_rate_source") or ("ACTUAL" if r.get("currency") == "KES" else ""),
+                      "source": "Manual entry", "notes": r.get("notes") or ""})
+    recon_latest: dict[str, dict] = {}
+    for r in sorted(read("reconciliation"), key=lambda x: x.get("period_end") or ""):
+        recon_latest[(r.get("account") or "").strip().casefold()] = r
+    for key, r in recon_latest.items():
+        if not key or key in latest:
+            continue
+        ccy = (r.get("currency") or "USD").upper()
+        fx = rates.get(ccy)
+        if fx is None:
+            warnings.append(f"No KES rate known for {ccy}: broker account {r.get('account')} left out. Add a net worth item or a deposit with an exchange rate.")
+            continue
+        lines.append({"date": r.get("period_end"), "item": r.get("account"), "category": "TRADING_ACCOUNT",
+                      "type": "ASSET", "liquid": "Y", "amount": ta.num(r.get("closing_equity_statement"), 0.0),
+                      "currency": ccy, "fx_rate_to_kes": fx[0], "fx_rate_source": "ESTIMATED" if fx[1] != "ACTUAL" else "ACTUAL",
+                      "source": f"Broker statement {r.get('period_end')}", "notes": f"Rate from {fx[2] or 'latest record'}"})
+    for ln in lines:
+        sign = -1 if ln["type"] == "LIABILITY" else 1
+        ln["kes_value"] = round(sign * ln["amount"] * (ln["fx_rate_to_kes"] or 0), 2)
+    lines.sort(key=lambda x: (x["type"] != "ASSET", x["category"] or "", x["item"] or ""))
+    assets = sum(x["kes_value"] for x in lines if x["type"] == "ASSET")
+    liabilities = -sum(x["kes_value"] for x in lines if x["type"] == "LIABILITY")
+    liquid = sum(x["kes_value"] for x in lines if x["type"] == "ASSET" and x["liquid"] == "Y") - liabilities
+    by_cat: dict[str, float] = {}
+    for x in lines:
+        by_cat[x["category"]] = round(by_cat.get(x["category"], 0.0) + x["kes_value"], 2)
+    nw = assets - liabilities
+    trading = by_cat.get("TRADING_ACCOUNT", 0.0)
+    return {"lines": lines, "assets_kes": round(assets, 2), "liabilities_kes": round(liabilities, 2),
+            "net_worth_kes": round(nw, 2), "liquid_net_worth_kes": round(liquid, 2), "by_category": by_cat,
+            "trading_share_of_net_worth": round(trading / nw, 4) if nw > 0 else None,
+            "warnings": warnings, "estimated_fx_lines": sum(1 for x in lines if x["fx_rate_source"] == "ESTIMATED"),
+            "note": "Prop firm nominal balances are excluded. Liabilities are subtracted."}
+
+
 def summary() -> dict:
     ensure_files()
     trades = read("trades")
@@ -345,6 +437,7 @@ def summary() -> dict:
         "prop_economics": ta.prop_economics(read("evaluations"), read("payouts")),
         "prop_accounts": prop_status(),
         "capital": ta.capital_summary(read("deposits"), read("withdrawals"), read("reconciliation")),
+        "net_worth": net_worth(),
         "counts": {k: len(read(k)) for k in KINDS},
         "presets": {k: {"firm": r.firm, "programme": r.programme, "verified_on": r.verified_on,
                         "kenya_eligible": r.kenya_eligible} for k, r in dc.PRESETS.items()},
@@ -460,6 +553,11 @@ def handle(method: str, path: str, query: dict, body: dict | None, paper_source=
             name = Path(KINDS[kind][0]).name if kind in KINDS else "export.csv"
             return 200, "text/csv; charset=utf-8", export_csv(kind), {
                 "Content-Disposition": f'attachment; filename="{name}"'}
+        if method == "GET" and path == "/api/tracker/workbook.xlsx":
+            import tracker_workbook
+            stamp = time.strftime("%Y-%m-%d")
+            return 200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", tracker_workbook.build(), {
+                "Content-Disposition": f'attachment; filename="Trading_Tracker_{stamp}.xlsx"'}
         if method == "GET" and path == "/api/tracker/backup":
             stamp = time.strftime("%Y%m%d-%H%M")
             return 200, "application/zip", backup_zip(), {

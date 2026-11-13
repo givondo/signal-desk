@@ -291,11 +291,13 @@ MAX_OPEN = int(os.environ.get("DESK_MAX_OPEN", "4"))
 LOSS_STREAK_TIGHTEN = int(os.environ.get("DESK_LOSS_STREAK_TIGHTEN", "2"))
 
 try:
-    from zoneinfo import ZoneInfo
-    _LON = ZoneInfo("Europe/London")
-    _NY = ZoneInfo("America/New_York")
-    DESK_TZ = ZoneInfo(os.environ.get("DESK_TZ", "Africa/Nairobi"))
-except Exception:          # no tzdata: fall back to fixed UTC session hours
+    # ZoneInfo when tz data exists; exact rule-based zones otherwise (Windows
+    # Python ships without tz data unless the tzdata package is installed).
+    from deskzones import get_zone
+    _LON = get_zone("Europe/London")
+    _NY = get_zone("America/New_York")
+    DESK_TZ = get_zone(os.environ.get("DESK_TZ", "Africa/Nairobi"))
+except Exception:          # unknown DESK_TZ without tzdata: fixed UTC session hours
     _LON = _NY = DESK_TZ = None
 AUTH_FILE = os.path.join(DATA_DIR, "tv_auth.json")
 DASH_FILE = os.path.join(BASE_DIR, "dashboard.html")   # read-only shipped asset
