@@ -3,11 +3,12 @@
  * TradingView -> Signal Desk trade sync (read-only).
  *
  * Reads closed trades from the Trading Panel (Account Manager) of TradingView
- * Desktop through the local debug port, and posts them to the Signal Desk
+ * (web window or Desktop) through the local debug port, and posts them to the Signal Desk
  * tracker inbox (/api/tracker/import/fills). It never clicks, types, places,
  * modifies or cancels anything: the only page code it runs reads table text.
  *
- * Start TradingView with tools/start_tradingview_sync.ps1 first.
+ * Open TradingView first with tools/start_tradingview_web.ps1 (web, any plan)
+ * or tools/start_tradingview_sync.ps1 (Desktop, paid plans).
  *
  * Usage:
  *   node tools/tv_trade_sync.mjs --dump            print what the panel shows (for checking)
@@ -19,7 +20,8 @@
  *   DESK_USER, DESK_PASS  only if the desk asks for a password (live site)
  *   TV_ACCOUNT_LABEL   e.g. PEPPERSTONE-TV-01 (default: broker name + "-TV")
  *   TV_ACCOUNT_TYPE    PERSONAL | DEMO | PROP (default PERSONAL)
- *   TV_BROKER          override the detected broker name
+ *   TV_BROKER          override the detected broker name (e.g. "Paper Trading")
+ *   TV_TZ_OFFSET_MIN   chart time zone offset from UTC in minutes (default 0 = UTC)
  *   CDP_PORT           default 9222
  *
  * Requires Node 22+ (built-in fetch and WebSocket). No packages to install.
@@ -34,12 +36,18 @@ const CDP = `http://127.0.0.1:${process.env.CDP_PORT || 9222}`;
 // trading panel as {tab, headers, rows}. No events, no clicks, no writes.
 const READER = String.raw`(() => {
   const txt = (el) => (el ? (el.innerText || el.textContent || "").replace(/\s+/g, " ").trim() : "");
+  // Cells can stack two values (Paper Trading shows exit above entry); keep them apart with " ¦ ".
+  const cell = (el) => (el ? (el.innerText || el.textContent || "").split(/\n+/).map(s => s.replace(/\s+/g, " ").trim()).filter(Boolean).join(" ¦ ") : "");
   const root = document.querySelector('[data-name="account-manager"]')
             || document.querySelector('[class*="accountManager"]')
             || document.querySelector('[class*="bottom-widgetbar-content"]') || document.body;
   const out = { broker: "", account: "", activeTab: "", tables: [] };
   const brokerEl = root.querySelector('[data-name="broker-name"], [class*="brokerName"], [class*="broker-title"], img[alt]');
   out.broker = brokerEl ? (brokerEl.getAttribute("alt") || txt(brokerEl)) : "";
+  if (!out.broker) {
+    const amBtn = [...document.querySelectorAll('[aria-label="Open account manager"], [title="Open account manager"]')].find(b => txt(b));
+    out.broker = amBtn ? txt(amBtn) : "";
+  }
   const acc = root.querySelector('[data-name="account-selector"], [class*="accountSelector"], [class*="account-title"]');
   out.account = txt(acc);
   const active = root.querySelector('[role="tab"][aria-selected="true"], [class*="tab"][class*="selected"], [class*="isActive"]');
@@ -54,13 +62,13 @@ const READER = String.raw`(() => {
   };
   for (const t of root.querySelectorAll("table")) {
     const headers = [...t.querySelectorAll("thead th, thead td")].map(txt);
-    const rows = [...t.querySelectorAll("tbody tr")].map(tr => [...tr.children].map(txt)).filter(r => r.some(Boolean));
+    const rows = [...t.querySelectorAll("tbody tr")].map(tr => [...tr.children].map(cell)).filter(r => r.some(Boolean));
     pushTable(headers, rows, "table");
   }
   for (const g of root.querySelectorAll('[role="table"], [role="grid"], [role="treegrid"]')) {
     const headers = [...g.querySelectorAll('[role="columnheader"]')].map(txt);
     const rows = [...g.querySelectorAll('[role="row"]')]
-      .map(r => [...r.querySelectorAll('[role="gridcell"], [role="cell"]')].map(txt))
+      .map(r => [...r.querySelectorAll('[role="gridcell"], [role="cell"]')].map(cell))
       .filter(r => r.length && r.some(Boolean));
     pushTable(headers, rows, "grid");
   }
@@ -69,7 +77,7 @@ const READER = String.raw`(() => {
 
 async function cdpTargets() {
   const r = await fetch(`${CDP}/json/list`).catch(() => null);
-  if (!r || !r.ok) throw new Error("TradingView is not open with sync access. Run tools/start_tradingview_sync.ps1 first.");
+  if (!r || !r.ok) throw new Error("TradingView is not open with sync access. Run tools/start_tradingview_web.ps1 (or start_tradingview_sync.ps1) first.");
   return r.json();
 }
 
@@ -108,7 +116,7 @@ const COLS = {
   exit: ["avg close price", "close price", "closing price", "exit price"],
   openTime: ["open time", "opening time", "opened", "placing time", "time"],
   closeTime: ["close time", "closing time", "closed", "execution time", "time"],
-  pnl: ["realized p&l", "realised p&l", "net p&l", "net profit", "profit", "p&l", "pl"],
+  pnl: ["realized p&l", "realised p&l", "realized pnl", "realised pnl", "net p&l", "net pnl", "net profit", "profit", "p&l", "pnl", "pl"],
   commission: ["commission", "fees", "fee"],
   swap: ["swap", "rollover", "financing"],
   sl: ["stop loss", "sl"],
@@ -128,23 +136,79 @@ function colIndex(headers, names, used) {
   }
   return -1;
 }
+const parts = (s) => String(s ?? "").split("¦").map(x => x.trim());
 const num = (s) => {
   if (s == null) return "";
-  const t = String(s).replace(/[−–]/g, "-").replace(/[^0-9.\-]/g, "");
-  return t && !isNaN(Number(t)) ? Number(t) : "";
+  let raw = parts(s)[0].replace(/[−–]/g, "-");
+  const k = /\d\s*K\s*[A-Z]{0,3}$/i.test(raw) ? 1000 : 1;   // "62.45 KUSD"
+  const t = raw.replace(/[^0-9.\-]/g, "");
+  return t && t !== "-" && !isNaN(Number(t)) ? Number(t) * k : "";
 };
 const costOf = (v) => (v === "" ? "" : Math.abs(v));
 const swapCost = (v) => (v === "" ? "" : -v);
-function toIso(s) {
+
+// TradingView shows times in the chart's time zone (bottom right of the chart).
+// Set TV_TZ_OFFSET_MIN to that zone's offset from UTC in minutes (UTC = 0, Nairobi = 180).
+const TZ_OFFSET_MIN = Number(process.env.TV_TZ_OFFSET_MIN || 0) || 0;
+const MONTHS = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+export function toIso(s, offsetMin = TZ_OFFSET_MIN) {
+  s = parts(s)[0];
   if (!s) return "";
-  const d = new Date(String(s).replace(/(\d{4}-\d{2}-\d{2}) (\d)/, "$1T$2"));
-  return isNaN(d) ? "" : d.toISOString().replace(".000Z", "+00:00");
+  let y, mo, d, h = 0, mi = 0, se = 0, m;
+  if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/))) {
+    if (/(Z|[+-]\d{2}:?\d{2})$/.test(s)) { const z = new Date(s); return isNaN(z) ? "" : z.toISOString().replace(".000Z", "+00:00"); }
+    [y, mo, d, h, mi, se] = [+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)];
+  } else if ((m = s.match(/^([A-Za-z]{3})[a-z]*\.? (\d{1,2}),? (\d{4}),? (\d{1,2}):(\d{2})(?::(\d{2}))?/))) {
+    if (!(m[1].toLowerCase() in MONTHS)) return "";
+    [y, mo, d, h, mi, se] = [+m[3], MONTHS[m[1].toLowerCase()], +m[2], +m[4], +m[5], +(m[6] || 0)];
+  } else return "";
+  const ms = Date.UTC(y, mo, d, h, mi, se) - offsetMin * 60000;
+  return new Date(ms).toISOString().replace(".000Z", "+00:00");
+}
+const symbolOf = (s) => parts(s).pop().split(/[\s:]/).pop().toUpperCase();
+
+/**
+ * TradingView Paper Trading "Trade history": one row per trade, with stacked
+ * cells (exit value above entry value) for Type, Date and time, Order ID and Price.
+ * Size shows quantity above trade value. Open trades show "Open" as the exit time.
+ */
+export function isTradeHistory(t) {
+  const h = (t.headers || []).map(norm);
+  return h.includes("type") && h.includes("date and time") && h.some(x => x === "net pnl" || x === "net p&l");
+}
+function mapTradeHistory(t) {
+  const h = t.headers.map(norm);
+  const at = (name) => h.indexOf(name);
+  const I = { sym: at("symbol"), side: at("side"), type: at("type"), time: at("date and time"), id: at("order id"),
+    price: at("price"), size: at("size"), pnl: h.findIndex(x => x === "net pnl" || x === "net p&l") };
+  const out = [];
+  for (const r of t.rows) {
+    const types = parts(r[I.type]).map(x => x.toLowerCase());
+    const pick = (col, which) => { const p = parts(r[col]); const k = types.indexOf(which); return k >= 0 ? (p[k] ?? "") : ""; };
+    const closeTime = toIso(pick(I.time, "exit"));
+    const exitId = pick(I.id, "exit"), entryId = pick(I.id, "entry");
+    const exit = num(pick(I.price, "exit"));
+    if (!closeTime || exit === "") continue;            // still open
+    const sym = symbolOf(r[I.sym]);
+    const side = /short|sell/i.test(r[I.side]) ? "SELL" : /long|buy/i.test(r[I.side]) ? "BUY" : "";
+    if (!sym || !side) continue;
+    out.push({
+      broker_trade_id: [entryId, exitId].filter(x => x && x !== "—").join("-") || [sym, side, closeTime].join("|"),
+      instrument: sym, direction: side, volume: num(parts(r[I.size])[0]),
+      entry_price: num(pick(I.price, "entry")), exit_price: exit,
+      open_time_utc: toIso(pick(I.time, "entry")), close_time_utc: closeTime,
+      net_pl: num(r[I.pnl]), gross_pl: "", commission: "", swap: "", stop_loss: "", take_profit: "",
+      raw: JSON.stringify(Object.fromEntries(t.headers.map((x, i) => [x, r[i]]))),
+    });
+  }
+  return out;
 }
 
 /** Pick tables that list CLOSED trades (they have an exit price or a realised P&L). */
 export function mapClosedTrades(panel) {
   const fills = [];
   for (const t of panel.tables || []) {
+    if (isTradeHistory(t)) { fills.push(...mapTradeHistory(t)); continue; }
     const used = new Set();
     const idx = {};
     for (const key of ["id", "symbol", "side", "qty", "exit", "entry", "closeTime", "openTime", "pnl", "commission", "swap", "sl", "tp", "status"]) {
@@ -160,7 +224,7 @@ export function mapClosedTrades(panel) {
       const exit = num(get("exit"));
       const pnl = num(get("pnl"));
       if (exit === "" && pnl === "") continue;
-      const sym = String(get("symbol")).split(/[\s:]/).pop().toUpperCase();
+      const sym = symbolOf(get("symbol"));
       const side = /sell|short/i.test(get("side")) ? "SELL" : /buy|long/i.test(get("side")) ? "BUY" : "";
       if (!sym || !side) continue;
       const closeTime = toIso(get("closeTime"));

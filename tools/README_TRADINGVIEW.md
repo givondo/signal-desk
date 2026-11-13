@@ -18,7 +18,8 @@ tools/tv_mcp_server.mjs (Claude Desktop MCP)                                    
 - **Tracker:** closed trades land in an inbox. A trade enters the journal only once its stop and money at risk are known. Duplicates are skipped by broker trade ID.
 
 ## Daily use
-1. Open TradingView with the **TradingView (sync)** desktop shortcut (or `tools/start_tradingview_sync.ps1`).
+1. Open TradingView with the **TradingView Web (sync)** shortcut (`tools/start_tradingview_web.ps1`). This opens tradingview.com in its own Chrome or Edge window with the debug port, and works on the free Basic plan. Sign in and connect Deriv once in that window; the profile is kept in `%LOCALAPPDATA%\SignalDesk\tradingview-browser`.
+   On a paid plan you can use TradingView Desktop instead: **TradingView (sync)** shortcut or `tools/start_tradingview_sync.ps1`. On Basic, the Desktop app shows an upgrade screen with no close button; the web window is the supported route, and the sync reads both the same way.
 2. Keep a chart tab open with the Trading Panel's **History** tab visible.
 3. The background sync (scheduled task *Signal Desk TradingView Sync*) posts new closed trades every 60 s.
 4. In the tracker, open **Journal → From TradingView**, add the stop and a note, and click **File in journal**.
@@ -31,6 +32,15 @@ node tools/tv_trade_sync.mjs --watch 60   # keep syncing
 node --test tools/tv_trade_sync.test.mjs  # mapping tests
 ```
 Settings: `DESK_URL` (default http://localhost:8899), `TV_ACCOUNT_LABEL`, `TV_ACCOUNT_TYPE` (PERSONAL, DEMO or PROP), `TV_BROKER`. `DESK_USER` / `DESK_PASS` only for the password-protected live site; set them as your own Windows user variables, never in this repo.
+
+### Paper Trading
+TradingView's Paper Trading lists finished trades on the **Trade history** tab (under the panel's ••• menu), one row per trade with exit and entry stacked. Leave the panel on that tab. Run the sync with:
+
+```
+TV_BROKER="Paper Trading"  TV_ACCOUNT_TYPE=DEMO  TV_ACCOUNT_LABEL=TV-PAPER  TV_TZ_OFFSET_MIN=0
+```
+
+`TV_TZ_OFFSET_MIN` is the chart's time zone offset from UTC in minutes (shown bottom right of the chart; UTC is 0, Nairobi 180). Paper Trading shows net P&L only, so fees are not split out.
 
 ## Claude Desktop MCP
 `tools/tv_mcp_server.mjs` gives Claude Desktop five tools: `tv_status`, `tv_read_closed_trades`, `tv_sync_now`, `desk_summary` and `desk_pending_trades`. Nothing on TradingView is changed.

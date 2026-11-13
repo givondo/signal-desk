@@ -66,6 +66,11 @@ padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;font-family:var(-
 .iconbtn{background:var(--p2);border:1px solid var(--bd2);color:var(--dim);width:36px;height:36px;border-radius:var(--radius-sm);
 cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;transition:all .15s}
 .iconbtn:hover{color:var(--tx);border-color:var(--bd2);background:var(--p3)}
+.clusters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:10px}
+.clusters .cl{padding:2px 7px;border-radius:var(--radius-sm);border:1px solid var(--bd);color:var(--dim)}
+.clusters .cl.full{border-color:var(--a);color:var(--a)}
+.clusters .cl small{color:var(--dim2);margin-left:3px}
+.inboxbadge{display:inline-block;margin-left:6px;min-width:16px;padding:0 5px;border-radius:8px;background:var(--a);color:#fff;font-size:10px;line-height:16px;text-align:center;font-weight:600}
 .tvlink{font-size:11px;color:var(--dim);padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--bd);
 background:var(--p2);cursor:pointer;transition:all .15s;white-space:nowrap}
 .tvlink:hover{color:var(--tx);border-color:var(--bd2)}
@@ -367,7 +372,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
         <span class="head-sync"><span class="live" aria-hidden="true"></span>Updated {{ d.ts||'—' }}
           <button type="button" @click="refreshNow" :disabled="refreshing">{{ refreshing?'…':'↻' }}</button></span>
         <span class="clockline">{{ clock }} UTC · 15m {{ countdown }}</span>
-        <a class="tvlink" href="/tracker" title="Trading OS tracker: journal, prop accounts, capital" style="text-decoration:none">Tracker</a>
+        <a class="tvlink" :href="inboxN?'/tracker#journal':'/tracker'" :title="inboxN?inboxN+' TradingView trade(s) waiting in the journal inbox':'Trading OS tracker: journal, prop accounts, capital'" style="text-decoration:none">Tracker<span v-if="inboxN" class="inboxbadge">{{ inboxN }}</span></a>
         <button type="button" class="tvlink" :class="{on:d.tv_user}" @click="openAuth" :title="d.tv_user?'TradingView connected':'Connect TradingView'">
           TV {{ d.tv_user||'Connect' }}
         </button>
@@ -668,8 +673,12 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
             <div><div class="lb">Open Tickets</div><div class="vv" :class="gov.full?'nt':''">{{ gov.open??0 }} / {{ gov.max_open??'--' }}</div></div>
             <div><div class="lb">Loss Streak Today</div><div class="vv" :class="gov.tightened?'dn':''">{{ gov.loss_streak??0 }}{{ gov.tightened?' · A only':'' }}</div></div>
           </div>
+          <div v-if="clusterList.length" class="clusters" title="Open tickets grouped by the risk they really carry. A second ticket in a full group is blocked.">
+            <span class="lb">Correlated exposure</span>
+            <span v-for="c in clusterList" :key="c.name" class="cl" :class="c.full?'full':''">{{ c.name }} {{ c.n }}/{{ gov.max_per_cluster }} <small>{{ c.syms }}</small></span>
+          </div>
           <div class="govbar" :title="'Desk day '+signed(gov.day_r)+'R'"><i :style="{width:riskUsedPct+'%',background:riskUsedPct>=75?'var(--r)':riskUsedPct>=40?'var(--a)':'var(--g)'}"></i></div>
-          <div style="font-size:9px;color:var(--dim2);margin-top:5px">{{ d.size_note }} · Kelly from tracked history · desk governor: daily stop, max open tickets, A-grade only after {{ gov.tighten_after||2 }} straight losses</div>
+          <div style="font-size:9px;color:var(--dim2);margin-top:5px">{{ d.size_note }} · Kelly from tracked history · desk governor: daily stop, max open tickets, {{ gov.max_per_cluster||1 }} per correlated group, A-grade only after {{ gov.tighten_after||2 }} straight losses</div>
         </div>
       </div>
 
@@ -772,7 +781,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
 const {createApp} = Vue;
 createApp({
   data(){return{
-    sym:'XAUUSD',
+    sym:'XAUUSD', inboxN:0,
     symGroups:[
       ['Metals',[['XAUUSD','Gold · XAU/USD'],['XAGUSD','Silver · XAG/USD']]],
       ['Crypto',[['BTCUSD','Bitcoin · BTC'],['ETHUSD','Ethereum · ETH'],['SOLUSD','Solana · SOL'],['XRPUSD','XRP']]],
@@ -791,6 +800,11 @@ createApp({
   computed:{
     perf(){ return this.d.perf||{} },
     gov(){ return this.d.governor||{} },
+    clusterList(){
+      const c=this.gov.clusters||{}, cap=this.gov.max_per_cluster||1;
+      return Object.keys(c).sort().map(k=>({name:k,n:c[k].length,full:c[k].length>=cap,
+        syms:c[k].map(x=>x.split(' ')[0]).join(', ')}));
+    },
     tp2PayoffR(){  // 50% banked at TP1, runner to TP2
       const l=this.d.levels, sl=this.d.sl_dist;
       if(!l||!sl) return 2.25;
@@ -869,6 +883,10 @@ createApp({
       setTimeout(()=>{this.toasts=this.toasts.filter(t=>t.id!==id)},4500) },
     chipDir(s){ const r=this.roster.find(x=>x.sym===s); return r&&r.direction==='LONG'?'dirL':r&&r.direction==='SHORT'?'dirS':'mut' },
     chipDirLabel(s){ const r=this.roster.find(x=>x.sym===s); if(!r||!r.direction)return '·'; return r.direction==='LONG'?'L':r.direction==='SHORT'?'S':'N' },
+    async fetchInbox(){
+      try{ const r=await fetch('/api/tracker/fills/pending'); if(!r.ok) return;
+        const j=await r.json(); this.inboxN=(j.fills||[]).length; }catch(e){}
+    },
     async fetchRoster(){ try{
       const r=await fetch('/api/roster'); this.roster=(await r.json()).symbols||[];
     }catch(e){} },
@@ -1026,7 +1044,8 @@ createApp({
       this.darkMode=(localStorage.getItem('sd-theme-v2')==='dark');
     }catch(e){}
     this.applyTheme();
-    this.tick(); this.fetchRoster();
+    this.tick(); this.fetchRoster(); this.fetchInbox();
+    setInterval(()=>this.fetchInbox(),60000);
     setInterval(()=>this.tick(),15000);
     setInterval(()=>this.fetchRoster(),15000);
     setInterval(()=>{this.now=Date.now()},1000);
