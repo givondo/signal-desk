@@ -14,7 +14,7 @@ if [ -z "${ZONE:-}" ]; then
   exit 1
 fi
 
-echo ">> Updating $NAME in $ZONE (password + /opt/signaldesk/data unchanged)..."
+echo ">> Updating $NAME in $ZONE (password, journal and /opt/signaldesk/data/trading_os_data unchanged)..."
 
 gcloud compute ssh "$NAME" --zone="$ZONE" --command="sudo bash -s" <<'REMOTE'
 set -e
@@ -30,7 +30,8 @@ else
   git clone https://github.com/givondo/signal-desk.git /opt/signaldesk-src
 fi
 mkdir -p /opt/signaldesk/data
-cp /opt/signaldesk-src/xauusd_trader.py /opt/signaldesk-src/precifarm_analyst.py /opt/signaldesk-src/dashboard.html /opt/signaldesk/
+cp /opt/signaldesk-src/xauusd_trader.py /opt/signaldesk-src/precifarm_analyst.py /opt/signaldesk-src/dashboard.html /opt/signaldesk-src/trading_tracker.py /opt/signaldesk-src/tracker.html /opt/signaldesk/
+rm -rf /opt/signaldesk/trading_os && cp -r /opt/signaldesk-src/trading_os /opt/signaldesk/trading_os
 cp /opt/signaldesk-src/deploy/signaldesk.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl restart signaldesk

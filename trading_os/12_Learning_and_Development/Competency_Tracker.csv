@@ -1,0 +1,13 @@
+competency,area,level_0_4,evidence,target_level,target_date,last_reviewed,next_action
+Position sizing with costs,Risk management,,,3,2027-01-31,,Size 20 trades by hand and check against Position_Sizing.py
+Prop firm drawdown mechanics,Risk management,,,3,2027-01-31,,Replay one statement with Drawdown_Calculator.py
+Trade journaling,Process,,,3,2027-01-31,,40 demo trades fully journaled
+Expectancy and confidence intervals,Statistics,,,3,2027-02-28,,Explain own lower 95% bound of mean R
+Backtesting with costs and walk-forward,Quantitative,,,3,2027-03-31,,S-001 real-data walk-forward filed
+Avoiding look-ahead and overfitting,Quantitative,,,3,2027-03-31,,Frozen-parameter test with random baseline
+Python and pandas for trading data,Technical,,,2,2027-03-31,,One tested contribution to Signal Desk
+USD macro drivers of gold,Macroeconomics,,,3,2027-02-28,,Monthly macro note
+Spread and slippage measurement,Microstructure,,,2,2027-04-30,,30-trade execution cost study
+Emotional regulation after losses,Psychology,,,3,2027-02-28,,Zero revenge-trading flags for 4 weeks
+Monthly reconciliation,Financial reporting,,,3,2027-04-30,,Two reconciled monthly reports
+Prop firm due diligence,Business,,,3,2026-12-31,,Pre-purchase checklist completed once

@@ -1,0 +1,1 @@
+txn_id,date,account,transaction_type,amount,currency,fx_rate_to_kes,kes_equivalent,fx_rate_source,charges,charges_currency,payment_method,reference,evidence,notes

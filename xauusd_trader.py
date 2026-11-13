@@ -10,6 +10,8 @@ Serves http://localhost:8899 (dashboard.html) and a JSON API:
   /api/desk/brief?sym=XAUUSD      Precifarm analyst brief (plain text)
   /api/roster                     every instrument + desk risk governor
   /api/tv_login (POST)            TradingView account session
+  /tracker                        Trading OS tracker (journal, prop, capital)
+  /api/tracker/*                  tracker API, see trading_tracker.py
 
 Data: TradingView scanner (multi-timeframe technicals), Yahoo (macro complex,
 15m candles, RSS news), optional Bloomberg Terminal via blpapi.
@@ -297,6 +299,22 @@ except Exception:          # no tzdata: fall back to fixed UTC session hours
     _LON = _NY = DESK_TZ = None
 AUTH_FILE = os.path.join(DATA_DIR, "tv_auth.json")
 DASH_FILE = os.path.join(BASE_DIR, "dashboard.html")   # read-only shipped asset
+TRACKER_FILE = os.path.join(BASE_DIR, "tracker.html")  # Trading OS tracker page
+TRACKER_MAX_BODY = 64 * 1024
+
+
+def _tracker_module():
+    """Import the Trading OS tracker lazily so the engine runs even without it."""
+    try:
+        import trading_tracker
+        return trading_tracker
+    except Exception as e:  # missing trading_os/ on an older deploy
+        print(f"tracker unavailable: {e}", file=sys.stderr)
+        return None
+
+
+def _paper_tickets():
+    return {s: list(t.resolved) for s, t in trackers.items()}
 
 state_lock = threading.Lock()
 latest = {s: {"status": "starting"} for s in SYMBOLS}
@@ -1926,9 +1944,43 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_full(self, status, ctype, body, headers=None):
+        self.send_response(status)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        for k, v in (headers or {}).items():
+            self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _tracker(self, method, parsed, body=None):
+        mod = _tracker_module()
+        if mod is None:
+            return self._send_full(503, "application/json",
+                                   b'{"ok": false, "error": "tracker not installed"}')
+        qs = urllib.parse.parse_qs(parsed.query)
+        status, ctype, out, headers = mod.handle(method, parsed.path, qs, body,
+                                                 paper_source=_paper_tickets)
+        self._send_full(status, ctype, out, headers)
+
     def do_POST(self):
         if not self._authorized():
             return self._deny()
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path.startswith("/api/tracker/"):
+            ln = int(self.headers.get("Content-Length", 0) or 0)
+            if ln > TRACKER_MAX_BODY:
+                return self._send_full(413, "application/json",
+                                       b'{"ok": false, "error": "body too large"}')
+            try:
+                body = json.loads(self.rfile.read(ln) or b"{}")
+            except Exception:
+                return self._send_full(400, "application/json",
+                                       b'{"ok": false, "error": "invalid JSON"}')
+            if not isinstance(body, dict):
+                body = {}
+            return self._tracker("POST", parsed, body)
         if self.path != "/api/tv_login":
             self.send_response(404)
             self.end_headers()
@@ -2033,6 +2085,15 @@ class Handler(BaseHTTPRequestHandler):
             self._send(json.dumps({"ts": time.strftime("%H:%M:%S"),
                                    "symbols": rows, "governor": gov}).encode(),
                        "application/json")
+        elif parsed.path.startswith("/api/tracker/"):
+            self._tracker("GET", parsed)
+        elif parsed.path in ("/tracker", "/tracker/"):
+            try:
+                with open(TRACKER_FILE, "rb") as f:
+                    body = f.read()
+            except Exception:
+                body = b"<h3>tracker.html missing</h3>"
+            self._send(body, "text/html; charset=utf-8")
         elif parsed.path == "/" or parsed.path.startswith("/index"):
             try:
                 with open(DASH_FILE, "rb") as f:
