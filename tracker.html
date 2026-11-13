@@ -160,7 +160,10 @@ async function api(path, body){
 }
 async function load(){
   S = await api("/api/tracker/summary");
-  if(S && S.ok !== false){ const r = await api("/api/tracker/records?kind=trades&limit=20"); S._recent = r.rows || []; }
+  if(S && S.ok !== false){
+    const [r, p] = await Promise.all([api("/api/tracker/records?kind=trades&limit=20"), api("/api/tracker/fills/pending")]);
+    S._recent = r.rows || []; S._fills = p.fills || [];
+  }
   render();
 }
 
@@ -249,6 +252,7 @@ function banners(){
   if(S.integrity && S.integrity.length) h += `<div class="banner bad"><b>Journal integrity:</b> ${S.integrity.map(esc).join(" ")}</div>`;
   if(S.validation && S.validation.length) h += `<div class="banner bad"><b>Check these trades:</b> ${S.validation.slice(0,4).map(esc).join("; ")}</div>`;
   (S.net_worth.warnings||[]).forEach(w => h += `<div class="banner bad">${esc(w)}</div>`);
+  if((S._fills||[]).length && tab!=="journal") h += `<div class="banner bad" style="background:var(--warnbg);color:var(--warn);border-color:#FDE68A">${S._fills.length} TradingView trade${S._fills.length>1?"s":""} waiting to be filed. <a href="#journal" data-goto="journal" style="color:inherit;font-weight:700">Review in Journal</a></div>`;
   return h;
 }
 function recentTrades(n=8){
@@ -258,6 +262,47 @@ function recentTrades(n=8){
     ${rows.map(r=>{ const R = parseFloat(r.r_multiple), P = parseFloat(r.net_pl); return `<tr><td>${esc((r.exit_time_utc||r.recorded_at_utc||"").slice(0,10))}</td><td>${esc(r.account_type)}</td><td>${esc(r.instrument)}</td>
     <td>${esc(r.direction)}</td><td>${esc(r.setup)}</td><td class="n ${sign(P)}">${esc(r.net_pl)}</td><td class="n ${sign(R)}">${isFinite(R)?R.toFixed(2):""}</td>
     <td>${r.rule_compliance==="VIOLATED"?'<span class="pill BREACHED">Violated</span>':'<span class="pill OK">Followed</span>'}</td></tr>`;}).join("")}</table></div>`;
+}
+
+// ---------------------------------------------------------------- broker inbox
+const CONTRACT = {XAUUSD:100, XAGUSD:5000, EURUSD:100000, GBPUSD:100000, AUDUSD:100000, NZDUSD:100000};
+function suggestRisk(f, stop){
+  const e = parseFloat(f.entry_price), v = parseFloat(f.volume), c = CONTRACT[(f.instrument||"").replace(/[^A-Z]/g,"")];
+  return (isFinite(e)&&isFinite(stop)&&isFinite(v)&&c) ? Math.abs(e-stop)*v*c : NaN;
+}
+function inboxHtml(){
+  const fills = S._fills || [];
+  if(!fills.length) return `<div class="empty">Nothing waiting. Closed trades from TradingView land here automatically, then you add the stop and a few notes to file them in the journal.</div>`;
+  return fills.slice(0,25).map(f=>{ const P = parseFloat(f.net_pl||f.gross_pl);
+    return `<form class="f inbox" data-fill="${esc(f.fill_id)}" style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px">
+    <div class="wide" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><b>${esc(f.instrument)} ${esc(f.direction)}</b>
+      <span class="preview">${esc(f.volume)} lots · ${esc(f.entry_price)} → ${esc(f.exit_price)} · ${esc((f.close_time_utc||"").replace("T"," ").slice(0,16))} UTC · ${esc(f.broker)}</span>
+      <span class="num ${sign(P)}" style="margin-left:auto;font-weight:700">${isFinite(P)?fmt(P)+" "+esc(f.currency||""):""}</span></div>
+    <label><span>Stop loss <b class="star">*</b></span><input name="stop_loss" type="number" step="any" value="${esc(f.stop_loss||"")}"></label>
+    <label><span>Money at risk <b class="star">*</b></span><input name="initial_risk_amount" type="number" step="any" placeholder="auto from stop"></label>
+    <label><span>Setup</span><input name="setup" value="S-001"></label>
+    <label><span>Rules</span><select name="rule_compliance"><option>FOLLOWED</option><option>VIOLATED</option></select></label>
+    <label><span>Emotion</span><select name="emotional_state">${EMOTIONS.map(o=>`<option>${o}</option>`).join("")}</select></label>
+    <label><span>Account type</span><select name="account_type">${["PERSONAL","PROP","DEMO"].map(o=>`<option${o===f.account_type?" selected":""}>${o}</option>`).join("")}</select></label>
+    <label class="wide"><span>Violation detail or lesson</span><input name="lessons"></label>
+    <div class="formfoot"><button class="btn pri" type="submit">File in journal</button><button class="btn sm" type="button" data-ignore>Ignore</button><span class="preview" data-r></span></div></form>`; }).join("")
+    + (fills.length>25 ? `<p class="preview">${fills.length-25} more after these.</p>` : "");
+}
+function wireInbox(){
+  document.querySelectorAll("form.inbox").forEach(form=>{
+    const f = (S._fills||[]).find(x=>x.fill_id===form.dataset.fill);
+    const upd = ()=>{ const st = parseFloat(form.elements.stop_loss.value), r = suggestRisk(f, st), out = form.querySelector("[data-r]");
+      if(isFinite(r)){ form.elements.initial_risk_amount.placeholder = r.toFixed(2); const P = parseFloat(f.net_pl||f.gross_pl); out.innerHTML = isFinite(P)&&r>0 ? `Result <b class="${sign(P)}">${(P/r).toFixed(2)}R</b>` : ""; } };
+    form.addEventListener("input", upd); upd();
+    form.addEventListener("submit", async e=>{ e.preventDefault();
+      const fields = {}; for(const el of form.elements){ if(el.name && el.value.trim()!=="") fields[el.name] = el.value.trim(); }
+      if(!fields.initial_risk_amount && form.elements.initial_risk_amount.placeholder && form.elements.initial_risk_amount.placeholder!=="auto from stop") fields.initial_risk_amount = form.elements.initial_risk_amount.placeholder;
+      if(fields.rule_compliance==="VIOLATED"){ fields.violation_detail = fields.lessons || "see lessons"; }
+      const r = await api("/api/tracker/fills/journal", {fill_id: f.fill_id, fields});
+      if(r.ok){ toast("Filed " + f.instrument + " " + f.direction); await load(); } else toast(r.error, true); });
+    form.querySelector("[data-ignore]").onclick = async ()=>{ const r = await api("/api/tracker/fills/ignore", {fill_id: f.fill_id, reason: "ignored in tracker"});
+      if(r.ok){ toast("Ignored"); await load(); } else toast(r.error, true); };
+  });
 }
 
 // ---------------------------------------------------------------- views
@@ -275,7 +320,8 @@ const VIEWS = {
   },
   journal(){
     return banners() + `<h1>Journal</h1><p class="lead">Fill in the essentials; everything else is under More details. Saved trades can't be edited later; add a correction instead.</p>
-      <div class="g2">${card("Log a trade", formHtml("trades",{button:"Save trade",preview:true}))}${card("Recent trades", recentTrades(12))}</div>
+      ${card(`From TradingView${(S._fills||[]).length?` (${S._fills.length} waiting)`:""}`, inboxHtml(), "Closed trades synced from your broker in TradingView. Add the stop and a note, then file them.")}<br>
+      <div class="g2">${card("Log a trade by hand", formHtml("trades",{button:"Save trade",preview:true}))}${card("Recent trades", recentTrades(12))}</div>
       <details class="sec"><summary>Missed trade</summary>${formHtml("missed")}</details>
       <details class="sec"><summary>Rule violation</summary>${formHtml("violations")}</details>
       <details class="sec"><summary>Correct a saved trade</summary>${formHtml("corrections",{button:"Save correction"})}</details>`;
@@ -324,7 +370,7 @@ const VIEWS = {
   },
   records(){
     return `<h1>Records</h1><p class="lead">Every saved row, newest first. Export any table to CSV, or download the full Excel workbook from the top bar.</p>
-      <div class="card"><form id="recF" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap"><label style="min-width:220px"><span>Record type</span><select name="kind">${Object.keys(FORMS).map(k=>`<option>${k}</option>`).join("")}</select></label>
+      <div class="card"><form id="recF" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap"><label style="min-width:220px"><span>Record type</span><select name="kind">${[...Object.keys(FORMS),"fills","fill_decisions"].map(k=>`<option>${k}</option>`).join("")}</select></label>
       <button class="btn">Show</button><a class="btn" id="exp" href="/api/tracker/export?kind=trades">Export CSV</a></form><div id="recOut" style="margin-top:14px"></div></div>`;
   },
 };
@@ -349,6 +395,8 @@ function render(){
   if(!S || S.ok===false){ document.getElementById("app").innerHTML = `<div class="banner bad">${esc((S&&S.error)||"Tracker unavailable")}</div>`; return; }
   document.getElementById("tabs").innerHTML = TABS.map(([k,l])=>`<button type="button" data-t="${k}" class="${k===tab?"on":""}">${l}</button>`).join("");
   document.getElementById("app").innerHTML = (VIEWS[tab]||VIEWS.overview)();
+  wireInbox();
+  document.querySelectorAll("[data-goto]").forEach(a=>a.onclick = e=>{ e.preventDefault(); tab = a.dataset.goto; location.hash = tab; render(); window.scrollTo(0,0); });
   document.querySelectorAll("form.f[data-kind]").forEach(f=>{
     f.addEventListener("submit", submitForm);
     if(f.dataset.kind==="trades") f.addEventListener("input", ()=>tradePreview(f));

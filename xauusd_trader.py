@@ -302,7 +302,7 @@ except Exception:          # unknown DESK_TZ without tzdata: fixed UTC session h
 AUTH_FILE = os.path.join(DATA_DIR, "tv_auth.json")
 DASH_FILE = os.path.join(BASE_DIR, "dashboard.html")   # read-only shipped asset
 TRACKER_FILE = os.path.join(BASE_DIR, "tracker.html")  # Trading OS tracker page
-TRACKER_MAX_BODY = 64 * 1024
+TRACKER_MAX_BODY = 1024 * 1024  # broker history imports can be large
 
 
 def _tracker_module():

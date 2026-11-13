@@ -208,6 +208,58 @@ class NetWorthAndWorkbook(TrackerBase):
         self.assertEqual(wb.sheetnames[0], "Summary")
 
 
+class BrokerFills(TrackerBase):
+    FILLS = [
+        {"broker_trade_id": "1001", "instrument": "xauusd", "direction": "long", "volume": "0.10",
+         "entry_price": "2650.0", "exit_price": "2660.0", "open_time_utc": "2026-11-13T13:00:00+00:00",
+         "close_time_utc": "2026-11-13T14:00:00+00:00", "gross_pl": "100", "commission": "0.7", "currency": "USD"},
+        {"broker_trade_id": "1002", "instrument": "XAUUSD", "direction": "SELL", "volume": "0.10",
+         "entry_price": "2660.0", "exit_price": "2665.0", "stop_loss": "2665.0", "net_pl": "-50",
+         "initial_risk_amount": "50", "close_time_utc": "2026-11-13T15:00:00+00:00", "currency": "USD"},
+    ]
+
+    def test_import_is_idempotent_and_risky_fills_wait_in_inbox(self):
+        r = tt.import_fills("tradingview", "Pepperstone", "PEP-TV-1", "personal", self.FILLS)
+        self.assertEqual((r["added"], r["duplicates"], r["auto_journaled"]), (2, 0, 1))
+        again = tt.import_fills("tradingview", "Pepperstone", "PEP-TV-1", "PERSONAL", self.FILLS)
+        self.assertEqual((again["added"], again["duplicates"]), (0, 2))
+        pending = tt.pending_fills()
+        self.assertEqual([f["broker_trade_id"] for f in pending], ["1001"])     # no stop yet
+        self.assertEqual(pending[0]["direction"], "BUY")
+        trades = tt.read("trades")
+        self.assertEqual(len(trades), 1)
+        self.assertEqual(trades[0]["trade_id"], tt.fill_key("tradingview", "Pepperstone", "1002"))
+        self.assertEqual(trades[0]["r_multiple"], "-1.00")
+
+    def test_filing_a_fill_needs_risk_and_derives_net(self):
+        tt.import_fills("tradingview", "Pepperstone", "PEP-TV-1", "PERSONAL", self.FILLS[:1])
+        fid = tt.pending_fills()[0]["fill_id"]
+        with self.assertRaises(tt.TrackerError):
+            tt.journal_fill(fid, {"setup": "S-001"})                    # no stop or risk
+        with self.assertRaises(tt.TrackerError):
+            tt.journal_fill(fid, {"hacked": "x"})
+        row = tt.journal_fill(fid, {"stop_loss": "2645", "initial_risk_amount": "50", "setup": "S-001",
+                                    "emotional_state": "Calm"})
+        self.assertEqual(row["net_pl"], "99.30")                        # 100 - 0.7 commission
+        self.assertEqual(row["r_multiple"], "1.99")
+        self.assertEqual(tt.pending_fills(), [])
+        with self.assertRaises(tt.TrackerError):
+            tt.journal_fill(fid, {"stop_loss": "2645", "initial_risk_amount": "50"})
+
+    def test_ignore_removes_from_inbox(self):
+        tt.import_fills("tradingview", "Pepperstone", "PEP-TV-1", "PERSONAL", self.FILLS[:1])
+        fid = tt.pending_fills()[0]["fill_id"]
+        st, _, body, _ = tt.handle("POST", "/api/tracker/fills/ignore", {}, {"fill_id": fid})
+        self.assertEqual(st, 200)
+        self.assertEqual(tt.pending_fills(), [])
+        st, _, body, _ = tt.handle("POST", "/api/tracker/fills/ignore", {}, {"fill_id": "nope"})
+        self.assertEqual(st, 400)
+
+    def test_import_rejects_bad_account_type(self):
+        st, _, body, _ = tt.handle("POST", "/api/tracker/import/fills", {}, {"broker": "X", "account_type": "MOON", "fills": []})
+        self.assertEqual(st, 400)
+
+
 class HttpRoutes(TrackerBase):
     """End to end through the desk's real HTTP handler, without the market poller."""
 

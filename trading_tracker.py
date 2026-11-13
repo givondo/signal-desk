@@ -56,6 +56,8 @@ KINDS: dict[str, tuple[str, str | None]] = {
     "withdrawals": ("09_Personal_Capital/Withdrawals.csv", "txn_id"),
     "reconciliation": ("09_Personal_Capital/Account_Reconciliation.csv", None),
     "networth": ("09_Personal_Capital/Net_Worth.csv", "entry_id"),
+    "fills": ("07_Trading_Journal/Broker_Fills.csv", "fill_id"),
+    "fill_decisions": ("07_Trading_Journal/Fill_Decisions.csv", "decision_id"),
 }
 
 REQUIRED: dict[str, tuple[str, ...]] = {
@@ -76,6 +78,8 @@ REQUIRED: dict[str, tuple[str, ...]] = {
     "withdrawals": ("date", "account", "amount", "currency", "fx_rate_source"),
     "reconciliation": ("period_end", "account", "opening_equity", "closing_equity_statement"),
     "networth": ("date", "item", "category", "amount", "currency"),
+    "fills": ("source", "broker", "broker_trade_id", "instrument", "direction"),
+    "fill_decisions": ("fill_id", "decision"),
 }
 
 ASSET_CATEGORIES = ("CASH", "EMERGENCY_FUND", "INVESTMENTS", "TRADING_ACCOUNT", "BUSINESS_EQUITY",
@@ -169,7 +173,7 @@ def _now_iso() -> str:
 def _new_id(kind: str, existing: set[str]) -> str:
     prefix = {"trades": "T", "corrections": "C", "missed": "M", "violations": "V",
               "evaluations": "E", "snapshots": "S", "payouts": "P", "deposits": "D",
-              "withdrawals": "W", "networth": "NW"}.get(kind, "R")
+              "withdrawals": "W", "networth": "NW", "fill_decisions": "FD"}.get(kind, "R")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     n = 1
     while f"{prefix}-{stamp}-{n}" in existing:
@@ -216,6 +220,10 @@ def _validate(kind: str, row: dict, existing: list[dict]) -> None:
             raise TrackerError(dup[-1])
     if kind == "snapshots" and row["rules_preset"] not in dc.PRESETS:
         raise TrackerError(f"rules_preset must be one of {sorted(dc.PRESETS)}")
+    if kind == "fill_decisions" and row["decision"].upper() not in ("IGNORED", "RESTORED"):
+        raise TrackerError("decision must be IGNORED or RESTORED")
+    if kind == "fill_decisions":
+        row["decision"] = row["decision"].upper()
     if kind == "networth":
         row["category"] = row["category"].upper().replace(" ", "_")
         if row["category"] in ASSET_CATEGORIES:
@@ -319,6 +327,117 @@ def _epoch_iso(v) -> str:
         return datetime.fromtimestamp(int(v), timezone.utc).isoformat(timespec="seconds")
     except (TypeError, ValueError):
         return ""
+
+
+# ----------------------------------------------------------------- broker fills
+FILL_NUMERIC = ("volume", "entry_price", "exit_price", "stop_loss", "take_profit", "gross_pl", "commission", "swap", "net_pl")
+
+
+def _slug(v: str) -> str:
+    return "".join(ch for ch in (v or "").upper() if ch.isalnum() or ch in "-_")[:40] or "X"
+
+
+def fill_key(source: str, broker: str, broker_trade_id: str) -> str:
+    """Deterministic ID shared by the fill and the journal trade created from it."""
+    return f"{_slug(source)[:4]}-{_slug(broker)}-{_slug(broker_trade_id)}"
+
+
+def import_fills(source: str, broker: str, account_label: str, account_type: str, fills: list) -> dict:
+    """Store closed trades read from a broker or TradingView. Idempotent by broker trade id.
+
+    Fills land in an inbox first. A fill becomes a journal trade only when its stop
+    and money at risk are known (sent by the sync, or added by you in the tracker),
+    so no trade enters the journal without a defined risk.
+    """
+    if not isinstance(fills, list):
+        raise TrackerError("fills must be a list")
+    account_type = (account_type or "PERSONAL").upper()
+    if account_type not in ENUMS["account_type"]:
+        raise TrackerError("account_type must be one of " + ", ".join(sorted(ENUMS["account_type"])))
+    if len(fills) > 2000:
+        raise TrackerError("too many fills in one request (max 2000)")
+    existing = {r.get("fill_id") for r in read("fills")}
+    added, dupes, journaled, errors = 0, 0, 0, []
+    for f in fills:
+        if not isinstance(f, dict):
+            errors.append("skipped a fill that is not an object")
+            continue
+        tid = str(f.get("broker_trade_id") or "").strip()
+        if not tid:
+            errors.append("skipped a fill without broker_trade_id")
+            continue
+        fid = fill_key(source, broker, tid)
+        if fid in existing:
+            dupes += 1
+            continue
+        side = str(f.get("direction") or "").upper()
+        side = {"LONG": "BUY", "SHORT": "SELL"}.get(side, side)
+        row = {"fill_id": fid, "source": source, "broker": broker, "account_label": account_label,
+               "account_type": account_type, "broker_trade_id": tid, "instrument": str(f.get("instrument") or "").upper(),
+               "direction": side, "open_time_utc": f.get("open_time_utc") or "", "close_time_utc": f.get("close_time_utc") or "",
+               "currency": f.get("currency") or "USD", "raw": str(f.get("raw") or "")[:600]}
+        for k in FILL_NUMERIC:
+            row[k] = f.get(k, "")
+        try:
+            append("fills", row)
+        except TrackerError as e:
+            errors.append(f"{tid}: {e}")
+            continue
+        existing.add(fid)
+        added += 1
+        risk = ta.num(f.get("initial_risk_amount"))
+        if risk and risk > 0 and row.get("stop_loss") not in ("", None):
+            try:
+                journal_fill(fid, {"initial_risk_amount": risk, "stop_loss": row["stop_loss"],
+                                   "rule_compliance": "FOLLOWED", "lessons": "auto-journaled by sync"})
+                journaled += 1
+            except TrackerError as e:
+                errors.append(f"{tid}: not journaled: {e}")
+    return {"added": added, "duplicates": dupes, "auto_journaled": journaled, "errors": errors[:20]}
+
+
+def pending_fills() -> list[dict]:
+    """Fills not yet in the journal and not ignored, newest first."""
+    journal_ids = {r.get("trade_id") for r in read("trades")}
+    state: dict[str, str] = {}
+    for d in read("fill_decisions"):
+        state[d.get("fill_id")] = d.get("decision")
+    out = [f for f in read("fills") if f["fill_id"] not in journal_ids and state.get(f["fill_id"]) != "IGNORED"]
+    return sorted(out, key=lambda f: f.get("close_time_utc") or f.get("recorded_at_utc") or "", reverse=True)
+
+
+def journal_fill(fill_id: str, extra: dict) -> dict:
+    """Turn one fill into a journal trade, adding the stop, risk and review fields you supply."""
+    fill = next((f for f in read("fills") if f.get("fill_id") == fill_id), None)
+    if fill is None:
+        raise TrackerError("unknown fill")
+    if fill_id in {r.get("trade_id") for r in read("trades")}:
+        raise TrackerError("this fill is already in the journal")
+    extra = extra or {}
+    allowed = {"stop_loss", "take_profit", "initial_risk_amount", "setup", "strategy_id", "timeframe", "session",
+               "rule_compliance", "violation_detail", "emotional_state", "lessons", "market_conditions",
+               "screenshot_before", "screenshot_after", "account_type"}
+    unknown = sorted(set(extra) - allowed)
+    if unknown:
+        raise TrackerError("unknown fields: " + ", ".join(unknown))
+    net = fill.get("net_pl")
+    if net in ("", None) and fill.get("gross_pl") not in ("", None):
+        net = f"{float(fill['gross_pl']) - (ta.num(fill.get('commission')) or 0) - (ta.num(fill.get('swap')) or 0):.2f}"
+    row = {"trade_id": fill_id, "account_type": extra.get("account_type") or fill.get("account_type") or "PERSONAL",
+           "account_label": fill.get("account_label"), "firm_or_broker": f"{fill.get('broker')} via {fill.get('source')}",
+           "instrument": fill.get("instrument"), "direction": fill.get("direction"),
+           "entry_time_utc": fill.get("open_time_utc"), "exit_time_utc": fill.get("close_time_utc"),
+           "entry_price": fill.get("entry_price"), "exit_price": fill.get("exit_price"), "volume": fill.get("volume"),
+           "take_profit": extra.get("take_profit") or fill.get("take_profit"),
+           "stop_loss": extra.get("stop_loss") or fill.get("stop_loss"),
+           "initial_risk_amount": extra.get("initial_risk_amount"), "currency": fill.get("currency"),
+           "gross_pl": fill.get("gross_pl"), "commission": fill.get("commission"), "swap": fill.get("swap"),
+           "net_pl": net, "rule_compliance": extra.get("rule_compliance") or "FOLLOWED"}
+    for k in ("setup", "strategy_id", "timeframe", "session", "violation_detail", "emotional_state", "lessons",
+              "market_conditions", "screenshot_before", "screenshot_after"):
+        if extra.get(k):
+            row[k] = extra[k]
+    return append("trades", {k: v for k, v in row.items() if v not in (None,)})
 
 
 # ----------------------------------------------------------------- summary
@@ -438,6 +557,7 @@ def summary() -> dict:
         "prop_accounts": prop_status(),
         "capital": ta.capital_summary(read("deposits"), read("withdrawals"), read("reconciliation")),
         "net_worth": net_worth(),
+        "pending_fills": len(pending_fills()),
         "counts": {k: len(read(k)) for k in KINDS},
         "presets": {k: {"firm": r.firm, "programme": r.programme, "verified_on": r.verified_on,
                         "kenya_eligible": r.kenya_eligible} for k, r in dc.PRESETS.items()},
@@ -570,6 +690,23 @@ def handle(method: str, path: str, query: dict, body: dict | None, paper_source=
             return 200, js, json.dumps({"ok": True, "result": size(body or {})}).encode(), {}
         if method == "POST" and path == "/api/tracker/drawdown":
             return 200, js, json.dumps({"ok": True, "result": drawdown(body or {})}).encode(), {}
+        if method == "GET" and path == "/api/tracker/fills/pending":
+            return 200, js, json.dumps({"ok": True, "fills": pending_fills()}).encode(), {}
+        if method == "POST" and path == "/api/tracker/import/fills":
+            b = body or {}
+            res = import_fills(str(b.get("source") or "tradingview"), str(b.get("broker") or "unknown"),
+                               str(b.get("account_label") or ""), str(b.get("account_type") or "PERSONAL"), b.get("fills") or [])
+            return 200, js, json.dumps({"ok": True, **res}).encode(), {}
+        if method == "POST" and path == "/api/tracker/fills/journal":
+            b = body or {}
+            row = journal_fill(str(b.get("fill_id") or ""), b.get("fields") or {})
+            return 200, js, json.dumps({"ok": True, "row": row}).encode(), {}
+        if method == "POST" and path == "/api/tracker/fills/ignore":
+            b = body or {}
+            if not any(f.get("fill_id") == b.get("fill_id") for f in read("fills")):
+                raise TrackerError("unknown fill")
+            row = append("fill_decisions", {"fill_id": b.get("fill_id"), "decision": "IGNORED", "reason": b.get("reason") or ""})
+            return 200, js, json.dumps({"ok": True, "row": row}).encode(), {}
         if method == "POST" and path == "/api/tracker/sync_paper":
             n = sync_paper(paper_source()) if paper_source else 0
             return 200, js, json.dumps({"ok": True, "added": n}).encode(), {}

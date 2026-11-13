@@ -1,0 +1,1 @@
+fill_id,recorded_at_utc,source,broker,account_label,account_type,broker_trade_id,instrument,direction,volume,entry_price,exit_price,open_time_utc,close_time_utc,stop_loss,take_profit,gross_pl,commission,swap,net_pl,currency,raw
