@@ -205,6 +205,31 @@ class Storage(Base):
             os.environ.pop("TELEGRAM_BOT_TOKEN")
             os.environ.pop("TELEGRAM_CHAT_ID")
 
+    def test_preview_route_is_not_logged(self):
+        sig = {"status": "ok", "direction": "LONG", "desk_action": {"mode": "EXECUTE"},
+               "levels": {"entry": 4100.0, "sl": 4092.0, "tp1": 4112.0}}
+        status, _, body, _ = pr.handle("GET", "/api/router/route", {"sym": ["XAUUSD"], "preview": ["1"]}, None,
+                                       latest_signal=lambda s: sig)
+        self.assertEqual(status, 200)
+        self.assertTrue(json.loads(body)["preview"])
+        self.assertEqual(pr._read_log("routes.jsonl"), [])
+        pr.handle("GET", "/api/router/route", {"sym": ["XAUUSD"]}, None, latest_signal=lambda s: sig)
+        self.assertEqual(len(pr._read_log("routes.jsonl")), 1)
+
+    def test_account_health(self):
+        h = pr.account_health(dict(PERSONAL), now=NOW)
+        self.assertEqual((h["status"], h["daily_used"], h["streak_max"]), ("OK", 0.0, 2))
+        tt.append("trades", trade("LIVE", -30))
+        h = pr.account_health(dict(PERSONAL), now=NOW)
+        self.assertAlmostEqual(h["daily_used"], 0.6)
+        self.assertEqual(h["status"], "WARN")
+        p = pr.account_health({**PROP, "equity": 94000, "day_start_balance": 94000}, now=NOW)
+        self.assertAlmostEqual(p["max_used"], 0.6)
+        self.assertIn(p["status"], ("WARN", "CRITICAL"))
+        self.assertEqual(pr.account_health({k: v for k, v in PERSONAL.items() if k != "equity"})["status"], "NO DATA")
+        status, _, body, _ = pr.handle("GET", "/api/router/accounts", {}, None)
+        self.assertIn("health", json.loads(body)["accounts"][0])
+
     def test_alert_text_mentions_every_account(self):
         r = pr.route(LONG, [dict(PERSONAL), dict(PROP)], now=NOW, log=False)
         t = pr.alert_text(r)

@@ -368,6 +368,39 @@ def _finish(out: dict, s: dict) -> dict:
     return out
 
 
+def account_health(acc: dict, limits: dict | None = None, now: datetime | None = None) -> dict:
+    """Limit usage for the gauges on the Router page: 0 is untouched, 1 is the limit."""
+    limits = limits or ps.load_limits()
+    kind = "prop" if acc["type"] == "PROP" else "personal"
+    lim = limits[kind]
+    st, perf = account_state(acc), performance(acc["label"], now)
+    out = {"kind": kind, "equity": st["equity"], "today_pl": perf["day_pl"], "week_pl": perf["week_pl"],
+           "trades_today": perf["trades_today"], "streak": perf["losses_in_a_row_today"],
+           "streak_max": lim["max_consecutive_losses_per_day"], "daily_used": None, "max_used": None,
+           "week_used": None, "status": "NO DATA" if not st["equity"] else "OK"}
+    if not st["equity"]:
+        return out
+    if kind == "personal":
+        day_ref = st["day_start"] or st["equity"]
+        out["daily_used"] = max(0.0, -perf["day_pl"]) / (day_ref * lim["daily_loss_limit_pct"] / 100)
+        week_ref = acc.get("week_start_balance") or day_ref
+        out["week_used"] = max(0.0, -perf["week_pl"]) / (week_ref * lim["weekly_loss_limit_pct"] / 100)
+        worst = max(out["daily_used"], out["week_used"], out["streak"] / out["streak_max"])
+        out["status"] = "STOPPED" if worst >= 1 else "WARN" if worst >= 0.5 else "OK"
+        return out
+    rules = dc.PRESETS.get(acc.get("rules_preset"))
+    if not rules or not st["initial"]:
+        out["status"] = "NO DATA"
+        return out
+    rep = dc.evaluate(rules, dc.AccountState(st["initial"], st["equity"], st["day_start"] or st["equity"],
+                                             highest_eod_balance=st["highest_eod"]), limits)
+    out.update(daily_used=rep.daily_used_fraction, max_used=rep.max_used_fraction, status=rep.status,
+               remaining=rep.remaining_allowance, binding_rule=rep.binding_rule)
+    if rep.internal_stop_hit or out["streak"] >= out["streak_max"]:
+        out["status"] = "STOPPED" if rep.status == "OK" else rep.status
+    return out
+
+
 def route(signal: dict, accounts: list[dict] | None = None, now: datetime | None = None, log: bool = True) -> dict:
     s = normalise(signal)
     accounts = load_accounts() if accounts is None else accounts
@@ -492,12 +525,15 @@ def handle(method: str, path: str, query: dict, body: dict | None, latest_signal
     try:
         if method == "GET" and path == "/api/router/accounts":
             accs = load_accounts()
-            return ok({"ok": True, "accounts": [{**a, "state": account_state(a), "today": performance(a["label"])} for a in accs],
+            lim = ps.load_limits()
+            return ok({"ok": True, "accounts": [{**a, "state": account_state(a), "today": performance(a["label"]),
+                                                 "health": account_health(a, lim)} for a in accs],
                        "limits": ps.load_limits(), "presets": sorted(dc.PRESETS), "telegram": telegram_configured()})
         if method == "GET" and path == "/api/router/route":
             sym = (query.get("sym") or ["XAUUSD"])[0].upper()
             sig = latest_signal(sym) if latest_signal else None
-            return ok({"ok": True, **route(from_desk(sym, sig))})
+            preview = (query.get("preview") or ["0"])[0] in ("1", "true")
+            return ok({"ok": True, "preview": preview, **route(from_desk(sym, sig), log=not preview)})
         if method == "POST" and path == "/api/router/route":
             b = dict(body or {})
             if b.get("spread") in (None, "") and latest_signal:
