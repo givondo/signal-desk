@@ -77,7 +77,8 @@ rm -rf /opt/signaldesk-src
 git clone https://github.com/givondo/signal-desk.git /opt/signaldesk-src
 mkdir -p /opt/signaldesk
 mkdir -p /opt/signaldesk/data
-cp /opt/signaldesk-src/xauusd_trader.py /opt/signaldesk-src/dashboard.html /opt/signaldesk/
+cp /opt/signaldesk-src/*.py /opt/signaldesk-src/*.html /opt/signaldesk/
+rm -rf /opt/signaldesk/trading_os && cp -r /opt/signaldesk-src/trading_os /opt/signaldesk/trading_os
 cp /opt/signaldesk-src/deploy/signaldesk.service /etc/systemd/system/
 for f in /opt/signaldesk-src/predictions*.json; do
   [ -f "$f" ] && cp "$f" /opt/signaldesk/data/ || true

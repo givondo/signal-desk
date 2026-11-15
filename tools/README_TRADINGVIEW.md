@@ -54,3 +54,21 @@ TradingView keeps its own page zoom. If charts look zoomed out, close TradingVie
 - The reader uses TradingView Desktop's page structure, which TradingView can change in an update. If the sync reads zero trades after an update, run `--dump` and adjust the column names in `COLS`.
 - Times are read as shown in the panel and converted using this computer's time zone. Keep TradingView's time zone set to Nairobi (or exchange time) consistently.
 - Some brokers report realised P&L before fees, others after. Check one trade against your broker statement. If the P&L already includes fees, set the commission to 0 when filing.
+
+## MCP servers for Claude (install_mcps.ps1)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\install_mcps.ps1                       # desk on this PC
+powershell -ExecutionPolicy Bypass -File tools\install_mcps.ps1 -DeskUrl https://desktrading-today.precifarm.com
+```
+
+The script installs Node.js and uv if missing (winget), caches `tradingview-mcp-server==0.8.1`, tests this repo's MCP server, backs up and updates `claude_desktop_config.json` (standard and Microsoft Store locations), and writes it without a byte-order mark. Quit Claude from the system tray and reopen it afterwards.
+
+| Server | Tools you'll use most | Writes |
+|---|---|---|
+| signal-desk-tradingview | `desk_route_signal`, `desk_route_idea`, `desk_router_accounts`, `desk_summary`, `tv_read_closed_trades`, `tv_sync_now` | router log and tracker inbox on your own desk only |
+| tradingview-mcp | `multi_timeframe_analysis`, `combined_analysis`, `backtest_strategy`, `walk_forward_backtest_strategy`, `financial_news`, `market_snapshot` | nothing |
+
+Checked before adding (15 Nov 2026): `tradingview-mcp-server` 0.8.1 exposes no order tools (its only trade function is a local SQLite paper simulator that no MCP tool calls), needs no TradingView login, and reads public TradingView scanner, Yahoo Finance and news feeds. Its optional proxy and Marketaux news token stay off unless you set them.
+
+Not added: TradingView Desktop MCP servers driven over the debug port (for example tradesdontlie/tradingview-mcp). They need the Desktop app, which asks for a paid plan, and their general `ui_click` and `ui_evaluate` tools can reach the order panel, which D-011 rules out.

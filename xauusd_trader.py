@@ -306,7 +306,18 @@ except Exception:          # unknown DESK_TZ without tzdata: fixed UTC session h
 AUTH_FILE = os.path.join(DATA_DIR, "tv_auth.json")
 DASH_FILE = os.path.join(BASE_DIR, "dashboard.html")   # read-only shipped asset
 TRACKER_FILE = os.path.join(BASE_DIR, "tracker.html")  # Trading OS tracker page
+ROUTER_FILE = os.path.join(BASE_DIR, "router.html")  # live/prop portfolio router page
 TRACKER_MAX_BODY = 1024 * 1024  # broker history imports can be large
+
+
+def _router_module():
+    """Portfolio router (route and gate, D-011). Optional, like the tracker."""
+    try:
+        import portfolio_router
+        return portfolio_router
+    except Exception as e:
+        print(f"router unavailable: {e}", file=sys.stderr)
+        return None
 
 
 def _tracker_module():
@@ -1921,6 +1932,9 @@ def poller():
                 with state_lock:
                     latest[sym] = sig
                     governor_state.update(sig["governor"])
+                rmod = _router_module()
+                if rmod is not None:
+                    rmod.on_signal(sym, sig)
             except Exception as e:
                 with state_lock:
                     latest[sym] = {"status": "error", "error": str(e),
@@ -1997,10 +2011,35 @@ class Handler(BaseHTTPRequestHandler):
                                                  paper_source=_paper_tickets)
         self._send_full(status, ctype, out, headers)
 
+    def _router(self, method, parsed, body=None):
+        mod = _router_module()
+        if mod is None:
+            return self._send_full(503, "application/json",
+                                   b'{"ok": false, "error": "router not installed"}')
+        qs = urllib.parse.parse_qs(parsed.query)
+
+        def latest_signal(sym):
+            with state_lock:
+                return json.loads(json.dumps(latest.get(sym) or {}))
+        status, ctype, out, headers = mod.handle(method, parsed.path, qs, body,
+                                                 latest_signal=latest_signal)
+        self._send_full(status, ctype, out, headers)
+
     def do_POST(self):
         if not self._authorized():
             return self._deny()
         parsed = urllib.parse.urlparse(self.path)
+        if parsed.path.startswith("/api/router/"):
+            ln = int(self.headers.get("Content-Length", 0) or 0)
+            if ln > TRACKER_MAX_BODY:
+                return self._send_full(413, "application/json",
+                                       b'{"ok": false, "error": "body too large"}')
+            try:
+                body = json.loads(self.rfile.read(ln) or b"{}")
+            except Exception:
+                return self._send_full(400, "application/json",
+                                       b'{"ok": false, "error": "invalid JSON"}')
+            return self._router("POST", parsed, body if isinstance(body, dict) else {})
         if parsed.path.startswith("/api/tracker/"):
             ln = int(self.headers.get("Content-Length", 0) or 0)
             if ln > TRACKER_MAX_BODY:
@@ -2120,6 +2159,15 @@ class Handler(BaseHTTPRequestHandler):
                        "application/json")
         elif parsed.path.startswith("/api/tracker/"):
             self._tracker("GET", parsed)
+        elif parsed.path.startswith("/api/router/"):
+            self._router("GET", parsed)
+        elif parsed.path in ("/router", "/router/"):
+            try:
+                with open(ROUTER_FILE, "rb") as f:
+                    body = f.read()
+            except Exception:
+                body = b"<h3>router.html missing</h3>"
+            self._send(body, "text/html; charset=utf-8")
         elif parsed.path in ("/tracker", "/tracker/"):
             try:
                 with open(TRACKER_FILE, "rb") as f:

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "signal-desk-tradingview": {
+      "command": "node",
+      "args": ["tools/tv_mcp_server.mjs"],
+      "env": { "DESK_URL": "http://localhost:8899" }
+    },
+    "tradingview-mcp": {
+      "command": "uvx",
+      "args": ["--from", "tradingview-mcp-server==0.8.1", "tradingview-mcp"]
+    }
+  }
+}

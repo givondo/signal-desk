@@ -11,3 +11,7 @@ Append-only. Each decision gets an ID, a date, the evidence and the review date.
 | D-005 | 2026-11-13 | Initial risk: 0.5% per trade, 1.5% daily, 3% weekly (personal); 0.5% of initial and 40% internal daily stop (prop) | Conservative limits while collecting data | After 100 journaled trades |
 | D-006 | 2026-11-13 | Prop shortlist: FTMO 2-Step first choice; The5ers High Stakes for a first low-cost evaluation; Alpha Capital only with written rules; FundedNext on hold | Scores in 02_Prop_Firm_Intelligence.md | Before any purchase (re-verify rules) |
 | D-007 | 2026-11-13 | Annual trading risk ceiling | PENDING: needs answer to Q8 | On answer |
+| D-008 | 2026-11-15 | Limits: 0.25% per trade, 0.5% daily, 1.5% weekly, stop after 2 consecutive losses, one correlated risk budget (supersedes D-005) | 15 Nov 2026 brief | After 100 journaled trades |
+| D-009 | 2026-11-15 | Prop ceiling KES 100,000 (a limit, not a target); KES 1,000,000 is a planning envelope only | 15 Nov 2026 brief | 2027-01-29 |
+| D-010 | 2026-11-15 | Rank only firms with confirmed Kenyan eligibility; E8 Markets and Blue Guardian held | Conflicting official and third-party lists | Before any purchase |
+| D-011 | 2026-11-15 | Live/prop portfolio: route and gate only. Signals are sized per account by the router and executed by hand; no automatic order placement to any live or prop account | D-003 gate not passed; 11 paper trades at profit factor 0.20 with no stops; prop firms restrict copy trading | When a strategy clears the validation gate |

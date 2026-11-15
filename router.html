@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Router · Signal Desk</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231F6F4A'/%3E%3C/svg%3E">
+<style>
+:root{--bg:#fff;--soft:#F9FAFB;--soft2:#F3F4F6;--line:#E5E7EB;--line2:#D1D5DB;--ink:#111827;--mute:#6B7280;
+--brand:#1F6F4A;--brand2:#E8F3EE;--good:#15803D;--goodbg:#ECFDF3;--warn:#B45309;--warnbg:#FFFBEB;--bad:#B91C1C;--badbg:#FEF2F2;--info:#1D4ED8;--infobg:#EFF6FF;
+--font:Helvetica,"Helvetica Neue",Arial,sans-serif;--mono:"SF Mono",Menlo,Consolas,monospace;--r:12px}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--font);-webkit-font-smoothing:antialiased}
+header{position:sticky;top:0;z-index:5;background:rgba(255,255,255,.95);border-bottom:1px solid var(--line)}
+.bar{max-width:1240px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.logo{width:34px;height:34px;border-radius:9px;background:var(--brand);color:#fff;font:700 12px var(--font);display:flex;align-items:center;justify-content:center}
+.bn{font-weight:700;font-size:15px;line-height:1.1}.bs{font-size:11px;color:var(--mute)}
+.bar a{color:var(--mute);text-decoration:none;font-weight:600;font-size:13px;padding:8px 10px;border-radius:8px}.bar a:hover{background:var(--soft2);color:var(--ink)}
+.sp{margin-left:auto}
+main{max-width:1240px;margin:0 auto;padding:22px 20px 60px}
+h1{font-size:22px}h2{font-size:15px;margin:26px 0 10px}.lead{color:var(--mute);margin:4px 0 16px;max-width:880px}
+.card{border:1px solid var(--line);border-radius:var(--r);padding:16px;background:#fff}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+label{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.5px;display:flex;flex-direction:column;gap:4px}
+input,select{font:14px var(--font);border:1px solid var(--line2);border-radius:8px;padding:7px 9px;min-width:110px}
+.btn{border:1px solid var(--line2);background:#fff;border-radius:9px;padding:8px 14px;font:600 13px var(--font);cursor:pointer}
+.btn:hover{border-color:var(--ink)}.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}.btn.sm{padding:5px 9px;font-size:12px}
+.sig{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:12px}
+.k{background:var(--soft);border-radius:10px;padding:10px 12px}.k .l{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.5px}.k .v{font:700 17px var(--font);font-variant-numeric:tabular-nums}
+.accts{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-top:14px}
+.acc{border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:8px}
+.acc h3{font-size:14px;display:flex;justify-content:space-between;gap:8px;align-items:center}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font:700 11px var(--font)}
+.TICKET{background:var(--goodbg);color:var(--good)}.WATCH{background:var(--infobg);color:var(--info)}.DRY_RUN{background:var(--soft2);color:var(--mute)}.BLOCKED{background:var(--badbg);color:var(--bad)}
+.big{font:700 24px var(--font);font-variant-numeric:tabular-nums}
+.muted{color:var(--mute);font-size:12px}
+ul{padding-left:18px;font-size:12px}ul.bad li{color:var(--bad)}ul.ok li{color:var(--mute)}
+.note{background:var(--warnbg);color:var(--warn);border-radius:10px;padding:10px 12px;font-size:13px;margin-top:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.5px}
+td input{min-width:90px;width:110px}
+.err{color:var(--bad);margin-top:8px;font-size:13px}
+</style></head>
+<body>
+<header><div class="bar">
+  <div class="logo">SD</div><div><div class="bn">Router</div><div class="bs">Live and prop portfolio · route and gate</div></div>
+  <span class="sp"></span><a href="/">Desk</a><a href="/tracker">Tracker</a><a href="/api/router/signals.csv">Signals CSV</a>
+</div></header>
+<main>
+  <h1>One signal, one ticket per account</h1>
+  <p class="lead">Each desk signal is checked against every account's own limits and firm rules, then sized. Nothing is sent to a broker or prop platform (D-011): place the ticket yourself, then mark it Taken, Skipped or Missed so signal quality and execution are measured separately.</p>
+
+  <div class="card">
+    <div class="row">
+      <label>Desk signal<select id="sym"></select></label>
+      <button class="btn pri" onclick="routeDesk()">Route desk signal</button>
+      <span class="muted" style="margin-left:8px">or a manual idea:</span>
+      <label>Symbol<input id="m_sym" value="XAUUSD"></label>
+      <label>Side<select id="m_dir"><option>BUY</option><option>SELL</option></select></label>
+      <label>Entry<input id="m_entry" inputmode="decimal"></label>
+      <label>Stop<input id="m_stop" inputmode="decimal"></label>
+      <label>Target<input id="m_tp" inputmode="decimal"></label>
+      <button class="btn" onclick="routeManual()">Route idea</button>
+    </div>
+    <div id="err" class="err"></div>
+    <div id="sig"></div>
+    <div id="notes"></div>
+    <div id="out" class="accts"></div>
+  </div>
+
+  <h2>Accounts</h2>
+  <p class="lead">Update equity before each session (prop: the firm dashboard's equity and today's opening balance). Snapshots logged in the Tracker take priority. Risk is capped by risk_limits.json whatever is typed here.</p>
+  <div class="card" style="overflow-x:auto"><table><thead><tr><th>Account</th><th>Type</th><th>Status</th><th>Risk %</th><th>Equity</th><th>Day start</th><th>Today</th><th>Source</th><th></th></tr></thead><tbody id="accts"></tbody></table>
+  <p class="muted" id="tg" style="margin-top:10px"></p></div>
+
+  <h2>Recent routes</h2>
+  <div class="card" style="overflow-x:auto"><table><thead><tr><th>Route</th><th>Signal</th><th>Decisions</th></tr></thead><tbody id="log"></tbody></table></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=v=>v==null||v===''?'-':Number(v).toLocaleString('en-GB',{maximumFractionDigits:2});
+let current=null;
+async function api(path,body){const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});const j=await r.json();if(!j.ok)throw new Error(j.error||r.status);return j}
+async function loadSyms(){try{const r=await fetch('/api/roster');const j=await r.json();$('sym').innerHTML=j.symbols.map(s=>`<option value="${esc(s.sym)}">${esc(s.sym)} · ${esc(s.direction||'')} ${esc(s.mode||'')}</option>`).join('')}catch(e){$('sym').innerHTML='<option>XAUUSD</option>'}}
+async function routeDesk(){await show(()=>api('/api/router/route?sym='+encodeURIComponent($('sym').value)))}
+async function routeManual(){await show(()=>api('/api/router/route',{symbol:$('m_sym').value,direction:$('m_dir').value,entry:$('m_entry').value,stop:$('m_stop').value,tp1:$('m_tp').value,mode:'EXECUTE',source:'manual'}))}
+async function show(fn){$('err').textContent='';try{current=await fn();render(current);loadLog()}catch(e){$('err').textContent=e.message}}
+function render(r){const s=r.signal;
+ $('sig').innerHTML=`<div class="sig">${[['Signal',s.symbol+' '+(s.direction||'')],['Desk mode',s.mode],['Grade',s.grade||'-'],['Entry',fmt(s.entry)],['Stop',fmt(s.stop)],['Target 1',fmt(s.tp1)],['Route',r.route_id]].map(([l,v])=>`<div class="k"><div class="l">${l}</div><div class="v">${esc(v)}</div></div>`).join('')}</div>`;
+ $('notes').innerHTML=r.notes.map(n=>`<div class="note">${esc(n)}</div>`).join('');
+ $('out').innerHTML=r.accounts.map(a=>`<div class="acc"><h3>${esc(a.account)} <span class="pill ${a.decision}">${a.decision.replace('_',' ')}</span></h3>
+  <div class="muted">${esc(a.type)} · ${esc(a.status)} · ${esc(a.firm_or_broker||'')} ${esc(a.platform?'· '+a.platform:'')}</div>
+  ${a.lots?`<div><span class="big">${a.side||''} ${a.lots}</span> <span class="muted">lots ${esc(a.broker_symbol||'')}</span></div><div class="muted">Risk ${fmt(a.money_at_risk)} at the stop (${fmt(a.risk_pct_actual)}% of ${a.type==='PROP'?'initial':'equity'})</div>`:''}
+  ${a.reasons.length?`<ul class="bad">${a.reasons.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}
+  ${a.checks.length?`<ul class="ok">${a.checks.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}
+  ${(a.notes||[]).length?`<details><summary class="muted">Account and firm notes</summary><ul class="ok">${a.notes.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>`:''}
+  <div class="row">${['TAKEN','SKIPPED','MISSED'].map(d=>`<button class="btn sm" onclick="decide('${esc(a.account)}','${d}',this)">${d[0]+d.slice(1).toLowerCase()}</button>`).join('')}</div></div>`).join('')}
+async function decide(acc,d,btn){try{await api('/api/router/decision',{route_id:current.route_id,account:acc,decision:d});btn.parentNode.innerHTML=`<span class="muted">Marked ${d.toLowerCase()}</span>`;loadLog()}catch(e){alert(e.message)}}
+async function loadAccts(){const j=await api('/api/router/accounts');
+ $('accts').innerHTML=j.accounts.map(a=>`<tr data-l="${esc(a.label)}"><td><b>${esc(a.label)}</b><div class="muted">${esc(a.firm_or_broker||'')}${a.rules_preset?' · '+esc(a.rules_preset):''}</div></td><td>${esc(a.type)}</td>
+ <td><select data-f="status">${['ACTIVE','PLANNED','PAUSED','CLOSED'].map(s=>`<option ${s===a.status?'selected':''}>${s}</option>`).join('')}</select></td>
+ <td><input data-f="risk_pct" value="${a.risk_pct??''}"></td><td><input data-f="equity" value="${a.equity??''}" placeholder="${a.state.equity??''}"></td><td><input data-f="day_start_balance" value="${a.day_start_balance??''}"></td>
+ <td>${fmt(a.today.day_pl)} <span class="muted">(${a.today.trades_today} trades)</span></td><td class="muted">${esc(a.state.source)}</td><td><button class="btn sm" onclick="save(this)">Save</button></td></tr>`).join('');
+ $('tg').textContent=j.telegram?'Telegram alerts on: new EXECUTE signals are sent with each account\'s size.':'Telegram alerts off. Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in /etc/signaldesk.env on the server to switch them on.'}
+async function save(btn){const tr=btn.closest('tr');const f={};tr.querySelectorAll('[data-f]').forEach(i=>f[i.dataset.f]=i.value);
+ try{await api('/api/router/account',{label:tr.dataset.l,fields:f});btn.textContent='Saved';setTimeout(()=>btn.textContent='Save',1500);loadAccts()}catch(e){alert(e.message)}}
+async function loadLog(){try{const j=await api('/api/router/log?limit=30');const dec={};j.decisions.forEach(d=>(dec[d.route_id]=dec[d.route_id]||[]).push(d.account+': '+d.decision.toLowerCase()));
+ const seen=new Set();$('log').innerHTML=j.routes.reverse().filter(r=>!seen.has(r.route_id)&&seen.add(r.route_id)).map(r=>`<tr><td class="muted">${esc(r.route_id)}<br>${esc(r.at_utc.replace('T',' ').slice(0,16))} UTC</td><td>${esc(r.signal.symbol)} ${esc(r.signal.direction)} ${fmt(r.signal.entry)} / stop ${fmt(r.signal.stop)} <span class="muted">${esc(r.signal.source)}</span></td><td>${Object.entries(r.decisions).map(([k,v])=>`${esc(k)} <span class="pill ${v[0]}">${v[0].replace('_',' ')}</span> ${v[1]||''}`).join('<br>')}${dec[r.route_id]?'<div class="muted">'+esc(dec[r.route_id].join(' · '))+'</div>':''}</td></tr>`).join('')}catch(e){}}
+loadSyms();loadAccts();loadLog();
+</script>
+</body></html>

@@ -20,6 +20,17 @@ async function desk(path) {
   if (!r.ok) throw new Error(`Signal Desk answered ${r.status} at ${DESK_URL}${path}`);
   return r.json();
 }
+async function deskPost(path, body) {
+  const r = await fetch(DESK_URL + path, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.ok === false) throw new Error(j.error || `Signal Desk answered ${r.status} at ${DESK_URL}${path}`);
+  return j;
+}
+const ticketView = (r) => ({ route_id: r.route_id, signal: r.signal, notes: r.notes,
+  accounts: r.accounts.map(a => ({ account: a.account, type: a.type, status: a.status, decision: a.decision,
+    side: a.side, lots: a.lots, money_at_risk: a.money_at_risk, entry: a.entry, stop: a.stop, tp1: a.tp1,
+    reasons: a.reasons, checks: a.checks })) });
 
 const TOOLS = [
   { name: "tv_status", description: "Check that TradingView Desktop is open with sync access, which chart tabs are open, the broker shown in the Trading Panel and which tables are visible. Read-only.",
@@ -29,6 +40,14 @@ const TOOLS = [
   { name: "tv_sync_now", description: "Read closed trades from TradingView and post new ones into the Signal Desk tracker inbox. Duplicates are skipped. Does not touch TradingView.",
     inputSchema: { type: "object", properties: {} } },
   { name: "desk_summary", description: "Signal Desk tracker summary: net worth, live/prop/practice performance, prop cash, trades waiting in the inbox.",
+    inputSchema: { type: "object", properties: {} } },
+  { name: "desk_route_signal", description: "Route the desk's current signal for a symbol across the live/prop/practice portfolio: per account TICKET, WATCH, DRY_RUN or BLOCKED with lot size and the risk checks. Read-only on brokers: never places an order (decision D-011).",
+    inputSchema: { type: "object", properties: { sym: { type: "string", description: "Desk symbol, default XAUUSD" } } } },
+  { name: "desk_route_idea", description: "Size a manual trade idea (symbol, BUY/SELL, entry, stop, optional target) for every account in the portfolio with the same checks as desk signals. Logs the route on the desk; never places an order.",
+    inputSchema: { type: "object", required: ["symbol", "direction", "entry", "stop"], properties: {
+      symbol: { type: "string" }, direction: { type: "string", enum: ["BUY", "SELL"] },
+      entry: { type: "number" }, stop: { type: "number" }, tp1: { type: "number" } } } },
+  { name: "desk_router_accounts", description: "Portfolio accounts in the router: type (PERSONAL, PROP, PAPER, DEMO), status, risk %, equity source, today's P/L and losses in a row.",
     inputSchema: { type: "object", properties: {} } },
   { name: "desk_pending_trades", description: "Trades synced from TradingView that still need a stop, risk and review before entering the journal.",
     inputSchema: { type: "object", properties: {} } },
@@ -54,6 +73,16 @@ async function callTool(name, a = {}) {
       prop_cash: { fees_kes: s.prop_economics.fees_paid_kes, payouts_kes: s.prop_economics.payouts_received_kes },
       prop_accounts: s.prop_accounts, pending_fills: s.pending_fills, integrity: s.integrity };
   }
+  if (name === "desk_route_signal")
+    return ticketView(await desk("/api/router/route?sym=" + encodeURIComponent(String(a.sym || "XAUUSD").toUpperCase())));
+  if (name === "desk_route_idea") {
+    for (const k of ["entry", "stop"]) if (!Number.isFinite(Number(a[k]))) throw new Error(`${k} must be a number`);
+    return ticketView(await deskPost("/api/router/route", { symbol: a.symbol, direction: a.direction, entry: Number(a.entry),
+      stop: Number(a.stop), tp1: a.tp1 === undefined ? null : Number(a.tp1), mode: "EXECUTE", source: "claude-mcp" }));
+  }
+  if (name === "desk_router_accounts")
+    return (await desk("/api/router/accounts")).accounts.map(x => ({ label: x.label, type: x.type, status: x.status,
+      risk_pct: x.risk_pct, rules_preset: x.rules_preset, equity: x.state.equity, equity_source: x.state.source, today: x.today }));
   if (name === "desk_pending_trades") return (await desk("/api/tracker/fills/pending")).fills;
   throw new Error(`unknown tool ${name}`);
 }
@@ -75,7 +104,7 @@ process.stdin.on("data", async (chunk) => {
     try {
       if (method === "initialize") {
         send({ jsonrpc: "2.0", id, result: { protocolVersion: params?.protocolVersion || "2025-06-18",
-          capabilities: { tools: {} }, serverInfo: { name: "signal-desk-tradingview", version: "1.0.0" } } });
+          capabilities: { tools: {} }, serverInfo: { name: "signal-desk-tradingview", version: "1.1.0" } } });
       } else if (method === "tools/list") {
         send({ jsonrpc: "2.0", id, result: { tools: TOOLS } });
       } else if (method === "tools/call") {

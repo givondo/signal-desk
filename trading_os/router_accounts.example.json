@@ -1,0 +1,59 @@
+{
+  "_comment": "Template for the portfolio router. The live copy is DATA_DIR/trading_os_data/router/accounts.json on the server (private, never committed). Balances below are placeholders: set real ones on the /router page. Prop sizes are illustrative until you buy an account (D-003, D-009). Risk is capped by trading_os/06_Risk_Management/risk_limits.json whatever you enter here.",
+  "accounts": [
+    {
+      "label": "TV-PAPER",
+      "type": "PAPER",
+      "status": "ACTIVE",
+      "enabled": true,
+      "firm_or_broker": "TradingView Paper Trading",
+      "platform": "TradingView",
+      "currency": "USD",
+      "equity": null,
+      "risk_pct": 0.25,
+      "symbols": ["XAUUSD"],
+      "rule_notes": ["Practice account: same rules as live so the record means something."]
+    },
+    {
+      "label": "DERIV-LIVE",
+      "type": "PERSONAL",
+      "status": "PAUSED",
+      "enabled": true,
+      "firm_or_broker": "Deriv",
+      "platform": "MT5 / TradingView",
+      "currency": "USD",
+      "equity": null,
+      "risk_pct": 0.25,
+      "symbols": ["XAUUSD"],
+      "rule_notes": ["Paused under D-003: no live capital until a strategy clears the validation gate. Tickets show as dry runs."]
+    },
+    {
+      "label": "FTMO-2STEP",
+      "type": "PROP",
+      "status": "PLANNED",
+      "enabled": true,
+      "firm_or_broker": "FTMO",
+      "platform": "MT5",
+      "rules_preset": "FTMO_2STEP",
+      "currency": "USD",
+      "initial_balance": 10000,
+      "risk_pct": 0.25,
+      "symbols": ["XAUUSD"],
+      "rule_notes": ["Illustrative size for dry runs; set the size you actually buy. Confirm the XAUUSD contract size in MT5 (right click the symbol, Specification)."]
+    },
+    {
+      "label": "THE5ERS-HS",
+      "type": "PROP",
+      "status": "PLANNED",
+      "enabled": true,
+      "firm_or_broker": "The5ers",
+      "platform": "MT5",
+      "rules_preset": "THE5ERS_HIGH_STAKES",
+      "currency": "USD",
+      "initial_balance": 5000,
+      "risk_pct": 0.25,
+      "symbols": ["XAUUSD"],
+      "rule_notes": ["Illustrative size for dry runs; set the size you actually buy."]
+    }
+  ]
+}
