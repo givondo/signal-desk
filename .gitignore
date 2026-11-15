@@ -10,3 +10,7 @@ trading_os_data/
 .pytest_cache/
 tools/tv_sync.log
 desk_local.log
+
+# Backtest inputs and outputs (market data licences; results are regenerated)
+trading_os/05_Backtesting/data/
+trading_os/05_Backtesting/results/

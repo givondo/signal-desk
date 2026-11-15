@@ -1,0 +1,198 @@
+{
+  "_comment": "Trader research tracker. Only records that an independent party audited or that the trader published can be scored as evidence; anything else is a lead. Figures are copied with the date they were read and the page they came from. Strategy codes refer to trading_os/05_Backtesting/gtos_backtest/champions.py. Updated weekly by the scheduled research task; validate with: py tools/trader_research.py check",
+  "version": 1,
+  "updated": "2026-11-15",
+  "verification_levels": {
+    "A": "Audited real-money competition or regulator filing",
+    "B": "Platform-certified track record (broker or fund platform)",
+    "C": "Published method by the trader (book, paper); record not independently checked here",
+    "D": "Self-reported or second-hand; lead only"
+  },
+  "traders": [
+    {
+      "id": "T-01",
+      "name": "Larry Williams",
+      "category": "Competition champion",
+      "markets": "Futures",
+      "record": "1987 World Cup Championship of Futures Trading: 11,376% net return ($10,000 to about $1.1 million)",
+      "verification": "A",
+      "record_period": "1987",
+      "record_source": "https://www.worldcupchampionships.com/",
+      "method": "Volatility breakout from the open by a fraction of the prior range; Oops failed-gap pattern; Williams %R; COT positioning; seasonality.",
+      "method_source": "https://www.luxalgo.com/library/concept/volatility-breakout/",
+      "strategy_codes": [
+        "S-011"
+      ],
+      "xauusd_relevance": "High",
+      "status": "Coded, awaiting real data",
+      "last_checked": "2026-11-15",
+      "notes": "Single-year competition result; the same contest also records large drawdowns. Treat the return as proof of method, not as a target."
+    },
+    {
+      "id": "T-02",
+      "name": "Andrea Unger",
+      "category": "Competition champion",
+      "markets": "Futures",
+      "record": "World Cup Championship of Futures Trading winner 2008, 2009, 2010 and 2012 (672% in 2008, 115% in 2009, 240% in 2010)",
+      "verification": "A",
+      "record_period": "2008-2012",
+      "record_source": "https://www.ireallytrade.com/halloffame",
+      "method": "Several simple automated systems; start from robust breakout or reversal ideas such as a break of yesterday's high; confirm the average trade beats costs before adding leverage.",
+      "method_source": "https://thealgorithmicadvantage.substack.com/p/038-andrea-unger-672-returns-sure",
+      "strategy_codes": [
+        "S-012"
+      ],
+      "xauusd_relevance": "High",
+      "status": "Coded, awaiting real data",
+      "last_checked": "2026-11-15",
+      "notes": "2012 title per https://www.ungeracademy.com/ (only four-time winner). Returns came with high leverage in a contest format; size by our 0.25% rule, not by his."
+    },
+    {
+      "id": "T-03",
+      "name": "Kevin Davey",
+      "category": "Competition champion",
+      "markets": "Futures",
+      "record": "World Cup Championship of Futures Trading 2005-2007: one first place and two second places; 148%, 107% and 112% annual returns",
+      "verification": "A",
+      "record_period": "2005-2007",
+      "record_source": "https://chatwithtraders.com/episode/038-kevin-davey-the-development-process-of-an-algo-trading-strategy-from-objectives-to-live-trading",
+      "method": "Strategy factory: idea, preliminary test, walk-forward, Monte Carlo, incubation on live data, written rules for when to quit a system; several systems in several markets.",
+      "method_source": "https://www.mql5.com/en/blogs/post/380333",
+      "strategy_codes": [
+        "P-01"
+      ],
+      "xauusd_relevance": "High",
+      "status": "Adopted into the validation gate",
+      "last_checked": "2026-11-15",
+      "notes": "His contribution is process, not a setup: the incubation and quit rules are now part of the gate."
+    },
+    {
+      "id": "T-04",
+      "name": "Michael Cook",
+      "category": "Competition champion",
+      "markets": "Futures, stocks",
+      "record": "World Cup Championship of Futures Trading winner 2007 (250%) and 2014 (366%)",
+      "verification": "A",
+      "record_period": "2007, 2014",
+      "record_source": "https://www.ireallytrade.com/halloffame",
+      "method": "Position sizing to maximise returns, stops set by market structure, discretion layered on systematic signals.",
+      "method_source": "https://sites.libsyn.com/66295/039-interview-with-michael-cook",
+      "strategy_codes": [],
+      "xauusd_relevance": "Medium",
+      "status": "Research: rules not published",
+      "last_checked": "2026-11-15",
+      "notes": "Lead for position-sizing and stop-placement ideas; no testable entry yet."
+    },
+    {
+      "id": "T-05",
+      "name": "Linda Bradford Raschke",
+      "category": "Author and professional trader",
+      "markets": "Futures, FX",
+      "record": "Published setups in Street Smarts (1995, with Laurence Connors); trading record not independently checked here",
+      "verification": "C",
+      "record_period": "1995 onward",
+      "record_source": "https://www.luxalgo.com/library/concept/turtle-soup/",
+      "method": "Turtle Soup: fade a new 20-period extreme when the earlier extreme was at least 3-4 bars old. Holy Grail: with ADX(14) above 30 and rising, buy the first pullback to the 20-period moving average.",
+      "method_source": "https://therighttrader.com/learn/trading-strategies/holy-grail-setup",
+      "strategy_codes": [
+        "S-013",
+        "S-014"
+      ],
+      "xauusd_relevance": "High",
+      "status": "Coded, awaiting real data",
+      "last_checked": "2026-11-15",
+      "notes": "Turtle Soup is the published, testable version of the 'liquidity sweep' idea already on our research list."
+    },
+    {
+      "id": "T-06",
+      "name": "Toby Crabel",
+      "category": "Author, fund manager",
+      "markets": "Futures",
+      "record": "Published NR4, NR7 and opening-range research (1990); later ran a large systematic fund; fund returns not checked here",
+      "verification": "C",
+      "record_period": "1990 onward",
+      "record_source": "https://www.luxalgo.com/library/concept/nr4-nr7-narrow-range-bars/",
+      "method": "Range contraction (NR7: narrowest range of the last 7 days) followed by an opening range breakout to catch the expansion.",
+      "method_source": "https://oxfordstrat.com/?p=3707",
+      "strategy_codes": [
+        "S-015"
+      ],
+      "xauusd_relevance": "High",
+      "status": "Coded, awaiting real data",
+      "last_checked": "2026-11-15",
+      "notes": "Closest published cousin of our S-002 pre-New York range breakout; compare the two directly."
+    },
+    {
+      "id": "T-07",
+      "name": "Richard Dennis and the Turtles (rules by Curtis Faith)",
+      "category": "Trend following",
+      "markets": "Futures",
+      "record": "Turtle rules published by former Turtle Curtis Faith; returns not checked here",
+      "verification": "C",
+      "record_period": "1983 onward",
+      "record_source": "https://www.mql5.com/en/forum/513829",
+      "method": "System 1: 20-day breakout, 10-day exit, skip after a winner. System 2: 55-day breakout, 20-day exit. N = 20-day ATR; stop 2N; up to 4 units added every N/2.",
+      "method_source": "https://pro.stockalarm.io/blog/turtle-trading-system-explained",
+      "strategy_codes": [
+        "S-016"
+      ],
+      "xauusd_relevance": "Medium",
+      "status": "Coded (approximated exits), awaiting real data",
+      "last_checked": "2026-11-15",
+      "notes": "Trend following holds trades for weeks; it fits the personal account more than a prop evaluation with daily loss limits."
+    },
+    {
+      "id": "T-08",
+      "name": "Paul Tudor Jones",
+      "category": "Hedge fund (global macro)",
+      "markets": "Macro",
+      "record": "Called the 1987 crash; long-running macro fund; fund figures not checked here",
+      "verification": "C",
+      "record_period": "1980 onward",
+      "record_source": "https://www.turtletrader.com/?p=1933",
+      "method": "Defensive filter: 'My metric for everything I look at is the 200-day moving average of closing prices'; aims for 5:1 reward to risk; never average losers.",
+      "method_source": "https://trendfollowing.com/paul-tudor-jones",
+      "strategy_codes": [
+        "F-01"
+      ],
+      "xauusd_relevance": "Medium",
+      "status": "Coded as a filter (S-014+PTJ, S-016+PTJ)",
+      "last_checked": "2026-11-15",
+      "notes": "Needs 200 days of history before the filter allows any trade."
+    },
+    {
+      "id": "T-09",
+      "name": "Patrick Nill",
+      "category": "Competition leader (live)",
+      "markets": "Forex",
+      "record": "2026 World Cup Championship of Forex Trading, annual division: 1st with 300.3% (1 January to 12 November 2026, subject to final audit)",
+      "verification": "A",
+      "record_period": "2026 (in progress)",
+      "record_source": "https://www.worldcupchampionships.com/standings",
+      "method": "Not published.",
+      "method_source": "",
+      "strategy_codes": [],
+      "xauusd_relevance": "Unknown",
+      "status": "Watch: search for interviews after the contest ends",
+      "last_checked": "2026-11-15",
+      "notes": "Live standings change daily; the weekly task refreshes the figure."
+    },
+    {
+      "id": "T-10",
+      "name": "Darwinex DarwinIA leaders",
+      "category": "Platform-certified",
+      "markets": "FX, CFDs",
+      "record": "July 2026 DarwinIA SILVER winner MOFQ: 7.32% month, 24.9% six-month return, -5.85% six-month drawdown; field median six-month return 10.29%",
+      "verification": "B",
+      "record_period": "Monthly",
+      "record_source": "https://blog.darwinex.com/hubfs/DarwinIA_SILVER_GOLD_Darwinex/Recap%20July%2026.pdf?hsLang=en",
+      "method": "Strategies are anonymous; useful as a benchmark for what certified, allocatable returns and drawdowns look like.",
+      "method_source": "",
+      "strategy_codes": [],
+      "xauusd_relevance": "Benchmark",
+      "status": "Benchmark: refresh monthly",
+      "last_checked": "2026-11-15",
+      "notes": "Realism check: allocated traders on a regulated platform run near 10% per six months with about 6% drawdown, not 300%."
+    }
+  ]
+}

@@ -56,6 +56,10 @@ Checks per account: symbol list, equity on record, losses in a row today, daily 
 
 Accounts live in `DATA_DIR/trading_os_data/router/accounts.json` on the server (private), created on first use from `trading_os/router_accounts.example.json`. Set balances on the Router page before each session; snapshots logged in the tracker take priority. Journal each trade under the same account label as the router (for example `FTMO-2STEP`), so its losses count towards that account's daily and consecutive-loss limits. Optional Telegram alerts for each new EXECUTE signal, with every account's size: put `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in `/etc/signaldesk.env` on the server and restart the service.
 
+## Trader research and the strategy lab
+
+`trading_os/14_Trader_Research/traders.json` tracks traders whose records can be checked (audited World Cup results, certified platforms, published methods), what each actually does, and which setup we are testing because of them. Six setups from that research are coded as hypotheses in `trading_os/05_Backtesting/gtos_backtest/champions.py`: S-011 volatility breakout (Larry Williams), S-012 prior-day breakout (Andrea Unger), S-013 Turtle Soup and S-014 Holy Grail (Linda Raschke), S-015 NR7 with opening range breakout (Toby Crabel), S-016 Turtle System 2, plus the 200-day filter F-01 (Paul Tudor Jones). Kevin Davey's incubation and quit rules are part of the validation gate. None is traded until it passes the gate on real XAUUSD data. A weekly scheduled task refreshes the list in the Trading OS Sheet; `py tools/trader_research.py check` validates the file.
+
 ## Claude and TradingView MCP servers
 
 `tools/install_mcps.ps1` sets up two MCP servers for Claude Desktop on Windows, and `.mcp.json` gives Claude Code the same two in this folder:

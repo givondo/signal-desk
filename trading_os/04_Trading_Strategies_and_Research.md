@@ -53,6 +53,8 @@ Testing runs in Signal Desk (`givondo/signal-desk`), which already has a cost-aw
 | Baseline | Beats the random-entry baseline with the same exits and costs |
 | Drawdown fit | 95th percentile simulated drawdown below 50% of the target prop firm's maximum loss at the planned risk |
 | Forward test | At least 30 demo trades with expectancy within one standard error of the backtest |
+| Incubation (P-01, after Kevin Davey) | The frozen version runs on demo for at least 30 trades before any money; nothing changes during incubation |
+| Quit rule (P-01) | Written before going live: stop the strategy if live drawdown passes the 95th percentile simulated drawdown, or after 20 trades with expectancy below zero by more than one standard error |
 
 Rules that protect the test:
 
@@ -70,8 +72,18 @@ Rules that protect the test:
 | S-004 | Momentum continuation | IDEA | Coded in Signal Desk; untested |
 | S-005 | Mean reversion | IDEA | Coded in Signal Desk; untested; usually weak on trending gold |
 | S-006 | Multi-timeframe trend | IDEA | Coded in Signal Desk; overlaps S-001 |
+| S-011 | Volatility breakout (Larry Williams) | HYPOTHESIS: coded in `05_Backtesting/gtos_backtest/champions.py` | London 08:00 open ± 0.5 × prior day range; untested on real data |
+| S-012 | Prior-day high/low breakout (Andrea Unger) | HYPOTHESIS: coded | M15 close beyond yesterday's high or low, 08:00 to 16:00 London; untested |
+| S-013 | Turtle Soup (Raschke and Connors) | HYPOTHESIS: coded | H1 failed 20-bar breakout; the mechanical version of research item 5; untested |
+| S-014 | Holy Grail (Raschke and Connors) | HYPOTHESIS: coded | H1 ADX above 30 and rising, first pullback to EMA 20; untested |
+| S-015 | NR7 + opening range breakout (Toby Crabel) | HYPOTHESIS: coded | After an NR7 day, break of the first London hour; compare with S-002; untested |
+| S-016 | Turtle System 2 (Dennis and Eckhardt) | HYPOTHESIS: coded | H4 55-bar breakout, 2N stop; personal account only (multi-week holds); untested |
+| F-01 | 200-day filter (Paul Tudor Jones) | FILTER | Applied as S-014+PTJ and S-016+PTJ; needs 200 days of history |
+| P-01 | Strategy factory (Kevin Davey) | PROCESS | Incubation and quit rules added to the validation gate above |
 
-Priority: test S-001 and S-002 first. They fit the overlap window and need no overnight holding.
+S-011 to S-016 come from traders with audited or published records; sources, verification levels and the weekly refresh are in `14_Trader_Research/`. A famous name changes the order of testing, never the gate.
+
+Priority: test S-001 and S-002 first, then S-015 against S-002 (same idea, published version), then S-013 against SWEEP, then S-011, S-012 and S-014. They fit the overlap window and need no overnight holding.
 
 The parameters below are written as testable starting points. Align them with the Signal Desk implementation before running, and log any differences.
 
