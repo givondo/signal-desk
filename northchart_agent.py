@@ -157,7 +157,7 @@ class DeskAgent:
         return {"kind": "candles", "title": f"{name} · 15m", "symbol": sym, "bars": bars,
                 "levels": self._levels(detail), "price": (snapshot or {}).get("price"),
                 "direction": (snapshot or detail or {}).get("direction"),
-                "source": candles.get("source"), "dp": None}
+                "source": candles.get("source"), "dp": (snapshot or detail or {}).get("dp")}
 
     # ------------------------------------------------------------ public
     def stream(self, question: str, symbol: str = "XAUUSD", history=None):

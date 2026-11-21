@@ -1406,7 +1406,7 @@ app.component('nc-chart',{
   data(){return{hover:null,W:640,H:290}},
   computed:{
     c(){return this.chart||{}},
-    dp(){ const p=this.c.price??(this.c.bars&&this.c.bars.length?this.c.bars[this.c.bars.length-1].c:1);
+    dp(){ if(Number.isInteger(this.c.dp)) return this.c.dp; const p=this.c.price??(this.c.bars&&this.c.bars.length?this.c.bars[this.c.bars.length-1].c:1);
       return Math.abs(p)>=1000?2:Math.abs(p)>=10?(Math.abs(p)>=100?2:3):4 },
     pad(){return{l:8,r:100,t:10,b:24}},
     bars(){return this.c.bars||[]},
