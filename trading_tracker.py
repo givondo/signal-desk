@@ -28,6 +28,7 @@ import time
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
+import contextvars
 
 HERE = Path(__file__).resolve().parent
 OS_DIR = HERE / "trading_os"
@@ -117,7 +118,17 @@ class TrackerError(ValueError):
     """Bad input or a refused write; the message is safe to show the user."""
 
 
+_ROOT = contextvars.ContextVar("tos_root", default=None)
+
+
+def set_root(path) -> contextvars.Token:
+    """Point this request (thread) at one user's journal folder. None means the desk owner's."""
+    return _ROOT.set(str(path) if path else None)
+
+
 def data_root() -> Path:
+    if _ROOT.get():
+        return Path(_ROOT.get())
     base = os.environ.get("TOS_DATA_DIR")
     if base:
         return Path(base)

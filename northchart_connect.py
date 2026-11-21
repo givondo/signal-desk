@@ -64,6 +64,9 @@ PUBLIC_PATH_PREFIXES = ("/mcp", "/.well-known/oauth-", "/.well-known/openid-conf
                         "/oauth/")
 
 
+OWNER_TOOLS = ("preview_signal_routing", "get_portfolio_summary")
+
+
 def is_public_path(path: str) -> bool:
     """Paths that handle their own auth (OAuth/bearer), not HTTP Basic."""
     return any(path == p or path.startswith(p) for p in PUBLIC_PATH_PREFIXES)
@@ -394,6 +397,7 @@ class Connect:
         self.activity = collections.deque(maxlen=300)
         self.fail = collections.defaultdict(list)   # ip -> failed password timestamps
         self.lock = threading.Lock()
+        self.who = threading.local()                 # uid of the account behind the current bearer token
 
     # ---------------------------------------------------------- shared tool runner
     def run_tool(self, name: str, args: dict | None, client: str = "Northchart UI"):
@@ -406,6 +410,8 @@ class Connect:
                 raise ToolError(f"unknown tool '{name}'")
             if not isinstance(args, dict):
                 args = {}
+            if name in OWNER_TOOLS and not self.ctx.get("is_owner", lambda: True)():
+                raise ToolError("this tool reads the desk owner's own accounts and is not available to your account")
             result = t.fn(args)
             entry.update(ok=True)
             return True, result
@@ -585,7 +591,13 @@ code{{background:#0b0d10;padding:1px 5px;border-radius:5px}}</style></head><body
                          for k in ("client_id", "redirect_uri", "state", "code_challenge",
                                    "code_challenge_method", "scope", "resource", "response_type"))
         need_pw = bool(self.ctx["owner_password"]())
-        pw = ('<label class="mut" for="pw">Desk password</label>'
+        accounts = self.ctx.get("accounts_enabled", lambda: False)()
+        pw = ('<label class="mut" for="em">Northchart email</label>'
+              '<input id="em" name="email" type="email" autocomplete="email" autofocus required>'
+              '<label class="mut" for="pw">Password</label>'
+              '<input id="pw" name="password" type="password" autocomplete="current-password" required>'
+              if accounts else
+              '<label class="mut" for="pw">Desk password</label>'
               '<input id="pw" name="password" type="password" autocomplete="current-password" autofocus required>'
               if need_pw else
               '<p class="warn">No desk password is set on this server, so anyone who can reach it can approve. '
@@ -597,8 +609,8 @@ code{{background:#0b0d10;padding:1px 5px;border-radius:5px}}</style></head><body
                  f"<p class='mut'>wants read-only access to your Northchart desk. "
                  f"You will be returned to <b>{html.escape(host)}</b>.</p>"
                  "<ul><li>Read market snapshots, signal detail, briefs and price history</li>"
-                 "<li>Preview how a signal routes across your accounts</li>"
-                 "<li>Read your portfolio summary</li></ul>"
+                 "<li>Read your trade journal</li>"
+                 "<li>Preview how a signal routes across your accounts (desk owner only)</li></ul>"
                  "<p class='mut'>It cannot place, change or cancel orders, or edit your journal.</p>"
                  + (f"<div class='err'>{html.escape(error)}</div>" if error else "") + warn +
                  f'<form method="post" action="/oauth/authorize">{hidden}{pw}'
@@ -617,17 +629,25 @@ code{{background:#0b0d10;padding:1px 5px;border-radius:5px}}</style></head><body
             client, err = self._validate_auth_request(form)
         if err:
             return self._page(400, "Northchart Connect", f"<h1>Cannot connect</h1><p class='mut'>{html.escape(err)}</p>")
-        owner = self.ctx["owner_password"]()
-        if owner and not hmac.compare_digest(g("password").encode(), owner.encode()):
-            with self.lock:
-                self.fail[ip].append(now)
-            return self.authorize_page(form, error="Wrong desk password.")
+        uid = None
+        if self.ctx.get("accounts_enabled", lambda: False)():
+            uid = self.ctx["account_login"](g("email"), g("password"))
+            if not uid:
+                with self.lock:
+                    self.fail[ip].append(now)
+                return self.authorize_page(form, error="Wrong email or password.")
+        else:
+            owner = self.ctx["owner_password"]()
+            if owner and not hmac.compare_digest(g("password").encode(), owner.encode()):
+                with self.lock:
+                    self.fail[ip].append(now)
+                return self.authorize_page(form, error="Wrong desk password.")
         code = secrets.token_urlsafe(32)
         with self.store.lock:
             self.store.data["codes"][_hash(code)] = {
                 "client_id": client["client_id"], "redirect_uri": g("redirect_uri"),
                 "challenge": g("code_challenge"), "scope": SCOPE,
-                "resource": g("resource") or base + "/mcp", "exp": _now() + CODE_TTL}
+                "resource": g("resource") or base + "/mcp", "exp": _now() + CODE_TTL, "uid": uid}
             self.store.save()
         params = {"code": code, "iss": base}
         if g("state"):
@@ -637,11 +657,11 @@ code{{background:#0b0d10;padding:1px 5px;border-radius:5px}}</style></head><body
                      "Cache-Control": "no-store", "Content-Length": "0"}, b""
 
     # ---------------------------------------------------------- token
-    def _issue(self, client_id, scope, resource):
+    def _issue(self, client_id, scope, resource, uid=None):
         access, refresh = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
-        self.store.data["access"][_hash(access)] = {"client_id": client_id, "scope": scope,
+        self.store.data["access"][_hash(access)] = {"client_id": client_id, "scope": scope, "uid": uid,
                                                     "resource": resource, "exp": _now() + ACCESS_TTL}
-        self.store.data["refresh"][_hash(refresh)] = {"client_id": client_id, "scope": scope,
+        self.store.data["refresh"][_hash(refresh)] = {"client_id": client_id, "scope": scope, "uid": uid,
                                                       "resource": resource, "exp": _now() + REFRESH_TTL}
         self.store.save()
         return {"access_token": access, "token_type": "Bearer", "expires_in": ACCESS_TTL,
@@ -663,7 +683,7 @@ code{{background:#0b0d10;padding:1px 5px;border-radius:5px}}</style></head><body
                 if not g("code_verifier") or not hmac.compare_digest(_b64url_sha256(g("code_verifier")),
                                                                      rec["challenge"]):
                     return 400, {"error": "invalid_grant", "error_description": "PKCE verification failed"}
-                return 200, self._issue(rec["client_id"], rec["scope"], rec["resource"])
+                return 200, self._issue(rec["client_id"], rec["scope"], rec["resource"], rec.get("uid"))
             if grant == "refresh_token":
                 rec = self.store.data["refresh"].pop(_hash(g("refresh_token")), None)
                 if not rec or rec["exp"] < _now():
@@ -675,7 +695,7 @@ code{{background:#0b0d10;padding:1px 5px;border-radius:5px}}</style></head><body
                 if rec["client_id"] not in self.store.data["clients"]:
                     self.store.save()
                     return 400, {"error": "invalid_grant", "error_description": "client no longer registered"}
-                return 200, self._issue(rec["client_id"], rec["scope"], rec["resource"])
+                return 200, self._issue(rec["client_id"], rec["scope"], rec["resource"], rec.get("uid"))
         return 400, {"error": "unsupported_grant_type"}
 
     # ---------------------------------------------------------- bearer check
@@ -683,11 +703,12 @@ code{{background:#0b0d10;padding:1px 5px;border-radius:5px}}</style></head><body
         """Return the caller's display name, or None."""
         h = headers.get("Authorization") or ""
         tok = h[7:].strip() if h[:7].lower() == "bearer " else (headers.get("X-Api-Key") or "").strip()
+        self.who.uid = None
         if not tok:
             return None
         static = os.environ.get("NORTHCHART_MCP_TOKEN")
         if static and len(static) >= 24 and hmac.compare_digest(tok.encode(), static.encode()):
-            return "Token client"
+            return "Token client"     # the static token is the desk owner's
         with self.store.lock:
             rec = self.store.data["access"].get(_hash(tok))
             if not rec or rec.get("exp", 0) < _now():
@@ -697,6 +718,9 @@ code{{background:#0b0d10;padding:1px 5px;border-radius:5px}}</style></head><body
             client = self.store.data["clients"].get(rec["client_id"])
         if not client:
             return None
+        if rec.get("uid") and not self.ctx.get("user_exists", lambda uid: True)(rec["uid"]):
+            return None               # the account was deleted
+        self.who.uid = rec.get("uid")
         return client.get("client_name") or "Unnamed client"
 
     # ---------------------------------------------------------- MCP (Streamable HTTP)
@@ -711,6 +735,7 @@ code{{background:#0b0d10;padding:1px 5px;border-radius:5px}}</style></head><body
         client = self.authenticate(headers, base)
         if not client:
             return self._unauthorized(base)
+        self.ctx.get("enter_user", lambda uid: None)(self.who.uid)
         if len(body) > MAX_BODY:
             return self._cors_json(413, self._err(None, -32600, "request too large"))
         try:

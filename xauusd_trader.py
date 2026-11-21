@@ -337,7 +337,7 @@ def _paper_tickets():
 # One backend, two channels: the agent panel in the UI and remote MCP clients
 # (ChatGPT, Claude) run the same read-only tools over the same engine state.
 _connect = None
-_connect_lock = threading.Lock()
+_connect_lock = threading.RLock()
 
 
 def _owner_password():
@@ -414,15 +414,65 @@ def _candles(sym, limit=96):
 
 
 _journal = None
+_accounts = None
+_user_journals = {}
+OWNER_ONLY_PREFIXES = ("/api/router/", "/api/tv_login", "/api/agent/revoke")
+INGEST_PATHS = ("/api/tracker/import/fills", "/api/ingest/")
 
 
-def journal_service():
+def accounts_service():
+    global _accounts
+    with _connect_lock:
+        if _accounts is None:
+            import northchart_accounts as na
+            _accounts = na.Accounts(DATA_DIR, lambda: os.environ.get("SIGNALDESK_USER") or AUTH_USER,
+                                    lambda: os.environ.get("SIGNALDESK_PASS") or AUTH_PASS)
+        return _accounts
+
+
+def _account_login(email, password):
+    import northchart_accounts as na
+    try:
+        u, tok = accounts_service().login(email, password, "oauth")
+        accounts_service().logout(tok)          # OAuth only needs to know who approved
+        return u["uid"]
+    except na.AuthError:
+        return None
+
+
+def _is_owner(u):
+    return not u or u.get("role") == "owner"
+
+
+def enter_user(u):
+    """Point this request thread at one user's data (journal, tracker)."""
+    import northchart_accounts as na
+    na.current_user.set(u)
+    mod = _tracker_module()
+    if mod is not None and hasattr(mod, "set_root"):
+        mod.set_root(None if _is_owner(u) else os.path.join(accounts_service().user_dir(u), "trading_os_data"))
+
+
+def journal_service(user=None):
+    """The journal for this request's user. Desk history is shared; review notes are per user."""
     global _journal
+    import northchart_accounts as na
+    u = user or na.current_user.get()
     with _connect_lock:
         if _journal is None:
             import northchart_journal as nj
             _journal = nj.Journal(DATA_DIR, lambda: SYMBOLS, _tracker_module)
-        return _journal
+        if _is_owner(u):
+            return _journal
+        j = _user_journals.get(u["uid"])
+        if j is None:
+            import northchart_journal as nj
+            _journal._load()
+            j = nj.Journal(accounts_service().user_dir(u), lambda: SYMBOLS, _tracker_module)
+            j.history, j.last_snap, j.lock, j.hist_path, j._loaded = (
+                _journal.history, _journal.last_snap, _journal.lock, _journal.hist_path, True)
+            _user_journals[u["uid"]] = j
+        return j
 
 
 def connect_service():
@@ -441,6 +491,11 @@ def connect_service():
                 "candles": _candles,
                 "journal": lambda limit: journal_service().sheet(limit=limit),
                 "owner_password": _owner_password,
+                "accounts_enabled": lambda: accounts_service().has_users(),
+                "account_login": _account_login,
+                "user_exists": lambda uid: bool(accounts_service().get(uid)),
+                "enter_user": lambda uid: enter_user(accounts_service().get(uid) if uid else None),
+                "is_owner": lambda: _is_owner(__import__("northchart_accounts").current_user.get()),
             }, DATA_DIR)
         return _connect
 
@@ -2067,6 +2122,11 @@ def poller():
             jn.record_desk(snap)
             if n % 4 == 0:
                 jn.auto_pass()
+                for u in list(accounts_service().data["users"].values()):   # every member's journal too
+                    if not _is_owner(u):
+                        enter_user(u)
+                        journal_service(u).auto_pass()
+                enter_user(None)
         except Exception as e:
             print(f"journal: {e}", file=sys.stderr)
         n += 1
@@ -2076,6 +2136,8 @@ def poller():
 # ---------------------------------------------------------------- http
 
 class Handler(BaseHTTPRequestHandler):
+    user = via = deny_reason = None
+
     def log_message(self, *a):
         pass
 
@@ -2086,31 +2148,230 @@ class Handler(BaseHTTPRequestHandler):
             passwd = AUTH_PASS
         return user, passwd
 
-    def _authorized(self):
-        user, passwd = self._auth_creds()
-        if not passwd:
-            return True
+    # ------------------------------------------------------------ identity
+    def _cookie(self, name):
+        from http.cookies import SimpleCookie
+        try:
+            c = SimpleCookie(self.headers.get("Cookie") or "")
+            return c[name].value if name in c else None
+        except Exception:
+            return None
+
+    def _client_ip(self):
+        peer = self.client_address[0] if self.client_address else ""
+        fwd = self.headers.get("CF-Connecting-IP") or (self.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+        return fwd or peer
+
+    def _is_https(self):
+        return (self.headers.get("X-Forwarded-Proto") == "https"
+                or (os.environ.get("NORTHCHART_PUBLIC_URL") or "").startswith("https://"))
+
+    def _identify(self):
+        acc = accounts_service()
+        tok = self._cookie("nc_s")
+        if tok:
+            u = acc.session_user(tok)
+            if u:
+                return u, "session"
         h = self.headers.get("Authorization", "")
         if h.startswith("Basic "):
-            try:
-                u, _, p = base64.b64decode(h[6:]).decode().partition(":")
-                return (hmac.compare_digest(u.encode(), user.encode())
-                        & hmac.compare_digest(p.encode(), passwd.encode()))
-            except Exception:
-                return False
-        return False
+            u = acc.basic_user(h)
+            return (u, "basic") if u else (None, "bad")
+        if h[:7].lower() == "bearer " and h[7:].strip().startswith("nci_"):
+            u = acc.ingest_user(h[7:].strip())
+            return (u, "ingest") if u else (None, "bad")
+        if not acc.has_users() and not self._auth_creds()[1]:
+            return {"uid": "owner", "email": "", "name": "", "role": "owner", "verified": True}, "open"
+        return None, None
+
+    def _same_origin(self):
+        src = self.headers.get("Origin") or self.headers.get("Referer") or ""
+        host = self.headers.get("X-Forwarded-Host") or self.headers.get("Host") or ""
+        return bool(src) and urllib.parse.urlsplit(src).netloc == host
+
+    def _authorized(self):
+        u, via = self._identify()
+        self.user, self.via, self.deny_reason = u, via, None
+        if not u:
+            return False
+        path = urllib.parse.urlparse(self.path).path
+        if via == "ingest" and not path.startswith(INGEST_PATHS):
+            self.deny_reason = "a sync token can only send trades"
+            return False
+        if via == "session" and self.command in ("POST", "PUT", "DELETE") and not self._same_origin():
+            self.deny_reason = "cross-site request refused"
+            return False
+        if not _is_owner(u) and path.startswith(OWNER_ONLY_PREFIXES):
+            self.deny_reason = "only the desk owner can do this"
+            return False
+        enter_user(u)
+        return True
 
     def _deny(self):
-        body = (b"<html><body><h3>Northchart</h3>"
-                b"<p>Login required. User: <b>trader</b> (unless you changed "
-                b"SIGNALDESK_USER). Cancel and retry if the password failed."
-                b"</p></body></html>")
-        self.send_response(401)
-        self.send_header("WWW-Authenticate", 'Basic realm="Northchart"')
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        path = urllib.parse.urlparse(self.path).path
+        wants_html = self.command == "GET" and not path.startswith("/api/") \
+            and "text/html" in (self.headers.get("Accept") or "text/html")
+        if self.user is None and wants_html:
+            nxt = urllib.parse.quote(self.path, safe="/?=&")
+            return self._send_full(302, "text/plain", b"", {"Location": "/signin?next=" + nxt})
+        status = 403 if self.user else 401
+        msg = self.deny_reason or "sign in to Northchart"
+        return self._send_full(status, "application/json", json.dumps({"ok": False, "error": msg}).encode())
+
+    # ------------------------------------------------------------ accounts: pages and API
+    AUTH_PAGES = ("/signin", "/signup", "/setup", "/forgot", "/reset", "/verify", "/account",
+                  "/legal/terms", "/legal/privacy", "/legal/risk")
+
+    def _session_cookie(self, token, max_age=30 * 86400):
+        parts = [f"nc_s={token}", "Path=/", "HttpOnly", "SameSite=Lax", f"Max-Age={max_age}"]
+        if self._is_https():
+            parts.append("Secure")
+        return "; ".join(parts)
+
+    def _auth_http(self, method, parsed):
+        """Handle sign-in pages and /api/auth/*. Returns True when the request was answered."""
+        path = parsed.path.rstrip("/") or "/"
+        if not (path in self.AUTH_PAGES or path.startswith("/api/auth/")):
+            return False
+        import northchart_accounts as na
+        import northchart_auth_pages as pages
+        acc = accounts_service()
+        qs = urllib.parse.parse_qs(parsed.query)
+        q = lambda k: (qs.get(k) or [""])[0]
+        base = self._base_url()
+        html_ = lambda b, status=200, extra=None: self._send_full(status, "text/html; charset=utf-8", b, extra)
+        js = lambda obj, status=200, extra=None: self._send_full(status, "application/json",
+                                                               json.dumps(obj, default=str).encode(), extra)
+        u, via = self._identify()
+        self.user, self.via = u, via
+        if method == "GET":
+            if path == "/signin":
+                if u and via != "open" and acc.has_users():
+                    return self._send_full(302, "text/plain", b"", {"Location": "/"}) or True
+                return html_(pages.signin(acc.signup_mode(), acc.has_users(), acc.smtp_ready())) or True
+            if path == "/setup":
+                if acc.has_users():
+                    return self._send_full(302, "text/plain", b"", {"Location": "/signin"}) or True
+                return html_(pages.setup_page(bool(self._auth_creds()[1]))) or True
+            if path == "/signup":
+                return html_(pages.signup(acc.signup_mode() if acc.has_users() else "closed", q("invite"))) or True
+            if path == "/forgot":
+                return html_(pages.forgot(acc.smtp_ready())) or True
+            if path == "/reset":
+                return html_(pages.reset(q("token"))) or True
+            if path == "/verify":
+                try:
+                    acc.verify(q("token"))
+                    return html_(pages.message("Email confirmed", "Thanks. Your email address is confirmed.")) or True
+                except na.AuthError as e:
+                    return html_(pages.message("Link not valid", str(e), "/account", "Go to your account"), 400) or True
+            if path.startswith("/legal/"):
+                return html_(pages.legal(path.split("/")[-1])) or True
+            if path == "/api/auth/state":
+                return js({"has_users": acc.has_users(), "signup_mode": acc.signup_mode(),
+                           "smtp": acc.smtp_ready()}) or True
+            if path == "/api/auth/me":
+                return js({"user": acc.public(u) if via in ("session", "basic", "open") else None,
+                           "signup_mode": acc.signup_mode(), "has_users": acc.has_users(),
+                           "via": via}) or True
+        # everything below needs a signed-in user
+        public_post = ("/api/auth/signin", "/api/auth/signup", "/api/auth/setup", "/api/auth/forgot",
+                       "/api/auth/reset")
+        if method == "POST" and not self._same_origin() and via != "basic":
+            return js({"ok": False, "error": "cross-site request refused"}, 403) or True
+        body = {}
+        if method == "POST":
+            ln = int(self.headers.get("Content-Length", 0) or 0)
+            if ln > 20000:
+                return js({"ok": False, "error": "body too large"}, 413) or True
+            try:
+                body = json.loads(self.rfile.read(ln) or b"{}")
+                body = body if isinstance(body, dict) else {}
+            except Exception:
+                return js({"ok": False, "error": "invalid JSON"}, 400) or True
+        b = lambda k: str(body.get(k) or "")
+        ip, ua = self._client_ip(), self.headers.get("User-Agent") or ""
+        try:
+            if method == "POST" and path in public_post:
+                if path == "/api/auth/signin":
+                    user, tok = acc.login(b("email"), b("password"), ip, ua)
+                elif path == "/api/auth/setup":
+                    loop_ip = ip if not (self.headers.get("CF-Connecting-IP") or self.headers.get("X-Forwarded-For")) \
+                        else "203.0.113.1"
+                    user = acc.setup_owner(b("email"), b("name"), b("password"), b("legacy_password"), loop_ip)
+                    tok = acc.new_session(user["uid"], ip, ua)
+                elif path == "/api/auth/signup":
+                    user = acc.signup(b("email"), b("name"), b("password"), b("invite"), ip)
+                    tok = acc.new_session(user["uid"], ip, ua)
+                    acc.send_verify(user, base)
+                elif path == "/api/auth/forgot":
+                    acc.start_reset(b("email"), base, ip)
+                    return js({"ok": True}) or True
+                else:   # reset
+                    user = acc.finish_reset(b("token"), b("password"))
+                    tok = acc.new_session(user["uid"], ip, ua)
+                return js({"ok": True, "user": acc.public(user)}, 200,
+                          {"Set-Cookie": self._session_cookie(tok)}) or True
+            if not u or via not in ("session", "basic", "open"):
+                if path == "/account":
+                    return self._send_full(302, "text/plain", b"", {"Location": "/signin?next=/account"}) or True
+                return js({"ok": False, "error": "sign in first"}, 401) or True
+            if via == "open":
+                if path == "/account":
+                    return self._send_full(302, "text/plain", b"", {"Location": "/setup"}) or True
+                return js({"ok": False, "error": "create the owner account first at /setup"}, 400) or True
+            uid, tok = u["uid"], self._cookie("nc_s")
+            enter_user(u)
+            if method == "GET":
+                if path == "/account":
+                    return html_(pages.account()) or True
+                if path == "/api/auth/sessions":
+                    return js({"sessions": acc.sessions(uid, tok)}) or True
+                if path == "/api/auth/tokens":
+                    return js({"tokens": acc.ingest_tokens(uid)}) or True
+                if path == "/api/auth/invites":
+                    if u.get("role") != "owner":
+                        return js({"ok": False, "error": "only the desk owner can invite"}, 403) or True
+                    return js({"invites": acc.invites()}) or True
+                if path == "/api/auth/export.zip":
+                    mod = _tracker_module()
+                    data = mod.backup_zip() if mod else b""
+                    return self._send_full(200, "application/zip", data, {
+                        "Content-Disposition": 'attachment; filename="northchart-journal.zip"'}) or True
+            else:
+                if path == "/api/auth/signout":
+                    acc.logout(tok)
+                    return js({"ok": True}, 200, {"Set-Cookie": self._session_cookie("", 0)}) or True
+                if path == "/api/auth/profile":
+                    acc.update_profile(uid, b("name"))
+                    return js({"ok": True}) or True
+                if path == "/api/auth/password":
+                    acc.change_password(uid, b("old"), b("new"), keep_token=tok)
+                    return js({"ok": True}) or True
+                if path == "/api/auth/verify/resend":
+                    acc.send_verify(u, base)
+                    return js({"ok": True, "emailed": acc.smtp_ready()}) or True
+                if path == "/api/auth/sessions/revoke":
+                    acc.revoke_sessions(uid, sid=None if body.get("others") else b("sid"), keep_token=tok)
+                    return js({"ok": True}) or True
+                if path == "/api/auth/tokens":
+                    return js({"ok": True, "token": acc.new_ingest_token(uid, b("label"))}) or True
+                if path == "/api/auth/tokens/revoke":
+                    acc.revoke_ingest(uid, b("id"))
+                    return js({"ok": True}) or True
+                if path in ("/api/auth/invites", "/api/auth/invites/revoke"):
+                    if u.get("role") != "owner":
+                        return js({"ok": False, "error": "only the desk owner can invite"}, 403) or True
+                    if path.endswith("revoke"):
+                        acc.revoke_invite(b("id"))
+                        return js({"ok": True}) or True
+                    return js({"ok": True, "code": acc.new_invite(uid, b("email"))}) or True
+                if path == "/api/auth/delete":
+                    acc.delete(uid, b("password"))
+                    return js({"ok": True}, 200, {"Set-Cookie": self._session_cookie("", 0)}) or True
+        except na.AuthError as e:
+            return js({"ok": False, "error": str(e)}, 400) or True
+        return js({"ok": False, "error": "not found"}, 404) or True
 
     def _send(self, body, ctype):
         self.send_response(200)
@@ -2259,6 +2520,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self._is_connect():
             return self._connect_http("POST")
+        if self._auth_http("POST", urllib.parse.urlparse(self.path)):
+            return
         if not self._authorized():
             return self._deny()
         parsed = urllib.parse.urlparse(self.path)
@@ -2371,6 +2634,8 @@ class Handler(BaseHTTPRequestHandler):
                 "macro_ts": macro_cache.get("ts"),
                 "port": PORT,
             }).encode(), "application/json")
+            return
+        if self._auth_http("GET", parsed):
             return
         if not self._authorized():
             return self._deny()

@@ -251,8 +251,15 @@ class DesktopApp(unittest.TestCase):
                 self.assertEqual(r.status, 200, path)
                 if path.endswith(".png"):
                     self.assertTrue(body.startswith(b"\x89PNG"))
-            c.request("GET", "/")
-            self.assertEqual(c.getresponse().status, 401)   # the app itself still needs the desk login
+            c.request("GET", "/", headers={"Accept": "text/html"})
+            r = c.getresponse()
+            r.read()
+            self.assertEqual(r.status, 302)                  # the app itself still needs a sign-in
+            self.assertTrue(r.getheader("Location").startswith("/signin"))
+            c.request("GET", "/api/signal")
+            r = c.getresponse()
+            r.read()
+            self.assertEqual(r.status, 401)
             c.close()
 
 

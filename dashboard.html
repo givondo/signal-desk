@@ -72,6 +72,7 @@ cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:
 .clusters .cl{padding:2px 7px;border-radius:var(--radius-sm);border:1px solid var(--bd);color:var(--dim)}
 .clusters .cl.full{border-color:var(--a);color:var(--a)}
 .clusters .cl small{color:var(--dim2);margin-left:3px}
+.avatar{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--tx,#111827);color:var(--bg,#fff);font-size:9.5px;font-weight:700;margin-right:6px;letter-spacing:.2px}
 .inboxbadge{display:inline-block;margin-left:6px;min-width:16px;padding:0 5px;border-radius:8px;background:var(--a);color:#fff;font-size:10px;line-height:16px;text-align:center;font-weight:600}
 .tvlink{font-size:11px;color:var(--dim);padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--bd);
 background:var(--p2);cursor:pointer;transition:all .15s;white-space:nowrap}
@@ -541,9 +542,8 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
         <button type="button" class="tvlink agentbtn" :class="{on:agentOpen}" @click="toggleAgent()" title="Agent desk: run tools, see what ChatGPT and Claude are doing, connect new agents (Ctrl+K)">
           <span class="adot" :class="{hot:agentUnread>0}"></span>Agents<span v-if="agentUnread" class="inboxbadge">{{ agentUnread }}</span>
         </button>
-        <button type="button" class="tvlink" :class="{on:d.tv_user}" @click="openAuth" :title="d.tv_user?'TradingView connected':'Connect TradingView'">
-          <span class="tvdot" :class="{on:d.tv_user}"></span>{{ d.tv_user?'TradingView · '+d.tv_user:'TradingView' }}
-        </button>
+        <a v-if="me&&me.email" class="tvlink acct" href="/account" :title="'Signed in as '+me.email" style="text-decoration:none"><span class="avatar">{{ initials }}</span>{{ me.name?me.name.split(' ')[0]:'Account' }}</a>
+        <a v-else class="tvlink" :href="hasUsers?'/signin':'/setup'" style="text-decoration:none">{{ hasUsers?'Sign in':'Set up account' }}</a>
         <button type="button" class="iconbtn" @click="toggleTheme" :aria-label="darkMode?'Switch to light mode':'Switch to dark mode'" :title="darkMode?'Light mode':'Dark mode'">{{ darkMode?'☀':'☾' }}</button>
       </div>
     </div>
@@ -1081,7 +1081,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
 const {createApp} = Vue;
 const app=createApp({
   data(){return{
-    sym:'XAUUSD', inboxN:0,
+    sym:'XAUUSD', inboxN:0, me:null, hasUsers:true,
     symGroups:[
       ['Metals',[['XAUUSD','Gold · XAU/USD'],['XAGUSD','Silver · XAG/USD']]],
       ['Crypto',[['BTCUSD','Bitcoin · BTC'],['ETHUSD','Ethereum · ETH'],['SOLUSD','Solana · SOL'],['XRPUSD','XRP']]],
@@ -1104,6 +1104,8 @@ const app=createApp({
       ['Chart USDJPY','15-minute candles with desk levels'],['Route XAUUSD','Sized for every account, preview only']],
   }},
   computed:{
+    initials(){ const m=this.me||{}; const src=(m.name||m.email||'?').trim();
+      const p=src.split(/[\s@.]+/).filter(Boolean); return ((p[0]||'?')[0]+((m.name&&p[1])?p[1][0]:'')).toUpperCase() },
     perf(){ return this.d.perf||{} },
     gov(){ return this.d.governor||{} },
     clusterList(){
@@ -1189,6 +1191,7 @@ const app=createApp({
       setTimeout(()=>{this.toasts=this.toasts.filter(t=>t.id!==id)},4500) },
     chipDir(s){ const r=this.roster.find(x=>x.sym===s); return r&&r.direction==='LONG'?'dirL':r&&r.direction==='SHORT'?'dirS':'mut' },
     chipDirLabel(s){ const r=this.roster.find(x=>x.sym===s); if(!r||!r.direction)return '·'; return r.direction==='LONG'?'L':r.direction==='SHORT'?'S':'N' },
+    async fetchMe(){ try{ const j=await (await fetch('/api/auth/me')).json(); this.me=j.user; this.hasUsers=j.has_users }catch(e){} },
     async fetchInbox(){
       try{ const r=await fetch('/api/journal/queue'); if(!r.ok) return;
         const j=await r.json(); this.inboxN=j.count||0; }catch(e){}
@@ -1492,7 +1495,8 @@ const app=createApp({
     }catch(e){}
     this.applyTheme();
     try{ this.agentSeenTs=+(localStorage.getItem('nc-agent-seen')||0) }catch(e){}
-    this.tick(); this.fetchRoster(); this.fetchInbox(); this.fetchAgentFeed();
+    this.tick(); this.fetchRoster(); this.fetchInbox(); this.fetchAgentFeed(); this.fetchMe();
+    if(location.hash==='#tradingview') this.openAuth();
     setInterval(()=>this.fetchAgentFeed(),10000);
     if(location.hash==='#agents') this.toggleAgent(true);
     document.addEventListener('click',()=>{this.menuOpen=false;this.installHelp=false});
