@@ -2380,6 +2380,8 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 with open(ROUTER_FILE, "rb") as f:
                     body = f.read()
+                import northchart_ui
+                body = northchart_ui.inject(body, "router")
             except Exception:
                 body = b"<h3>router.html missing</h3>"
             self._send(body, "text/html; charset=utf-8")
@@ -2387,6 +2389,8 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 with open(TRACKER_FILE, "rb") as f:
                     body = f.read()
+                import northchart_ui
+                body = northchart_ui.inject(body, "tracker")
             except Exception:
                 body = b"<h3>tracker.html missing</h3>"
             self._send(body, "text/html; charset=utf-8")

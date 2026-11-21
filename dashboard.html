@@ -77,6 +77,9 @@ cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:
 background:var(--p2);cursor:pointer;transition:all .15s;white-space:nowrap}
 .tvlink:hover{color:var(--tx);border-color:var(--bd2)}
 .tvlink.on{color:var(--g);border-color:rgba(13,155,110,.35);background:var(--gt)}
+.tvlink.here{color:var(--tx);border-color:var(--bd2);background:var(--p3);font-weight:600}
+.tvlink{display:inline-flex;align-items:center;gap:6px}
+.tvdot{width:7px;height:7px;border-radius:50%;background:var(--dim2)}.tvdot.on{background:var(--g)}
 .clockline{font-size:11px;color:var(--dim2);font-family:var(--mono);white-space:nowrap}
 
 /* ---------- metrics strip ---------- */
@@ -295,27 +298,34 @@ padding:10px 14px;font-size:12px;box-shadow:var(--shadow-lg);border-radius:var(-
 .overlay{position:fixed;inset:0;background:rgba(16,24,40,.55);z-index:70;display:flex;align-items:center;justify-content:center;padding:20px;
 backdrop-filter:blur(4px);animation:fadeIn .2s ease}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-.modal{background:var(--p1);border:1px solid var(--bd2);width:100%;max-width:400px;padding:26px 28px;position:relative;
+.modal{background:var(--p1);border:1px solid var(--bd2);width:100%;max-width:420px;padding:22px 24px 20px;position:relative;
 border-radius:14px;box-shadow:var(--shadow-lg);animation:modalIn .25s ease}
 @keyframes modalIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
-.modal .x{position:absolute;top:8px;right:12px;background:none;border:none;color:var(--dim);font-size:16px;cursor:pointer}
-.modal h2{font-size:14px;font-weight:600;text-align:center;margin-bottom:16px;color:var(--tx)}
-.field{margin-bottom:10px}
-.field label{display:block;font-size:10px;color:var(--dim);margin-bottom:3px;letter-spacing:.5px;text-transform:uppercase}
-.field input{width:100%;background:var(--p2);border:1px solid var(--bd2);color:var(--tx);padding:9px 11px;font-size:12.5px;border-radius:var(--radius-sm)}
+.modal .x{position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:8px;background:none;border:none;color:var(--dim);
+font-size:15px;cursor:pointer}
+.modal .x:hover{background:var(--p3);color:var(--tx)}
+.mhead{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.modal h2{font-size:16px;font-weight:800;color:var(--tx)}
+.msub{font-size:12.5px;color:var(--dim);margin-bottom:16px;line-height:1.5}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--tx);margin-bottom:5px}
+.field input{width:100%;background:var(--p2);border:1px solid var(--bd2);color:var(--tx);padding:10px 12px;font-size:13.5px;border-radius:9px;font-family:var(--font)}
 .field input:focus{border-color:var(--b);outline:none;box-shadow:0 0 0 3px var(--bt)}
-.mbtn{width:100%;background:var(--b);border:none;color:#fff;padding:10px;font-weight:700;cursor:pointer;font-size:12px;margin-top:4px;
-border-radius:var(--radius-sm);transition:filter .15s}
+.mbtn{width:100%;background:var(--b);border:none;color:#fff;padding:11px;font-weight:700;cursor:pointer;font-size:13.5px;margin-top:2px;
+border-radius:9px;transition:filter .15s;font-family:var(--font)}
 .mbtn:hover:not(:disabled){filter:brightness(1.06)}.mbtn:disabled{opacity:.55;cursor:not-allowed}
 .gbtn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--p1);color:var(--tx);
-border:1px solid var(--bd2);padding:9px;font-weight:600;font-size:12.5px;cursor:pointer;border-radius:var(--radius-sm);transition:background .15s}
+border:1px solid var(--bd2);padding:10px;font-weight:600;font-size:13.5px;cursor:pointer;border-radius:9px;transition:background .15s;font-family:var(--font)}
 .gbtn:hover{background:var(--p2)}
-.divider{display:flex;align-items:center;gap:10px;color:var(--dim2);font-size:10px;margin:12px 0}
+.divider{display:flex;align-items:center;gap:10px;color:var(--dim2);font-size:11.5px;margin:14px 0}
 .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--bd)}
-.merr{border:1px solid var(--r);background:var(--rt);color:var(--r);padding:7px 10px;font-size:11px;margin-bottom:10px}
-.mnote{font-size:9.5px;color:var(--dim2);text-align:center;margin-top:12px;line-height:1.5}
-.blink{border:none;background:none;color:var(--b);font-size:11px;cursor:pointer;padding:6px 0 0}
-.gsteps{background:var(--p2);border:1px solid var(--bd);padding:9px 11px;font-size:11px;line-height:1.7;color:var(--dim);margin-bottom:10px}
+.merr{border:1px solid rgba(208,68,56,.35);background:var(--rt);color:var(--r);padding:8px 11px;font-size:12.5px;margin-bottom:12px;border-radius:9px}
+.mnote{font-size:11.5px;color:var(--dim);margin-top:14px;line-height:1.55;padding-top:12px;border-top:1px solid var(--bd)}
+.blink{border:none;background:none;color:var(--b);font-size:12.5px;cursor:pointer;padding:10px 0 0;font-family:var(--font)}
+.blink:hover{text-decoration:underline}
+.mconn{display:flex;align-items:center;gap:10px;background:var(--gt);border:1px solid rgba(13,155,110,.3);border-radius:9px;padding:10px 12px;
+font-size:13px;margin-bottom:14px}
+.gsteps{background:var(--p2);border:1px solid var(--bd);border-radius:9px;padding:10px 12px;font-size:12.5px;line-height:1.7;color:var(--tx);margin-bottom:12px}
 .spin{display:inline-block;width:11px;height:11px;border:2px solid rgba(77,127,209,.35);border-top-color:var(--b);border-radius:50%;animation:rot .7s linear infinite;margin-right:6px;vertical-align:-1px}
 @keyframes rot{to{transform:rotate(360deg)}}
 .loadwrap{padding:12px;max-width:1920px;margin:0 auto}
@@ -526,13 +536,14 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
         <span class="head-sync"><span class="live" aria-hidden="true"></span>Updated {{ d.ts||'—' }}
           <button type="button" @click="refreshNow" :disabled="refreshing">{{ refreshing?'…':'↻' }}</button></span>
         <span class="clockline">{{ clock }} UTC · 15m {{ countdown }}</span>
+        <a class="tvlink here" href="/" aria-current="page" style="text-decoration:none">Desk</a>
         <a class="tvlink" :href="inboxN?'/tracker#journal':'/tracker'" :title="inboxN?inboxN+' TradingView trade(s) waiting in the journal inbox':'Trading OS tracker: journal, prop accounts, capital'" style="text-decoration:none">Tracker<span v-if="inboxN" class="inboxbadge">{{ inboxN }}</span></a>
         <a class="tvlink" href="/router" title="Live/prop router: this signal sized for every account (route and gate, you place the orders)" style="text-decoration:none">Router</a>
         <button type="button" class="tvlink agentbtn" :class="{on:agentOpen}" @click="toggleAgent()" title="Agent desk: run tools, see what ChatGPT and Claude are doing, connect new agents (Ctrl+K)">
           <span class="adot" :class="{hot:agentUnread>0}"></span>Agents<span v-if="agentUnread" class="inboxbadge">{{ agentUnread }}</span>
         </button>
         <button type="button" class="tvlink" :class="{on:d.tv_user}" @click="openAuth" :title="d.tv_user?'TradingView connected':'Connect TradingView'">
-          TV {{ d.tv_user||'Connect' }}
+          <span class="tvdot" :class="{on:d.tv_user}"></span>{{ d.tv_user?'TradingView · '+d.tv_user:'TradingView' }}
         </button>
         <button type="button" class="iconbtn" @click="toggleTheme" :aria-label="darkMode?'Switch to light mode':'Switch to dark mode'" :title="darkMode?'Light mode':'Dark mode'">{{ darkMode?'☀':'☾' }}</button>
       </div>
@@ -908,25 +919,27 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
   <div class="overlay" v-if="authOpen" @click.self="closeAuth">
     <div class="modal">
       <button class="x" @click="closeAuth">✕</button>
-      <h2>Connect TradingView</h2>
+      <div class="mhead"><div class="brand-mark" style="width:30px;height:30px;font-size:11px" aria-hidden="true">N</div><h2>Connect TradingView</h2></div>
+      <p class="msub">Links your TradingView session so the desk can read TradingView data and sync your trades.</p>
+      <div v-if="d.tv_user" class="mconn"><span class="tvdot on"></span><span style="flex:1">Connected as <b>{{ d.tv_user }}</b></span>
+        <button class="blink" style="padding:0;color:var(--r)" @click="tvLogout">Disconnect</button></div>
       <div v-if="tverrMsg" class="merr">{{ tverrMsg }}</div>
       <template v-if="authStep==='signin'">
-        <button class="gbtn" @click="googleFlow"><svg width="15" height="15" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg> Continue with Google</button>
-        <div class="divider">OR EMAIL</div>
-        <div class="field"><label>Email / username</label><input v-model="tvu" @keyup.enter="tvLogin"></div>
-        <div class="field"><label>Password</label><input v-model="tvp" type="password" @keyup.enter="tvLogin"></div>
-        <button class="mbtn" :disabled="authLoading" @click="tvLogin"><span v-if="authLoading" class="spin"></span>{{ authLoading?'SIGNING IN…':'SIGN IN' }}</button>
-        <button class="blink" @click="authStep='cookies';tverrMsg=''">Use session cookies (2FA accounts)</button>
-        <button class="blink" v-if="d.tv_user" @click="tvLogout" style="color:var(--r)">Disconnect {{ d.tv_user }}</button>
+        <button class="gbtn" @click="googleFlow"><svg width="15" height="15" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Continue with Google</button>
+        <div class="divider">or use your TradingView login</div>
+        <div class="field"><label for="tvu">Email or username</label><input id="tvu" v-model="tvu" autocomplete="username" @keyup.enter="tvLogin"></div>
+        <div class="field"><label for="tvp">Password</label><input id="tvp" v-model="tvp" type="password" autocomplete="current-password" @keyup.enter="tvLogin"></div>
+        <button class="mbtn" :disabled="authLoading" @click="tvLogin"><span v-if="authLoading" class="spin"></span>{{ authLoading?'Signing in…':'Sign in' }}</button>
+        <button class="blink" @click="authStep='cookies';tverrMsg=''">Two-factor account? Use session cookies instead</button>
       </template>
       <template v-else>
-        <div class="gsteps"><b>1.</b> Finish signing in on the tradingview.com tab.<br><b>2.</b> F12 → Application → Cookies → tradingview.com.<br><b>3.</b> Copy both values below.</div>
-        <div class="field"><label>sessionid</label><input ref="sidbox" v-model="tvsid"></div>
-        <div class="field"><label>sessionid_sign</label><input v-model="tvsign" placeholder="v3:…"></div>
-        <button class="mbtn" :disabled="authLoading" @click="tvCookie"><span v-if="authLoading" class="spin"></span>{{ authLoading?'CONNECTING…':'CONNECT' }}</button>
-        <button class="blink" @click="authStep='signin';tverrMsg=''">← Back</button>
+        <div class="gsteps"><b>1.</b> Sign in on tradingview.com in this browser.<br><b>2.</b> Press F12, then Application, Cookies, tradingview.com.<br><b>3.</b> Copy the two values below.</div>
+        <div class="field"><label for="tvsid">sessionid</label><input id="tvsid" ref="sidbox" v-model="tvsid"></div>
+        <div class="field"><label for="tvsign">sessionid_sign</label><input id="tvsign" v-model="tvsign" placeholder="v3:…"></div>
+        <button class="mbtn" :disabled="authLoading" @click="tvCookie"><span v-if="authLoading" class="spin"></span>{{ authLoading?'Connecting…':'Connect' }}</button>
+        <button class="blink" @click="authStep='signin';tverrMsg=''">‹ Back to sign in</button>
       </template>
-      <div class="mnote">Credentials go from this PC directly to tradingview.com.<br>Only the session token is stored locally — never your password.</div>
+      <div class="mnote">Your login goes from this computer straight to tradingview.com. Only the session token is kept here, never your password.</div>
     </div>
   </div>
 

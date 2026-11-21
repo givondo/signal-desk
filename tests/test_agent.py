@@ -254,3 +254,19 @@ class DesktopApp(unittest.TestCase):
             c.request("GET", "/")
             self.assertEqual(c.getresponse().status, 401)   # the app itself still needs the desk login
             c.close()
+
+
+class SharedDesign(unittest.TestCase):
+    def test_tracker_and_router_get_the_shared_header_and_theme(self):
+        with DeskServer() as s:
+            for path, active in (("/tracker", "Tracker"), ("/router", "Router")):
+                c = http.client.HTTPConnection("127.0.0.1", s.port, timeout=10)
+                c.request("GET", path, headers={"Authorization": AUTH})
+                r = c.getresponse()
+                page = r.read().decode()
+                c.close()
+                self.assertEqual(r.status, 200)
+                self.assertNotIn("<!--NC:", page)                      # both markers replaced
+                self.assertIn('class="nc-head"', page)
+                self.assertIn("sd-theme-v2", page)                     # same theme switch as the home page
+                self.assertIn(f'class="nc-pill on" href="{path}" aria-current="page">{active}<', page)

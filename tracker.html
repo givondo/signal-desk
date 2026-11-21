@@ -3,7 +3,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Trading Tracker · Northchart</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231F6F4A'/%3E%3Ctext x='32' y='42' font-size='26' font-weight='bold' text-anchor='middle' fill='white' font-family='Helvetica'%3ETR%3C/text%3E%3C/svg%3E">
 <style>
 :root{--bg:#ffffff;--soft:#F9FAFB;--soft2:#F3F4F6;--line:#E5E7EB;--line2:#D1D5DB;--ink:#111827;--mute:#6B7280;--mute2:#9CA3AF;
 --brand:#1F6F4A;--brand2:#E8F3EE;--good:#15803D;--goodbg:#ECFDF3;--warn:#B45309;--warnbg:#FFFBEB;--bad:#B91C1C;--badbg:#FEF2F2;
@@ -15,21 +14,21 @@ header{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.94);backdro
 .bar{max-width:1240px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .logo{width:34px;height:34px;border-radius:9px;background:var(--brand);color:#fff;font:700 13px var(--font);display:flex;align-items:center;justify-content:center}
 .brandname{font-weight:700;font-size:15px;line-height:1.1}.brandsub{font-size:11px;color:var(--mute)}
-nav{display:flex;gap:2px;flex-wrap:wrap;margin-left:12px}
-nav button{white-space:nowrap;background:none;border:0;border-radius:8px;padding:8px 12px;color:var(--mute);font:500 13px var(--font);cursor:pointer}
-nav button:hover{background:var(--soft2);color:var(--ink)}nav button.on{background:var(--brand2);color:var(--brand);font-weight:700}
+#tabs{display:flex;gap:6px;flex-wrap:nowrap}
+#tabs button{white-space:nowrap;background:var(--p2);border:1px solid var(--bd);border-radius:var(--radius-sm);padding:6px 11px;color:var(--dim);font:500 12px var(--font);cursor:pointer}
+#tabs button:hover{color:var(--tx);border-color:var(--bd2)}#tabs button.on{background:var(--tx);border-color:var(--tx);color:var(--bg);font-weight:600}
 .actions{margin-left:auto;display:flex;gap:8px}
-.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line2);background:#fff;color:var(--ink);border-radius:9px;padding:8px 14px;font:600 13px var(--font);cursor:pointer;text-decoration:none}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line2);background:var(--p1);color:var(--ink);border-radius:9px;padding:8px 14px;font:600 13px var(--font);cursor:pointer;text-decoration:none}
 .btn:hover{border-color:var(--ink)}.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}.btn.pri:hover{filter:brightness(1.08)}
 .btn.sm{padding:6px 10px;font-size:12px}.btn:disabled{opacity:.6;cursor:wait}
 main{max-width:1240px;margin:0 auto;padding:24px 20px 60px}
 h1{font-size:22px;letter-spacing:-.2px}h2{font-size:15px;margin-bottom:12px}.lead{color:var(--mute);margin:4px 0 20px}
 .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
 .g2{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(420px,1fr))}
-.card{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:18px;box-shadow:var(--shadow)}
+.card{background:var(--p1);border:1px solid var(--line);border-radius:var(--r);padding:18px;box-shadow:var(--shadow)}
 .card.flat{box-shadow:none;background:var(--soft)}
 .kpis{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:20px}
-.kpi{border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;background:#fff}
+.kpi{border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;background:var(--p1)}
 .kpi .l{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.6px}
 .kpi .v{font:700 22px var(--font);margin-top:4px;font-variant-numeric:tabular-nums}.kpi .s{font-size:12px;color:var(--mute);margin-top:2px}
 .kpi.hero{background:var(--brand);border-color:var(--brand);color:#fff}.kpi.hero .l,.kpi.hero .s{color:rgba(255,255,255,.82)}
@@ -46,13 +45,13 @@ td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-
 form.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px 14px}
 label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mute);font-weight:500}
 .star{color:var(--brand)}
-input,select,textarea{background:#fff;color:var(--ink);border:1px solid var(--line2);border-radius:8px;padding:9px 10px;font:14px var(--font);transition:border-color .15s,box-shadow .15s;width:100%}
+input,select,textarea{background:var(--p1);color:var(--ink);border:1px solid var(--line2);border-radius:8px;padding:9px 10px;font:14px var(--font);transition:border-color .15s,box-shadow .15s;width:100%}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand2)}
 textarea{min-height:64px;resize:vertical}.wide{grid-column:1/-1}
 details.more{grid-column:1/-1;border-top:1px dashed var(--line2);padding-top:10px}
 details.more>summary{cursor:pointer;color:var(--brand);font-weight:600;font-size:13px}
 details.more .f2{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px 14px;margin-top:12px}
-details.sec{border:1px solid var(--line);border-radius:var(--r);padding:14px 18px;background:#fff;margin-top:16px}
+details.sec{border:1px solid var(--line);border-radius:var(--r);padding:14px 18px;background:var(--p1);margin-top:16px}
 details.sec>summary{cursor:pointer;font-weight:700}details.sec[open]>summary{margin-bottom:14px}
 .formfoot{grid-column:1/-1;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .preview{font-size:13px;color:var(--mute)}.preview b{color:var(--ink)}
@@ -62,20 +61,17 @@ details.sec>summary{cursor:pointer;font-weight:700}details.sec[open]>summary{mar
 .legend{display:flex;flex-wrap:wrap;gap:10px 18px;font-size:12px;color:var(--mute);margin-bottom:16px}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
 .empty{color:var(--mute);font-size:13px;padding:6px 0}
 #toast{position:fixed;right:20px;bottom:20px;z-index:50;display:flex;flex-direction:column;gap:8px}
-.toast{background:var(--ink);color:#fff;border-radius:10px;padding:10px 14px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.18);max-width:380px}
-.toast.err{background:var(--bad)}
-@media(max-width:700px){.kpis{grid-template-columns:1fr 1fr}.kpi.hero{grid-column:1/-1}.kpi .v{font-size:18px}main{padding:16px 14px 60px}nav{margin-left:0;width:100%;overflow:auto;flex-wrap:nowrap}.actions{margin-left:0}.g2{grid-template-columns:1fr}}
-</style></head>
+.toast{background:var(--p1);color:var(--tx);border:1px solid var(--bd2);border-left:3px solid var(--gold);border-radius:10px;padding:10px 14px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.18);max-width:380px}
+.toast.err{border-left-color:var(--r);color:var(--r)}
+@media(max-width:700px){.kpis{grid-template-columns:1fr 1fr}.kpi.hero{grid-column:1/-1}.kpi .v{font-size:18px}main{padding:16px 14px 60px}#tabs{width:100%;overflow:auto}.actions{margin-left:0}.g2{grid-template-columns:1fr}}
+</style>
+<!--NC:HEAD-->
+</head>
 <body>
-<header><div class="bar">
-  <div class="logo">TR</div>
-  <div><div class="brandname">Trading Tracker</div><div class="brandsub">GIVONDO Trading OS</div></div>
-  <nav id="tabs"></nav>
-  <div class="actions">
-    <a class="btn pri" href="/api/tracker/workbook.xlsx" title="Excel workbook with live formulas, rebuilt from your records">⬇ Download Excel</a>
-    <a class="btn" href="/">Desk</a>
-  </div>
-</div></header>
+<!--NC:NAV-->
+<div class="nc-sec"><nav id="tabs" aria-label="Tracker sections"></nav><span style="flex:1"></span>
+  <a class="btn pri sm" href="/api/tracker/workbook.xlsx" title="Excel workbook with live formulas, rebuilt from your records">Download Excel</a>
+</div>
 <main id="app"><div class="empty">Loading…</div></main>
 <div id="toast"></div>
 
