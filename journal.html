@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Journal · Northchart</title>
+<style>
+*{box-sizing:border-box;margin:0}
+body{min-height:100vh;line-height:1.45}
+.bar2{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--bd2);border-radius:var(--radius-sm);overflow:hidden}
+.seg button{border:0;background:var(--p2);color:var(--dim);font:500 11.5px var(--nc-font);padding:6px 11px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--bd2)}
+.seg button.on{background:var(--tx);color:var(--bg);font-weight:600}
+.sel{font:500 11.5px var(--nc-font);padding:6px 8px;background:var(--p2);color:var(--tx);border:1px solid var(--bd2);border-radius:var(--radius-sm)}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--dim);cursor:pointer}
+.sp{flex:1}
+.strip{display:flex;overflow-x:auto;border-bottom:1px solid var(--bd);background:var(--p1)}
+.strip>div{padding:9px 18px;border-right:1px solid var(--bd);white-space:nowrap;min-width:110px}
+.strip .lb{display:block;font-size:9px;color:var(--dim);letter-spacing:1.1px;text-transform:uppercase;font-weight:600}
+.strip .v{font:700 18px var(--nc-mono)}
+.pos{color:var(--g)}.neg{color:var(--r)}.mut{color:var(--dim)}
+main{padding:12px 14px 40px}
+.sheet{border:1px solid var(--bd);border-radius:var(--radius);background:var(--p1);box-shadow:var(--shadow);overflow:auto;max-height:calc(100vh - 190px)}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:12.5px}
+th{position:sticky;top:0;z-index:2;background:var(--p2);text-align:left;font:600 9.5px var(--nc-font);letter-spacing:.9px;
+text-transform:uppercase;color:var(--dim);padding:9px 10px;border-bottom:1px solid var(--bd);white-space:nowrap;cursor:pointer;user-select:none}
+th.n,td.n{text-align:right}
+th .ar{opacity:.5;margin-left:3px}
+td{padding:7px 10px;border-bottom:1px solid var(--bd);white-space:nowrap;vertical-align:middle}
+tr:hover td{background:var(--p2)}
+td.n{font-family:var(--nc-mono);font-variant-numeric:tabular-nums}
+td.wrap{white-space:normal;min-width:220px;max-width:340px}
+.pill{font:800 9.5px var(--nc-font);letter-spacing:.6px;padding:2px 7px;border-radius:999px;text-transform:uppercase}
+.pill.ok{color:var(--g);background:var(--gt)}.pill.need{color:var(--a);background:var(--at)}.pill.paper{color:var(--dim);background:var(--p3)}
+.side{font:700 11px var(--nc-mono)}.side.BUY{color:var(--g)}.side.SELL{color:var(--r)}
+.al{font-size:11.5px}.al.with{color:var(--g)}.al.against{color:var(--r)}
+.cell{width:100%;min-width:90px;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 6px;
+font:12.5px var(--nc-font);color:var(--tx)}
+.cell:hover{border-color:var(--bd2)}.cell:focus{background:var(--p1);border-color:var(--b);box-shadow:0 0 0 3px var(--bt);outline:none}
+.cell.num{font-family:var(--nc-mono);text-align:right;width:96px;min-width:96px}
+.cell.need{border-color:var(--a);background:var(--at)}
+select.cell{min-width:110px;cursor:pointer}
+.empty{padding:44px 20px;text-align:center;color:var(--dim)}
+.empty h3{color:var(--tx);font-size:16px;margin-bottom:6px}
+.empty p{max-width:520px;margin:0 auto;font-size:13px;line-height:1.6}
+.note{font-size:11.5px;color:var(--dim);margin-top:10px;line-height:1.55}
+.toast{position:fixed;bottom:16px;right:16px;background:var(--p1);border:1px solid var(--bd2);border-left:3px solid var(--gold);
+color:var(--tx);padding:10px 14px;font-size:12.5px;box-shadow:var(--shadow-lg);border-radius:var(--radius-sm);opacity:0;transform:translateY(6px);
+transition:all .2s;z-index:60;pointer-events:none}
+.toast.show{opacity:1;transform:none}.toast.err{border-left-color:var(--r)}
+@media(max-width:700px){main{padding:8px}.strip>div{padding:7px 12px;min-width:92px}.strip .v{font-size:15px}}
+</style>
+<!--NC:HEAD-->
+</head>
+<body>
+<!--NC:NAV-->
+<div class="nc-sec bar2">
+  <div class="seg" role="group" aria-label="Status">
+    <button data-f="all" class="on">All</button><button data-f="Complete">Complete</button><button data-f="Needs stop">Needs stop</button>
+  </div>
+  <select class="sel" id="acct" aria-label="Account"><option value="">All accounts</option></select>
+  <select class="sel" id="inst" aria-label="Instrument"><option value="">All instruments</option></select>
+  <label class="chk"><input type="checkbox" id="paper"> Include desk paper trades</label>
+  <span class="sp"></span>
+  <button class="nc-pill" id="sync" title="Journal any synced trades now">Sync now</button>
+  <a class="nc-pill" href="/api/tracker/export?kind=trades" title="Journal as CSV">CSV</a>
+  <a class="nc-pill" href="/api/tracker/workbook.xlsx" title="Excel workbook with live formulas">Excel</a>
+</div>
+<div class="strip" id="stats" aria-label="Journal statistics"></div>
+<main>
+  <div class="sheet" id="sheet"><div class="empty">Loading your journal…</div></div>
+  <p class="note">Trades arrive automatically from TradingView trade sync and broker imports. Each one is matched to the
+  desk's view when you entered: bias, grade, regime and session. The stop comes from your broker, or from the desk when
+  you traded its signal; risk and R are worked out from the trade's own profit per point. A trade without a stop waits
+  here as <b>Needs stop</b>: type the stop in and it joins the sealed journal. Edits are saved as corrections, never overwrites.</p>
+</main>
+<div class="toast" id="toast" role="status"></div>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num=(v,d)=>v==null||v===""?"":Number(v).toLocaleString("en-GB",{minimumFractionDigits:d??0,maximumFractionDigits:d??5});
+const money=v=>v==null?"":(v<0?"-":"")+Math.abs(v).toLocaleString("en-GB",{minimumFractionDigits:2,maximumFractionDigits:2});
+const when=iso=>{ if(!iso) return ""; const d=new Date(iso); if(isNaN(d)) return esc(iso);
+  return d.toLocaleDateString("en-GB",{day:"2-digit",month:"short"})+" "+d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}) };
+let data={rows:[],stats:{},emotions:[]}, filter="all", sortKey="opened", sortDir=-1, editing=false;
+
+function toast(msg,err){ const t=$("toast"); t.textContent=msg; t.className="toast show"+(err?" err":""); clearTimeout(t._h); t._h=setTimeout(()=>t.className="toast",2600) }
+
+async function load(){
+  if(editing) return;
+  try{ const r=await fetch("/api/journal/sheet"+($("paper").checked?"?paper=1":"")); data=await r.json(); }
+  catch(e){ $("sheet").innerHTML='<div class="empty"><h3>Could not load the journal</h3><p>'+esc(e.message)+'</p></div>'; return }
+  fillFilters(); render();
+}
+function fillFilters(){
+  for(const [id,key,label] of [["acct","account","All accounts"],["inst","instrument","All instruments"]]){
+    const el=$(id), cur=el.value, vals=[...new Set(data.rows.map(r=>r[key]).filter(Boolean))].sort();
+    el.innerHTML='<option value="">'+label+'</option>'+vals.map(v=>`<option${v===cur?" selected":""}>${esc(v)}</option>`).join("");
+  }
+}
+function stats(){
+  const s=data.stats||{}, net=Object.entries(s.net_by_currency||{});
+  const cells=[["Trades",s.trades??0,""],["Win rate",s.win_rate==null?"—":s.win_rate+"%",""],
+    ["Total R",s.total_r==null?"—":(s.total_r>0?"+":"")+s.total_r+"R",s.total_r>0?"pos":s.total_r<0?"neg":""],
+    ["Average R",s.avg_r==null?"—":(s.avg_r>0?"+":"")+s.avg_r+"R",s.avg_r>0?"pos":s.avg_r<0?"neg":""],
+    ["Net P/L",net.length?net.map(([c,v])=>money(v)+" "+c).join(" · "):"—",net.length&&net[0][1]>0?"pos":net.length&&net[0][1]<0?"neg":""],
+    ["Losing streak",s.max_losing_streak??0,""],["With / against desk",(s.with_desk??0)+" / "+(s.against_desk??0),""],
+    ["Needs stop",s.needs_stop??0,s.needs_stop?"neg":""]];
+  $("stats").innerHTML=cells.map(([l,v,c])=>`<div><span class="lb">${l}</span><span class="v ${c}">${esc(v)}</span></div>`).join("");
+}
+const COLS=[["status","Status"],["opened","Opened"],["account","Account"],["instrument","Instrument"],["side","Side"],
+  ["volume","Size","n"],["entry","Entry","n"],["stop","Stop","n"],["exit","Exit","n"],["risk","Risk","n"],["net","Net P/L","n"],
+  ["r","R","n"],["setup","Desk at entry"],["session","Session"],["emotion","Emotion"],["notes","Notes"]];
+function rowsView(){
+  let rows=data.rows.filter(r=>(filter==="all"||r.status===filter)&&(!$("acct").value||r.account===$("acct").value)
+    &&(!$("inst").value||r.instrument===$("inst").value));
+  rows.sort((a,b)=>{ const x=a[sortKey],y=b[sortKey]; if(x==null&&y==null) return 0; if(x==null) return 1; if(y==null) return -1;
+    return (typeof x==="number"?x-y:String(x).localeCompare(String(y)))*sortDir });
+  return rows;
+}
+function render(){
+  stats();
+  const rows=rowsView();
+  if(!data.rows.length){
+    $("sheet").innerHTML=`<div class="empty"><h3>No trades yet</h3><p>Your trades appear here by themselves once TradingView
+      trade sync is running (<code>tools/start_tradingview_sync.ps1</code>) or a broker import arrives. Nothing to type: each
+      trade is matched to the desk's view at entry and its risk is worked out for you.</p></div>`; return }
+  const emo=data.emotions||[];
+  const head="<tr>"+COLS.map(([k,l,n])=>`<th class="${n||""}" data-k="${k}">${l}${sortKey===k?`<span class="ar">${sortDir>0?"▲":"▼"}</span>`:""}</th>`).join("")+"</tr>";
+  const body=rows.map(r=>{
+    const st=r.origin==="Desk paper"?'<span class="pill paper">Desk paper</span>':r.status==="Complete"?'<span class="pill ok">Complete</span>':'<span class="pill need">Needs stop</span>';
+    const al=r.setup.startsWith("With")?"with":r.setup.startsWith("Against")?"against":"";
+    const dp=Number.isInteger(r.dp)?r.dp:(r.entry!=null&&Math.abs(r.entry)<10?5:r.entry!=null&&Math.abs(r.entry)<1000?3:2);
+    const stopCell=`<input class="cell num${r.status==="Needs stop"?" need":""}" data-id="${esc(r.id)}" data-f="stop" value="${r.stop==null?"":Number(r.stop).toFixed(dp)}" placeholder="${r.status==="Needs stop"?"add stop":""}" inputmode="decimal" aria-label="Stop for ${esc(r.instrument)}">`;
+    const locked=r.status!=="Complete";
+    const emoCell=locked?'<span class="mut">—</span>':`<select class="cell" data-id="${esc(r.id)}" data-f="emotion" aria-label="Emotion"><option value=""></option>${emo.map(e=>`<option${e===r.emotion?" selected":""}>${e}</option>`).join("")}</select>`;
+    const noteCell=locked?'<span class="mut">after the stop</span>':`<input class="cell" data-id="${esc(r.id)}" data-f="notes" value="${esc(r.notes)}" placeholder="add a note" aria-label="Notes">`;
+    return `<tr><td>${st}</td><td>${when(r.opened)}</td><td>${esc(r.account)}</td><td title="${esc(r.instrument_raw)}"><b>${esc(r.instrument)}</b></td>
+      <td><span class="side ${esc(r.side)}">${esc(r.side)}</span></td><td class="n">${num(r.volume)}</td><td class="n">${num(r.entry,dp)}</td>
+      <td class="n">${stopCell}</td><td class="n">${num(r.exit,dp)}</td><td class="n">${r.risk==null?"":money(r.risk)}</td>
+      <td class="n ${r.net>0?"pos":r.net<0?"neg":""}">${r.net==null?"":money(r.net)}</td>
+      <td class="n ${r.r>0?"pos":r.r<0?"neg":""}"><b>${r.r==null?"":(r.r>0?"+":"")+r.r.toFixed(2)}</b></td>
+      <td><span class="al ${al}" title="${esc(r.conditions)}">${esc(r.setup)}</span></td><td>${esc(r.session)}</td>
+      <td>${emoCell}</td><td class="wrap">${noteCell}</td></tr>`}).join("");
+  $("sheet").innerHTML=`<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
+}
+async function save(el){
+  const id=el.dataset.id, field=el.dataset.f, value=el.value.trim();
+  const row=data.rows.find(r=>r.id===id); if(!row) return;
+  const before=field==="stop"?(row.stop==null?"":String(row.stop)):field==="emotion"?row.emotion:row.notes;
+  if(value===String(before??"")||(field==="stop"&&row.stop!=null&&Number(value)===Number(row.stop))) return;
+  if(field==="stop"&&!value) return;
+  try{ const r=await fetch("/api/journal/update",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,field,value})});
+    const j=await r.json(); if(!j.ok) throw new Error(j.error||"not saved");
+    toast(j.journaled?"Added to the journal":"Saved"); editing=false; load();
+  }catch(e){ toast(e.message,true) }
+}
+document.addEventListener("focusin",e=>{ if(e.target.classList.contains("cell")) editing=true });
+document.addEventListener("focusout",e=>{ if(e.target.classList.contains("cell")){ editing=false; if(e.target.tagName!=="SELECT") save(e.target) } });
+document.addEventListener("change",e=>{ if(e.target.tagName==="SELECT"&&e.target.classList.contains("cell")) save(e.target) });
+document.addEventListener("keydown",e=>{ if(e.key==="Enter"&&e.target.classList.contains("cell")) e.target.blur() });
+document.querySelector(".seg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return;
+  filter=b.dataset.f; document.querySelectorAll(".seg button").forEach(x=>x.classList.toggle("on",x===b)); render() });
+$("acct").onchange=render; $("inst").onchange=render; $("paper").onchange=load;
+$("sheet").addEventListener("click",e=>{ const th=e.target.closest("th"); if(!th) return;
+  const k=th.dataset.k; if(sortKey===k) sortDir*=-1; else { sortKey=k; sortDir=-1 } render() });
+$("sync").onclick=async()=>{ const r=await fetch("/api/journal/sync",{method:"POST"}); const j=await r.json();
+  toast(j.journaled?j.journaled+" trade(s) journalled":"Nothing new to journal"); load() };
+load(); setInterval(load,30000);
+</script>
+</body></html>

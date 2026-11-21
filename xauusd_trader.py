@@ -305,8 +305,7 @@ except Exception:          # unknown DESK_TZ without tzdata: fixed UTC session h
     _LON = _NY = DESK_TZ = None
 AUTH_FILE = os.path.join(DATA_DIR, "tv_auth.json")
 DASH_FILE = os.path.join(BASE_DIR, "dashboard.html")   # read-only shipped asset
-TRACKER_FILE = os.path.join(BASE_DIR, "tracker.html")  # Trading OS tracker page
-ROUTER_FILE = os.path.join(BASE_DIR, "router.html")  # live/prop portfolio router page
+JOURNAL_FILE = os.path.join(BASE_DIR, "journal.html")  # automatic trade journal sheet
 TRACKER_MAX_BODY = 1024 * 1024  # broker history imports can be large
 
 
@@ -414,6 +413,18 @@ def _candles(sym, limit=96):
     return out
 
 
+_journal = None
+
+
+def journal_service():
+    global _journal
+    with _connect_lock:
+        if _journal is None:
+            import northchart_journal as nj
+            _journal = nj.Journal(DATA_DIR, lambda: SYMBOLS, _tracker_module)
+        return _journal
+
+
 def connect_service():
     global _connect
     with _connect_lock:
@@ -428,6 +439,7 @@ def connect_service():
                 "route_preview": _route_preview,
                 "portfolio": _portfolio_summary,
                 "candles": _candles,
+                "journal": lambda limit: journal_service().sheet(limit=limit),
                 "owner_password": _owner_password,
             }, DATA_DIR)
         return _connect
@@ -2048,6 +2060,15 @@ def poller():
                     latest[sym] = {"status": "error", "error": str(e),
                                    "ts": time.strftime("%H:%M:%S"),
                                    "history": list(price_history[sym])}
+        try:   # automatic journal: desk context every 5 min, pending fills every 60 s
+            with state_lock:
+                snap = {k: v for k, v in latest.items()}
+            jn = journal_service()
+            jn.record_desk(snap)
+            if n % 4 == 0:
+                jn.auto_pass()
+        except Exception as e:
+            print(f"journal: {e}", file=sys.stderr)
         n += 1
         time.sleep(POLL_SECONDS)
 
@@ -2243,6 +2264,22 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path.startswith("/api/agent/"):
             return self._agent_post(parsed)
+        if parsed.path in ("/api/journal/update", "/api/journal/sync"):
+            ln = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                body = json.loads(self.rfile.read(ln) or b"{}") if ln <= TRACKER_MAX_BODY else {}
+            except Exception:
+                body = {}
+            jn = journal_service()
+            try:
+                if parsed.path == "/api/journal/sync":
+                    out = {"ok": True, **jn.auto_pass(force=True)}
+                else:
+                    out = jn.update(str(body.get("id") or ""), str(body.get("field") or ""), body.get("value"))
+                return self._send(json.dumps(out).encode(), "application/json")
+            except Exception as e:
+                return self._send_full(400, "application/json",
+                                       json.dumps({"ok": False, "error": str(e)}).encode())
         if parsed.path.startswith("/api/router/"):
             ln = int(self.headers.get("Content-Length", 0) or 0)
             if ln > TRACKER_MAX_BODY:
@@ -2376,24 +2413,25 @@ class Handler(BaseHTTPRequestHandler):
             self._tracker("GET", parsed)
         elif parsed.path.startswith("/api/router/"):
             self._router("GET", parsed)
-        elif parsed.path in ("/router", "/router/"):
+        elif parsed.path in ("/router", "/router/", "/tracker", "/tracker/"):
+            # Tracker and Router pages were replaced by the automatic journal.
+            self.send_response(302)
+            self.send_header("Location", "/journal")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+        elif parsed.path in ("/journal", "/journal/"):
             try:
-                with open(ROUTER_FILE, "rb") as f:
+                with open(JOURNAL_FILE, "rb") as f:
                     body = f.read()
                 import northchart_ui
-                body = northchart_ui.inject(body, "router")
+                body = northchart_ui.inject(body, "journal")
             except Exception:
-                body = b"<h3>router.html missing</h3>"
+                body = b"<h3>journal.html missing</h3>"
             self._send(body, "text/html; charset=utf-8")
-        elif parsed.path in ("/tracker", "/tracker/"):
-            try:
-                with open(TRACKER_FILE, "rb") as f:
-                    body = f.read()
-                import northchart_ui
-                body = northchart_ui.inject(body, "tracker")
-            except Exception:
-                body = b"<h3>tracker.html missing</h3>"
-            self._send(body, "text/html; charset=utf-8")
+        elif parsed.path == "/api/journal/sheet":
+            paper = (qs.get("paper") or ["0"])[0] in ("1", "true")
+            self._send(json.dumps(journal_service().sheet(include_paper=paper), default=str).encode(),
+                       "application/json")
         elif parsed.path == "/" or parsed.path.startswith("/index"):
             try:
                 with open(DASH_FILE, "rb") as f:

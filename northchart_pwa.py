@@ -39,8 +39,7 @@ def manifest() -> bytes:
         ],
         "shortcuts": [
             {"name": "Agent desk", "url": "/?source=desktop#agents"},
-            {"name": "Router", "url": "/router"},
-            {"name": "Tracker", "url": "/tracker"},
+            {"name": "Journal", "url": "/journal"},
         ],
     }).encode()
 

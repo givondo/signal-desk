@@ -28,6 +28,19 @@ Tradeable signals are paper-executed and journaled so the statistics are honest:
 
 A desk-wide risk governor sits above every instrument: a daily stop in R, a cap on open tickets, one open ticket per correlated group, and A-grade only after a losing streak. Correlated groups are crypto, metals, indices and energy, with FX majors grouped by the direction they put on the US dollar (short EURUSD and long USDJPY are both long USD), so three crypto shorts cannot fill the desk as if they were three separate bets. When the daily stop is hit the whole desk shows HALT until the next EAT trading day.
 
+## Journal (automatic)
+
+`/journal` (**Journal** in the header) is a sheet of every trade you take, filled in by itself. Trades arrive from TradingView trade sync and broker imports (`/api/tracker/import/fills`). `northchart_journal.py` then:
+
+- matches each trade to the desk's view when it opened (bias, grade, mode, regime, session) from a snapshot the engine keeps every five minutes, and labels it With desk, Against desk or Desk neutral;
+- takes the stop from the broker, or, when you traded in the desk's direction near its entry, from the desk's stop at that moment (labelled as such);
+- works out money at risk from the trade's own profit per point, so R multiples are exact without contract-size guesses;
+- writes the trade into the sealed, append-only journal. A trade with no stop it can trust stays in the sheet as **Needs stop** until you type one in. Notes, emotion and later stop changes are stored as corrections, never overwrites.
+
+The strip above the sheet shows trades, win rate, total and average R, net P/L, the longest losing streak, how often you traded with or against the desk, and how many trades still need a stop. CSV and Excel exports are one click. Agents read it through the `get_journal` tool.
+
+The Tracker and Router pages were removed in favour of the journal; `/tracker` and `/router` redirect here. Their APIs stay: TradingView sync posts fills to `/api/tracker/*`, and the agent's `preview_signal_routing` tool uses the router.
+
 ## Trading tracker and Trading OS
 
 `/tracker` (also linked as **Tracker** in the desk header) is the record-keeping side of the desk, built on the GIVONDO Trading OS in `trading_os/`:

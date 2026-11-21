@@ -257,16 +257,104 @@ class DesktopApp(unittest.TestCase):
 
 
 class SharedDesign(unittest.TestCase):
-    def test_tracker_and_router_get_the_shared_header_and_theme(self):
+    def test_journal_page_gets_the_shared_header_and_old_pages_redirect(self):
         with DeskServer() as s:
-            for path, active in (("/tracker", "Tracker"), ("/router", "Router")):
-                c = http.client.HTTPConnection("127.0.0.1", s.port, timeout=10)
-                c.request("GET", path, headers={"Authorization": AUTH})
+            c = http.client.HTTPConnection("127.0.0.1", s.port, timeout=10)
+            c.request("GET", "/journal", headers={"Authorization": AUTH})
+            r = c.getresponse()
+            page = r.read().decode()
+            self.assertEqual(r.status, 200)
+            self.assertNotIn("<!--NC:", page)
+            self.assertIn('class="nc-pill on" href="/journal" aria-current="page">Journal<', page)
+            self.assertIn("sd-theme-v2", page)
+            for old in ("/tracker", "/router"):
+                c.request("GET", old, headers={"Authorization": AUTH})
                 r = c.getresponse()
-                page = r.read().decode()
-                c.close()
-                self.assertEqual(r.status, 200)
-                self.assertNotIn("<!--NC:", page)                      # both markers replaced
-                self.assertIn('class="nc-head"', page)
-                self.assertIn("sd-theme-v2", page)                     # same theme switch as the home page
-                self.assertIn(f'class="nc-pill on" href="{path}" aria-current="page">{active}<', page)
+                r.read()
+                self.assertEqual(r.status, 302)
+                self.assertEqual(r.getheader("Location"), "/journal")
+            c.close()
+
+
+def post(port, path, body):
+    c = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+    c.request("POST", path, body=json.dumps(body), headers={"Authorization": AUTH, "Content-Type": "application/json"})
+    r = c.getresponse()
+    out = json.loads(r.read() or b"{}")
+    c.close()
+    return r.status, out
+
+
+def get(port, path):
+    c = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+    c.request("GET", path, headers={"Authorization": AUTH})
+    r = c.getresponse()
+    out = json.loads(r.read() or b"{}")
+    c.close()
+    return out
+
+
+class AutoJournal(unittest.TestCase):
+    """Trades you take are journalled by themselves, with the desk's view at entry."""
+
+    def setUp(self):
+        seed()
+        jn = sd.journal_service()
+        # the desk was LONG gold, entry 2649, stop 2640, when the trade opened
+        self.t0 = int(time.time()) - 3 * 3600
+        jn.record_desk({"XAUUSD": fake_signal()}, now=self.t0 - 120)
+
+    def iso(self, ts):
+        return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ts))
+
+    def test_fill_without_stop_takes_the_desk_stop_and_exact_risk(self):
+        tid = "T" + os.urandom(3).hex()
+        with DeskServer() as s:
+            st, out = post(s.port, "/api/tracker/import/fills", {
+                "source": "tradingview", "broker": "Paper", "account_label": "TV-PAPER", "account_type": "PAPER",
+                "fills": [{"broker_trade_id": tid, "instrument": "OANDA:XAUUSD", "direction": "BUY", "volume": 1,
+                           "entry_price": 2650.0, "exit_price": 2668.0, "gross_pl": 180.0, "net_pl": 180.0,
+                           "open_time_utc": self.iso(self.t0), "close_time_utc": self.iso(self.t0 + 3600)}]})
+            self.assertEqual(st, 200)
+            self.assertEqual(out["auto_journaled"], 0)            # the broker sent no stop
+            post(s.port, "/api/journal/sync", {})
+            sheet = get(s.port, "/api/journal/sheet")
+        row = next(r for r in sheet["rows"] if r["id"].endswith(tid.upper()))
+        self.assertEqual(row["status"], "Complete")
+        self.assertEqual(row["stop"], 2640.0)                     # desk stop at entry
+        self.assertAlmostEqual(row["risk"], 100.0)                # 10 points x $10 per point from the trade's own P/L
+        self.assertAlmostEqual(row["r"], 1.8)
+        self.assertTrue(row["setup"].startswith("With desk LONG"))
+        self.assertIn("desk stop", row["notes"])
+
+    def test_against_the_desk_waits_for_a_stop_then_joins_on_edit(self):
+        tid = "S" + os.urandom(3).hex()
+        with DeskServer() as s:
+            post(s.port, "/api/tracker/import/fills", {
+                "source": "tradingview", "broker": "Deriv", "account_label": "DERIV-LIVE", "account_type": "PERSONAL",
+                "fills": [{"broker_trade_id": tid, "instrument": "XAUUSD", "direction": "SELL", "volume": 0.1,
+                           "entry_price": 2652.0, "exit_price": 2656.0, "gross_pl": -40.0,
+                           "open_time_utc": self.iso(self.t0), "close_time_utc": self.iso(self.t0 + 900)}]})
+            post(s.port, "/api/journal/sync", {})
+            sheet = get(s.port, "/api/journal/sheet")
+            row = next(r for r in sheet["rows"] if r["id"].endswith(tid.upper()))
+            self.assertEqual(row["status"], "Needs stop")
+            self.assertTrue(row["setup"].startswith("Against desk"))
+            self.assertGreaterEqual(sheet["stats"]["needs_stop"], 1)
+            st, out = post(s.port, "/api/journal/update", {"id": row["id"], "field": "stop", "value": "2660"})
+            self.assertTrue(out["journaled"], out)
+            st, out = post(s.port, "/api/journal/update", {"id": row["id"], "field": "notes", "value": "Faded the desk; no edge."})
+            self.assertTrue(out["ok"])
+            st, out = post(s.port, "/api/journal/update", {"id": row["id"], "field": "emotion", "value": "FOMO"})
+            self.assertTrue(out["ok"])
+            row = next(r for r in get(s.port, "/api/journal/sheet")["rows"] if r["id"] == row["id"])
+        self.assertEqual(row["status"], "Complete")
+        self.assertAlmostEqual(row["risk"], 80.0)                 # 8 points x $10 per point
+        self.assertAlmostEqual(row["r"], -0.5)
+        self.assertEqual(row["notes"], "Faded the desk; no edge.")  # stored as a correction, original kept
+        self.assertEqual(row["emotion"], "FOMO")
+
+    def test_agents_can_read_the_journal(self):
+        ok, res = sd.connect_service().run_tool("get_journal", {"limit": 5}, client="test")
+        self.assertTrue(ok, res)
+        self.assertIn("stats", res)

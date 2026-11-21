@@ -294,7 +294,7 @@ class HttpRoutes(TrackerBase):
     def test_page_summary_append_export(self):
         status, ctype, body = self._get("/tracker")
         self.assertEqual(status, 200)
-        self.assertIn(b"Trading Tracker", body)
+        self.assertIn(b"Journal", body)   # /tracker now redirects to the automatic journal
         status, data = self._post("/api/tracker/append", {"kind": "trades", "row": TRADE})
         self.assertEqual((status, data["ok"]), (200, True))
         status, data = self._post("/api/tracker/append", {"kind": "trades", "row": {"instrument": "X"}})

@@ -303,6 +303,18 @@ def build_tools(ctx) -> dict:
             raise ToolError(f"no candles for {s} yet; the engine refreshes them every minute")
         return out
 
+    def journal(args):
+        if "journal" not in ctx:
+            raise ToolError("journal not available")
+        lim = args.get("limit", 30)
+        try:
+            lim = max(1, min(200, int(lim)))
+        except (TypeError, ValueError):
+            lim = 30
+        out = ctx["journal"](lim)
+        return {"stats": out.get("stats"), "trades": out.get("rows", [])[:lim],
+                "note": "Trades you took, newest first. 'Needs stop' rows are not yet in the sealed journal."}
+
     def route(args):
         s = sym_of(args)
         return ctx["route_preview"](s)
@@ -349,6 +361,13 @@ def build_tools(ctx) -> dict:
              "portfolio (TICKET, WATCH, DRY_RUN or BLOCKED with the reasons). Preview only: nothing is logged "
              "and no order is ever placed.",
              _sym_schema(), route, private=True),
+        Tool("get_journal", "Trade journal",
+             "The owner's own trades, journalled automatically: entry, stop, exit, risk, P/L, R multiple, session, "
+             "whether the trade was with or against the desk, emotion and notes, plus win rate, average R and "
+             "losing streak. Use it to review performance or find patterns in losses.",
+             {"type": "object", "properties": {"limit": {"type": "integer", "minimum": 1, "maximum": 200,
+                                                          "description": "Most recent trades to return, default 30."}},
+              "additionalProperties": False}, journal, private=True),
         Tool("get_portfolio_summary", "Portfolio summary",
              "Owner's tracker summary: performance by account type, prop account status and trades waiting "
              "in the journal inbox.",

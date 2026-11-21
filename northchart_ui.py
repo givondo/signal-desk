@@ -91,8 +91,7 @@ e.newValue==='dark'?'dark':'light');paint()}});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',paint);else paint();})();</script>"""
 
 PAGES = {
-    "tracker": ("Tracker", "Journal, prop firms and capital"),
-    "router": ("Router", "One signal, sized for every account"),
+    "journal": ("Journal", "Every trade you take, journalled automatically"),
 }
 
 
@@ -106,8 +105,7 @@ def head() -> str:
 
 def nav(page: str) -> str:
     title, sub = PAGES.get(page, ("", ""))
-    links = [("/", "Desk", "home"), ("/tracker", "Tracker", "tracker"), ("/router", "Router", "router"),
-             ("/#agents", "Agents", "agents")]
+    links = [("/", "Desk", "home"), ("/journal", "Journal", "journal"), ("/#agents", "Agents", "agents")]
     current = ' aria-current="page"'
     pills = "".join(
         f'<a class="nc-pill{" on" if key == page else ""}" href="{href}"'
