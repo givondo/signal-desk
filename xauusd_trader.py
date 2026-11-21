@@ -1,5 +1,5 @@
 """
-Signal Desk v4.4 - institutional-grade terminal backend
+Northchart engine v4.4 (formerly Signal Desk) - terminal backend
 -----------------------------------------------------
 Serves http://localhost:8899 (dashboard.html) and a JSON API:
 
@@ -332,6 +332,77 @@ def _tracker_module():
 
 def _paper_tickets():
     return {s: list(t.resolved) for s, t in trackers.items()}
+
+
+# ---------------------------------------------------------- Northchart Connect
+# One backend, two channels: the agent panel in the UI and remote MCP clients
+# (ChatGPT, Claude) run the same read-only tools over the same engine state.
+_connect = None
+_connect_lock = threading.Lock()
+
+
+def _owner_password():
+    return (os.environ.get("NORTHCHART_OWNER_PASS") or os.environ.get("SIGNALDESK_PASS")
+            or AUTH_PASS or None)
+
+
+def roster_payload():
+    with state_lock:
+        rows = []
+        for s, c in SYMBOLS.items():
+            st = latest.get(s) or {}
+            rows.append({
+                "sym": s, "grp": c.get("grp"), "name": c.get("name"),
+                "status": st.get("status", "starting"),
+                "direction": st.get("direction"),
+                "price": st.get("price"),
+                "grade": st.get("grade"),
+                "confidence": st.get("confidence"),
+                "tradeable": st.get("tradeable"),
+                "mode": (st.get("desk_action") or {}).get("mode"),
+            })
+        gov = dict(governor_state)
+    return {"ts": time.strftime("%H:%M:%S"), "symbols": rows, "governor": gov}
+
+
+def _latest_copy(sym):
+    with state_lock:
+        return json.loads(json.dumps(latest.get(sym) or {}, default=str))
+
+
+def _route_preview(sym):
+    mod = _router_module()
+    if mod is None:
+        return {"ok": False, "error": "router not installed"}
+    _, _, out, _ = mod.handle("GET", "/api/router/route", {"sym": [sym], "preview": ["1"]}, None,
+                              latest_signal=_latest_copy)
+    return json.loads(out)
+
+
+def _portfolio_summary():
+    mod = _tracker_module()
+    if mod is None:
+        return {"ok": False, "error": "tracker not installed"}
+    _, _, out, _ = mod.handle("GET", "/api/tracker/summary", {}, None, paper_source=_paper_tickets)
+    return json.loads(out)
+
+
+def connect_service():
+    global _connect
+    with _connect_lock:
+        if _connect is None:
+            import northchart_connect as nc
+            _connect = nc.Connect({
+                "symbols": lambda: SYMBOLS,
+                "latest": _latest_copy,
+                "roster": roster_payload,
+                "brief": lambda s: precifarm_brief_for(s, None),
+                "ask": copilot_answer,
+                "route_preview": _route_preview,
+                "portfolio": _portfolio_summary,
+                "owner_password": _owner_password,
+            }, DATA_DIR)
+        return _connect
 
 state_lock = threading.Lock()
 latest = {s: {"status": "starting"} for s in SYMBOLS}
@@ -1972,12 +2043,12 @@ class Handler(BaseHTTPRequestHandler):
         return False
 
     def _deny(self):
-        body = (b"<html><body><h3>Signal Desk</h3>"
+        body = (b"<html><body><h3>Northchart</h3>"
                 b"<p>Login required. User: <b>trader</b> (unless you changed "
                 b"SIGNALDESK_USER). Cancel and retry if the password failed."
                 b"</p></body></html>")
         self.send_response(401)
-        self.send_header("WWW-Authenticate", 'Basic realm="Signal Desk"')
+        self.send_header("WWW-Authenticate", 'Basic realm="Northchart"')
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -2025,10 +2096,93 @@ class Handler(BaseHTTPRequestHandler):
                                                  latest_signal=latest_signal)
         self._send_full(status, ctype, out, headers)
 
+    # ------------------------------------------------ Northchart Connect (MCP)
+    def _base_url(self):
+        fixed = os.environ.get("NORTHCHART_PUBLIC_URL")
+        if fixed:
+            return fixed.rstrip("/")
+        proto = (self.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip() or "http"
+        host = (self.headers.get("X-Forwarded-Host") or self.headers.get("Host")
+                or f"localhost:{PORT}").split(",")[0].strip()
+        return f"{proto}://{host}"
+
+    def _connect_http(self, method):
+        parsed = urllib.parse.urlparse(self.path)
+        body = b""
+        if method == "POST":
+            ln = int(self.headers.get("Content-Length", 0) or 0)
+            if ln > TRACKER_MAX_BODY:
+                return self._send_full(413, "application/json", b'{"error": "body too large"}')
+            body = self.rfile.read(ln) if ln else b""
+        ip = (self.headers.get("CF-Connecting-IP") or self.headers.get("X-Forwarded-For")
+              or self.client_address[0]).split(",")[0].strip()
+        status, headers, out = connect_service().handle(
+            method, parsed.path, parsed.query, self.headers, body, self._base_url(), ip)
+        self.send_response(status)
+        for k, v in headers.items():
+            self.send_header(k, v)
+        if "Content-Length" not in headers:
+            self.send_header("Content-Length", str(len(out)))
+        self.end_headers()
+        if method != "HEAD" and out:
+            self.wfile.write(out)
+
+    def _is_connect(self):
+        import northchart_connect as nc
+        return nc.is_public_path(urllib.parse.urlparse(self.path).path)
+
+    def do_OPTIONS(self):
+        if self._is_connect():
+            return self._connect_http("OPTIONS")
+        self.send_response(204)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def do_HEAD(self):
+        if self._is_connect():
+            return self._connect_http("HEAD")
+        if not self._authorized():
+            return self._deny()
+        self.send_response(200)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def do_DELETE(self):
+        if self._is_connect():
+            return self._connect_http("DELETE")
+        self.send_response(405)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _agent_post(self, parsed):
+        ln = int(self.headers.get("Content-Length", 0) or 0)
+        if ln > TRACKER_MAX_BODY:
+            return self._send_full(413, "application/json", b'{"ok": false, "error": "body too large"}')
+        try:
+            body = json.loads(self.rfile.read(ln) or b"{}")
+        except Exception:
+            body = None
+        if not isinstance(body, dict):
+            return self._send_full(400, "application/json", b'{"ok": false, "error": "invalid JSON"}')
+        svc = connect_service()
+        if parsed.path == "/api/agent/run":
+            ok, result = svc.run_tool(str(body.get("tool") or ""), body.get("args") or {},
+                                      client="Northchart UI")
+            return self._send(json.dumps({"ok": ok, "result": result}, default=str).encode(),
+                              "application/json")
+        if parsed.path == "/api/agent/revoke":
+            svc.revoke_all()
+            return self._send(b'{"ok": true}', "application/json")
+        return self._send_full(404, "application/json", b'{"ok": false, "error": "not found"}')
+
     def do_POST(self):
+        if self._is_connect():
+            return self._connect_http("POST")
         if not self._authorized():
             return self._deny()
         parsed = urllib.parse.urlparse(self.path)
+        if parsed.path.startswith("/api/agent/"):
+            return self._agent_post(parsed)
         if parsed.path.startswith("/api/router/"):
             ln = int(self.headers.get("Content-Length", 0) or 0)
             if ln > TRACKER_MAX_BODY:
@@ -2097,6 +2251,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
+        if self._is_connect():
+            return self._connect_http("GET")
         # Render/platform health probes must not require HTTP Basic auth.
         if parsed.path == "/api/health":
             with state_lock:
@@ -2139,23 +2295,16 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self._send(text.encode("utf-8"), "text/plain; charset=utf-8")
         elif parsed.path == "/api/roster":
-            with state_lock:
-                rows = []
-                for s, c in SYMBOLS.items():
-                    st = latest.get(s) or {}
-                    rows.append({
-                        "sym": s, "grp": c.get("grp"), "name": c.get("name"),
-                        "status": st.get("status", "starting"),
-                        "direction": st.get("direction"),
-                        "price": st.get("price"),
-                        "grade": st.get("grade"),
-                        "confidence": st.get("confidence"),
-                        "tradeable": st.get("tradeable"),
-                        "mode": (st.get("desk_action") or {}).get("mode"),
-                    })
-                gov = dict(governor_state)
-            self._send(json.dumps({"ts": time.strftime("%H:%M:%S"),
-                                   "symbols": rows, "governor": gov}).encode(),
+            self._send(json.dumps(roster_payload()).encode(), "application/json")
+        elif parsed.path == "/api/agent/status":
+            self._send(json.dumps(connect_service().status(self._base_url())).encode(),
+                       "application/json")
+        elif parsed.path == "/api/agent/activity":
+            try:
+                n = int((qs.get("limit") or ["50"])[0] or 50)
+            except ValueError:
+                n = 50
+            self._send(json.dumps({"activity": connect_service().activity_feed(min(n, 300))}).encode(),
                        "application/json")
         elif parsed.path.startswith("/api/tracker/"):
             self._tracker("GET", parsed)
@@ -2197,7 +2346,7 @@ def main():
         sys.exit(1)
     load_auth()
     threading.Thread(target=poller, daemon=True).start()
-    print(f"Signal Desk v{ENGINE_V} -> http://localhost:{PORT} (and Tailscale devices)")
+    print(f"Northchart (engine v{ENGINE_V}) -> http://localhost:{PORT} (and Tailscale devices)")
     srv.serve_forever()
 
 

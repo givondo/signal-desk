@@ -1,6 +1,14 @@
-# Signal Desk
+# Northchart
 
-Multi-asset confluence terminal for discretionary-systematic trading. XAU/USD first; metals, crypto, FX majors, indices and WTI also covered. Stdlib Python backend, single-file Vue dashboard.
+Multi-asset charts, confluence signals and an agent desk. XAU/USD first; metals, crypto, FX majors, indices and WTI also covered. Stdlib Python backend, single-file Vue dashboard. This repository was called Signal Desk; the code, service names and data paths keep the old names so existing deployments update in place.
+
+| Name | What it is |
+|---|---|
+| Northchart | The platform: dashboard, tracker and router |
+| Northchart Connect | The agent-facing interface: a remote MCP server for ChatGPT, Claude and other MCP clients |
+| Agent desk | The panel in the dashboard (Ctrl+K or `/`) that runs the same tools and shows what agents are doing |
+
+Strategy and competitive notes: `docs/TRADINGVIEW_TEARDOWN.md`.
 
 ```
 python xauusd_trader.py          # http://localhost:8899
@@ -69,6 +77,36 @@ Accounts live in `DATA_DIR/trading_os_data/router/accounts.json` on the server (
 
 Neither can place, modify or cancel an order. MCP servers that drive TradingView Desktop through its debug port were left out: they need a paid plan for the Desktop app, and their general click tools can reach the order panel. Details: `tools/README_TRADINGVIEW.md`.
 
+## Northchart Connect (MCP for ChatGPT and Claude)
+
+The server exposes a remote MCP endpoint at `/mcp` (Streamable HTTP, protocol versions 2025-11-25, 2025-06-18 and 2025-03-26). It is part of the same process as the dashboard, so agents and people read the same engine state.
+
+**Tools (all read-only, `readOnlyHint: true`):** `list_instruments`, `get_market_overview`, `get_market_snapshot`, `get_signal_detail`, `get_price_history`, `get_desk_brief`, `ask_desk`, `preview_signal_routing` (nothing is logged, no order is placed) and `get_portfolio_summary`. Nothing in Connect can place, change or cancel an order, edit the journal or change an account (decision D-011).
+
+**Sign-in.** Connect runs its own small OAuth 2.1 server: discovery at `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server`, Dynamic Client Registration at `/oauth/register`, PKCE S256 required, one-hour access tokens and 30-day refresh tokens rotated on every use, all stored hashed in `DATA_DIR/northchart_connect/oauth.json`. A client is approved on a Northchart consent page with the desk password (`SIGNALDESK_PASS`, or `NORTHCHART_OWNER_PASS` if you want a separate one). Five wrong passwords lock the page for 15 minutes per address. Redirects are limited to Claude's and ChatGPT's callbacks and loopback addresses; add others with `NORTHCHART_REDIRECT_ALLOW` (comma-separated prefixes). Tokens are never accepted in a URL.
+
+**Connect Claude:** Settings, Connectors, Add custom connector, paste `https://<your-host>/mcp`, approve with the desk password.
+
+**Connect ChatGPT:** Settings, Apps, Create (developer mode must be available on the plan), paste the same URL, choose OAuth, approve with the desk password.
+
+**Claude Code and scripts:** set a long random `NORTHCHART_MCP_TOKEN` (24+ characters) on the server, then
+`claude mcp add --transport http northchart https://<your-host>/mcp --header "Authorization: Bearer <token>"`.
+
+**Server settings** (in `/etc/signaldesk.env`, then restart the service):
+
+| Variable | Purpose |
+|---|---|
+| `NORTHCHART_PUBLIC_URL` | The public base URL, for example `https://desktrading-today.precifarm.com`. Recommended behind Cloudflare so OAuth metadata always names the right host |
+| `NORTHCHART_OWNER_PASS` | Optional consent password; defaults to `SIGNALDESK_PASS` |
+| `NORTHCHART_MCP_TOKEN` | Optional fixed bearer token for header-based clients |
+| `NORTHCHART_REDIRECT_ALLOW` | Optional extra redirect URI prefixes |
+
+`/mcp`, `/.well-known/oauth-*` and `/oauth/*` bypass HTTP Basic auth because they handle their own; every other route still needs the desk login.
+
+**Agent desk.** The Agents button in the header (or Ctrl+K, or `/`) opens a panel with three tabs: Run (plain-language commands such as `snapshot`, `brief EURUSD`, `route` or any question, answered as cards), Activity (every tool call by the UI, ChatGPT or Claude, with timing and errors) and Connect (the MCP URL, setup steps, connected agents and a sign-out-all button). UI calls go through `/api/agent/run`, `/api/agent/activity`, `/api/agent/status` and `/api/agent/revoke`, which stay behind the desk login.
+
+Tests: `python -m unittest tests.test_connect` runs the full OAuth flow and MCP calls against a real local server.
+
 ## API
 
 | Route | Purpose |
@@ -78,6 +116,8 @@ Neither can place, modify or cancel an order. MCP servers that drive TradingView
 | `/api/desk/brief?sym=XAUUSD` | Precifarm analyst brief (plain text; `format=json`) |
 | `/api/ask?sym=..&q=..` | rule-based copilot from live state |
 | `/api/health` | unauthenticated health probe |
+| `/mcp` | Northchart Connect MCP endpoint (OAuth or bearer token) |
+| `/api/agent/*` | agent desk: run a tool, activity feed, status, sign out agents |
 | `/tracker` | trading tracker page |
 | `/api/tracker/summary` | journal metrics, prop status, prop economics, capital (syncs paper tickets) |
 | `/api/tracker/records?kind=` / `export?kind=` / `backup` | read rows, CSV export, zip backup |

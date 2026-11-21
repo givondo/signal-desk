@@ -2,12 +2,12 @@
 <html lang="en" data-theme="light"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="Signal Desk — multi-asset trading terminal with live confluence scores, macro context, and performance analytics.">
+<meta name="description" content="Northchart: multi-asset charts, live confluence signals and an agent desk that works with ChatGPT and Claude.">
 <meta name="theme-color" content="#ffffff" id="meta-theme">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>SIGNAL DESK</title>
+<title>Northchart</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230b0d10'/%3E%3Ctext x='32' y='44' font-size='30' font-weight='bold' text-anchor='middle' fill='%23c9a227' font-family='Consolas'%3ESD%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -346,6 +346,63 @@ color:var(--r);font-size:12px;text-align:center}
   .mtx .hc{height:24px;line-height:24px}
   .foot{padding-bottom:max(20px,env(safe-area-inset-bottom))}
 }
+/* ---------- agent desk (agentic UI) ---------- */
+.agentbtn{display:inline-flex;align-items:center;gap:6px}
+.adot{width:7px;height:7px;border-radius:50%;background:var(--dim2)}
+.adot.hot{background:var(--b);box-shadow:0 0 0 3px var(--bt);animation:bl 1.6s infinite}
+.agentbtn.on{color:var(--b);border-color:rgba(37,99,235,.4);background:var(--bt)}
+.adrawer{position:fixed;top:0;right:0;bottom:0;width:min(460px,100vw);z-index:65;background:var(--p1);
+border-left:1px solid var(--bd2);box-shadow:var(--shadow-lg);display:flex;flex-direction:column;transform:translateX(102%);
+transition:transform .22s ease}
+.adrawer.open{transform:none}
+.ahead{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--bd)}
+.ahead h2{font-size:14px;font-weight:800;letter-spacing:.3px;flex:1}
+.ahead h2 small{display:block;font-size:10px;color:var(--dim);font-weight:500;letter-spacing:.2px}
+.atabs{display:flex;gap:4px;padding:8px 14px 0;border-bottom:1px solid var(--bd)}
+.atabs button{background:none;border:none;border-bottom:2px solid transparent;color:var(--dim);font-size:12px;font-weight:600;
+padding:7px 10px;cursor:pointer}
+.atabs button.on{color:var(--tx);border-color:var(--b)}
+.abody{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.abody>*{flex-shrink:0}
+.acmd{display:flex;gap:6px;padding:12px 14px;border-top:1px solid var(--bd);background:var(--p2)}
+.acmd input{flex:1;background:var(--p1);border:1px solid var(--bd2);color:var(--tx);border-radius:9px;padding:10px 12px;font-size:13px}
+.acmd input:focus{outline:none;border-color:var(--b);box-shadow:0 0 0 3px var(--bt)}
+.acmd button{background:var(--b);color:#fff;border:none;border-radius:9px;padding:0 14px;font-weight:700;cursor:pointer}
+.achips{display:flex;flex-wrap:wrap;gap:6px}
+.achips button{background:var(--p2);border:1px solid var(--bd);color:var(--tx);font-size:11px;border-radius:999px;padding:5px 10px;cursor:pointer}
+.achips button:hover{border-color:var(--b)}
+.amsg{max-width:92%;font-size:12.5px}
+.amsg.me{align-self:flex-end;background:var(--b);color:#fff;padding:8px 11px;border-radius:12px 12px 2px 12px}
+.acard{border:1px solid var(--bd);border-radius:10px;background:var(--p2);overflow:hidden}
+.acard .top{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--bd);
+font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:var(--dim);font-weight:700}
+.acard .top .ok{color:var(--g)}.acard .top .bad{color:var(--r)}
+.acard .in{padding:10px}
+.acard pre{white-space:pre-wrap;font-family:var(--mono);font-size:11px;line-height:1.5;margin:0;max-height:340px;overflow:auto}
+.akv{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.akv div{background:var(--p1);border:1px solid var(--bd);border-radius:8px;padding:6px 8px}
+.akv span{display:block;font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.9px;font-weight:600}
+.akv b{font-family:var(--mono);font-size:13px}
+.atbl{width:100%;border-collapse:collapse;font-size:11.5px}
+.atbl td,.atbl th{padding:5px 6px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}
+.atbl th{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.8px}
+.dec{font-weight:800;font-size:10px;padding:2px 6px;border-radius:5px}
+.dec.TICKET{color:var(--g);background:var(--gt)}.dec.WATCH,.dec.DRY_RUN{color:var(--a);background:var(--at)}.dec.BLOCKED{color:var(--r);background:var(--rt)}
+.afeed{display:flex;flex-direction:column;gap:6px}
+.afeed .row{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;border:1px solid var(--bd);border-radius:9px;padding:7px 9px;background:var(--p2)}
+.afeed .who{font-size:10px;font-weight:800;padding:2px 7px;border-radius:999px;background:var(--bt);color:var(--b);white-space:nowrap}
+.afeed .who.ui{background:var(--p3);color:var(--dim)}
+.afeed .what{font-family:var(--mono);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.afeed .when{font-size:10px;color:var(--dim2);white-space:nowrap}
+.afeed .err{grid-column:1/-1;color:var(--r);font-size:11px}
+.aurl{display:flex;gap:6px;align-items:center;background:var(--p2);border:1px solid var(--bd);border-radius:9px;padding:8px 10px;font-family:var(--mono);font-size:12px}
+.aurl span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.asteps{font-size:12.5px;line-height:1.6;padding-left:18px;color:var(--tx)}
+.asteps li{margin-bottom:3px}
+.anote{font-size:11.5px;color:var(--dim);line-height:1.55}
+.aempty{color:var(--dim);font-size:12px;text-align:center;padding:24px 10px}
+.ascrim{position:fixed;inset:0;z-index:64;background:rgba(16,24,40,.25)}
+@media(min-width:1500px){.ascrim{display:none}}
 .foot{color:var(--dim2);font-size:10px;text-align:center;padding:14px 16px 20px;line-height:1.65;max-width:920px;margin:0 auto}
 kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:10px;font-family:var(--mono);border-radius:4px}
 </style></head><body>
@@ -354,10 +411,10 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
   <header class="apphead">
     <div class="appbar">
       <div class="brand">
-        <div class="brand-mark" aria-hidden="true">SD</div>
+        <div class="brand-mark" aria-hidden="true">N</div>
         <div class="brand-txt">
-          <div class="name">Signal Desk</div>
-          <div class="sub">Multi-asset confluence terminal</div>
+          <div class="name">Northchart</div>
+          <div class="sub">Charts · signals · agents</div>
         </div>
       </div>
       <div class="instr">
@@ -374,6 +431,9 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
         <span class="clockline">{{ clock }} UTC · 15m {{ countdown }}</span>
         <a class="tvlink" :href="inboxN?'/tracker#journal':'/tracker'" :title="inboxN?inboxN+' TradingView trade(s) waiting in the journal inbox':'Trading OS tracker: journal, prop accounts, capital'" style="text-decoration:none">Tracker<span v-if="inboxN" class="inboxbadge">{{ inboxN }}</span></a>
         <a class="tvlink" href="/router" title="Live/prop router: this signal sized for every account (route and gate, you place the orders)" style="text-decoration:none">Router</a>
+        <button type="button" class="tvlink agentbtn" :class="{on:agentOpen}" @click="toggleAgent()" title="Agent desk: run tools, see what ChatGPT and Claude are doing, connect new agents (Ctrl+K)">
+          <span class="adot" :class="{hot:agentUnread>0}"></span>Agents<span v-if="agentUnread" class="inboxbadge">{{ agentUnread }}</span>
+        </button>
         <button type="button" class="tvlink" :class="{on:d.tv_user}" @click="openAuth" :title="d.tv_user?'TradingView connected':'Connect TradingView'">
           TV {{ d.tv_user||'Connect' }}
         </button>
@@ -745,7 +805,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
   </div>
 
   <footer class="foot">15 instruments · Metals, Crypto, FX, Indices, Energy · hotkeys <kbd>1</kbd>–<kbd>9</kbd> · refresh 15s · TradingView + Yahoo<br>
-  Rule-based copilot (no LLM). All R figures net of estimated spread. <strong style="font-weight:600;color:var(--dim)">Educational only — not financial advice.</strong></footer>
+  Rule-based copilot (no LLM) · agent desk <kbd>Ctrl</kbd>+<kbd>K</kbd> · ChatGPT and Claude via Northchart Connect. All R figures net of estimated spread. <strong style="font-weight:600;color:var(--dim)">Educational only — not financial advice.</strong></footer>
 
   <!-- auth modal -->
   <div class="overlay" v-if="authOpen" @click.self="closeAuth">
@@ -773,6 +833,106 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
     </div>
   </div>
 
+
+  <!-- agent desk: the human view of Northchart Connect -->
+  <div class="ascrim" v-if="agentOpen" @click="toggleAgent(false)"></div>
+  <aside class="adrawer" :class="{open:agentOpen}" aria-label="Agent desk" :aria-hidden="!agentOpen">
+    <div class="ahead">
+      <div class="brand-mark" style="width:30px;height:30px;font-size:12px" aria-hidden="true">N</div>
+      <h2>Agent desk<small>Same read-only tools for you, ChatGPT and Claude. Nothing here places orders.</small></h2>
+      <button class="iconbtn" @click="toggleAgent(false)" aria-label="Close agent desk">✕</button>
+    </div>
+    <div class="atabs" role="tablist">
+      <button v-for="t in [['run','Run'],['activity','Activity'],['connect','Connect']]" :key="t[0]" role="tab"
+        :class="{on:agentTab===t[0]}" @click="setAgentTab(t[0])">{{ t[1] }}<span v-if="t[0]==='activity'&&agentUnread" class="inboxbadge">{{ agentUnread }}</span></button>
+    </div>
+
+    <div class="abody" v-if="agentTab==='run'" ref="arun">
+      <div v-if="!agentLog.length" class="anote">Ask about <b>{{ sym }}</b> in plain words, or pick a tool. Try <code>snapshot</code>, <code>brief</code>,
+        <code>route</code>, <code>overview</code>, <code>history</code> or a question such as <i>why no trade?</i> Add a symbol to switch, for example <code>brief EURUSD</code>.</div>
+      <div class="achips">
+        <button v-for="c in agentChips" :key="c[0]" @click="agentSend(c[0])">{{ c[1] }}</button>
+      </div>
+      <template v-for="m in agentLog" :key="m.id">
+        <div v-if="m.me" class="amsg me">{{ m.text }}</div>
+        <div v-else class="acard">
+          <div class="top"><span>{{ m.title }}</span><span :class="m.ok?'ok':'bad'">{{ m.pending?'running…':(m.ok?m.ms+' ms':'error') }}</span></div>
+          <div class="in">
+            <div v-if="m.pending" class="anote"><span class="spin"></span> Running {{ m.tool }}…</div>
+            <div v-else-if="!m.ok" style="color:var(--r)">{{ m.res && m.res.error }}</div>
+            <template v-else-if="m.tool==='get_market_snapshot'">
+              <div class="akv">
+                <div><span>Price</span><b>{{ m.res.price }}</b></div>
+                <div><span>Bias</span><b :class="m.res.direction==='LONG'?'dirL':m.res.direction==='SHORT'?'dirS':'dirN'">{{ m.res.direction }}</b></div>
+                <div><span>Grade</span><b>{{ m.res.grade }}</b></div>
+                <div><span>Confidence</span><b>{{ m.res.confidence }}%</b></div>
+                <div><span>Quality</span><b>{{ m.res.signal_quality }}</b></div>
+                <div><span>MTF</span><b>{{ m.res.mtf_agreement }}%</b></div>
+              </div>
+              <p v-if="m.res.desk_action" style="margin-top:8px"><b>{{ m.res.desk_action.mode }}</b> · {{ m.res.desk_action.title }}<br><span class="anote">{{ m.res.desk_action.detail }}</span></p>
+            </template>
+            <table v-else-if="m.tool==='get_market_overview'" class="atbl">
+              <tr><th>Symbol</th><th>Price</th><th>Bias</th><th>Grade</th><th>Mode</th></tr>
+              <tr v-for="r in m.res.symbols" :key="r.sym" style="cursor:pointer" @click="switchSym(r.sym)">
+                <td><b>{{ r.sym }}</b></td><td class="num">{{ r.price ?? '—' }}</td>
+                <td :class="r.direction==='LONG'?'dirL':r.direction==='SHORT'?'dirS':'dirN'">{{ r.direction||'—' }}</td>
+                <td>{{ r.grade||'—' }}</td><td>{{ r.mode||r.status }}</td></tr>
+            </table>
+            <table v-else-if="m.tool==='preview_signal_routing'" class="atbl">
+              <tr><th>Account</th><th>Answer</th><th>Size</th></tr>
+              <tr v-for="a in (m.res.accounts||[])" :key="a.account"><td><b>{{ a.account }}</b><div class="anote" v-if="a.reasons&&a.reasons.length">{{ a.reasons.join(' · ') }}</div></td>
+                <td><span class="dec" :class="a.decision">{{ a.decision }}</span></td><td class="num">{{ a.lots }} lots</td></tr>
+            </table>
+            <pre v-else-if="m.tool==='get_desk_brief'">{{ m.res.brief }}</pre>
+            <p v-else-if="m.tool==='ask_desk'" style="white-space:pre-wrap">{{ m.res.answer }}</p>
+            <pre v-else>{{ JSON.stringify(m.res,null,2) }}</pre>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <div class="abody" v-else-if="agentTab==='activity'">
+      <div class="anote">Every tool call, from this panel and from connected agents, newest first.</div>
+      <div v-if="!agentFeed.length" class="aempty">No agent activity yet. Connect ChatGPT or Claude from the Connect tab.</div>
+      <div class="afeed">
+        <div class="row" v-for="(a,i) in agentFeed" :key="i">
+          <span class="who" :class="{ui:a.client==='Northchart UI'}">{{ a.client }}</span>
+          <span class="what">{{ a.tool }}<template v-if="a.args&&a.args.symbol"> · {{ a.args.symbol }}</template><template v-if="a.args&&a.args.question"> · “{{ a.args.question }}”</template></span>
+          <span class="when"><span :class="a.ok?'dirL':'dirS'">{{ a.ok?'✓':'✕' }}</span> {{ ago(a.ts) }} · {{ a.ms }}ms</span>
+          <span v-if="!a.ok" class="err">{{ a.error }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="abody" v-else>
+      <div class="anote">Northchart Connect is a remote MCP server. Add it once and ChatGPT or Claude can read the desk with the same tools you use here.</div>
+      <div class="aurl"><span>{{ agentStatus.mcp_url || '…' }}</span><button class="tvlink" @click="copyMcp">Copy</button></div>
+      <div class="acard"><div class="top"><span>Claude</span></div><div class="in"><ol class="asteps">
+        <li>Open <b>Settings → Connectors</b> (claude.ai or the desktop app).</li>
+        <li>Choose <b>Add custom connector</b> and paste the URL above.</li>
+        <li>Approve on the Northchart page with your desk password.</li></ol></div></div>
+      <div class="acard"><div class="top"><span>ChatGPT</span></div><div class="in"><ol class="asteps">
+        <li>Open <b>Settings → Apps</b>, then <b>Create</b> (developer mode must be on for your plan).</li>
+        <li>Paste the URL above and choose <b>OAuth</b> authentication.</li>
+        <li>Approve on the Northchart page with your desk password.</li></ol></div></div>
+      <div class="acard"><div class="top"><span>Claude Code and scripts</span></div><div class="in">
+        <p class="anote">Set <code>NORTHCHART_MCP_TOKEN</code> on the server, then:</p>
+        <pre>claude mcp add --transport http northchart {{ agentStatus.mcp_url }} --header "Authorization: Bearer $NORTHCHART_MCP_TOKEN"</pre>
+        <p class="anote" style="margin-top:6px">Token configured: <b>{{ agentStatus.static_token?'yes':'no' }}</b></p></div></div>
+      <div class="acard"><div class="top"><span>Connected agents</span><button class="tvlink" @click="revokeAgents" style="color:var(--r)">Sign out all</button></div><div class="in">
+        <div v-if="!(agentStatus.clients||[]).length" class="anote">None yet.</div>
+        <table v-else class="atbl"><tr><th>Agent</th><th>Returns to</th><th>Status</th></tr>
+          <tr v-for="c in agentStatus.clients" :key="c.created+c.name"><td><b>{{ c.name }}</b></td><td>{{ c.redirect_host }}</td>
+          <td :class="c.connected?'dirL':'mut'">{{ c.connected?'signed in':'signed out' }}</td></tr></table></div></div>
+      <div class="anote">{{ (agentStatus.tools||[]).length }} tools, all read-only: {{ (agentStatus.tools||[]).map(t=>t.name).join(', ') }}.</div>
+      <div v-if="agentStatus.owner_password_set===false" class="anote" style="color:var(--r)">No desk password is set on this server. Set SIGNALDESK_PASS before connecting agents.</div>
+    </div>
+
+    <form class="acmd" @submit.prevent="agentSend()" v-if="agentTab==='run'">
+      <input ref="ainput" v-model="agentQ" :placeholder="'Ask or run a tool for '+sym+'…'" aria-label="Agent command">
+      <button type="submit">Run</button>
+    </form>
+  </aside>
   <div class="toastwrap"><transition-group name="toast">
     <div class="toast" v-for="t in toasts" :key="t.id">{{ t.msg }}</div>
   </transition-group></div>
@@ -797,6 +957,8 @@ createApp({
     tvu:'',tvp:'',tvsid:'',tvsign:'',tverrMsg:'',authOpen:false,authStep:'signin',authLoading:false,
     tvWidgetSym:null, curvePts:[], macroHelp:false,
     darkMode:false, roster:[], refreshing:false,
+    agentOpen:false, agentTab:'run', agentQ:'', agentLog:[], agentFeed:[], agentStatus:{}, agentUnread:0, agentSeenTs:0, agentId:0,
+    agentChips:[['snapshot','Snapshot'],['brief','Desk brief'],['why no trade?','Why no trade?'],['route','Route preview'],['overview','All markets'],['detail','Full detail']],
   }},
   computed:{
     perf(){ return this.d.perf||{} },
@@ -1023,6 +1185,58 @@ createApp({
       headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}); return r.json() },
     openAuth(){ this.authOpen=true; this.authStep='signin'; this.tverrMsg='' },
     closeAuth(){ if(!this.authLoading){this.authOpen=false;this.tverrMsg=''} },
+    // ---------------- agent desk ----------------
+    toggleAgent(v){ this.agentOpen = (v===undefined)?!this.agentOpen:v;
+      if(this.agentOpen){ this.fetchAgentStatus(); this.fetchAgentFeed();
+        if(this.agentTab==='activity') this.markAgentSeen();
+        this.$nextTick(()=>this.$refs.ainput&&this.$refs.ainput.focus()) } },
+    setAgentTab(t){ this.agentTab=t; if(t==='activity') this.markAgentSeen(); if(t==='connect') this.fetchAgentStatus();
+      if(t==='run') this.$nextTick(()=>this.$refs.ainput&&this.$refs.ainput.focus()) },
+    markAgentSeen(){ this.agentUnread=0; this.agentSeenTs=Math.max(this.agentSeenTs,...this.agentFeed.map(a=>a.ts),0);
+      try{localStorage.setItem('nc-agent-seen',String(this.agentSeenTs))}catch(e){} },
+    async fetchAgentStatus(){ try{ const r=await fetch('/api/agent/status'); if(r.ok) this.agentStatus=await r.json() }catch(e){} },
+    async fetchAgentFeed(){ try{ const r=await fetch('/api/agent/activity?limit=60'); if(!r.ok) return;
+        const j=await r.json(); this.agentFeed=j.activity||[];
+        this.agentUnread=this.agentFeed.filter(a=>a.client!=='Northchart UI'&&a.ts>this.agentSeenTs).length;
+        if(this.agentOpen&&this.agentTab==='activity') this.markAgentSeen();
+      }catch(e){} },
+    parseAgent(text){
+      const raw=(text||'').trim(); const words=raw.split(/\s+/);
+      const symWord=words.map(w=>w.toUpperCase().replace('/','')).find(w=>this.flatSyms.some(f=>f[0]===w));
+      const sym=symWord||this.sym; const first=(words[0]||'').toLowerCase();
+      const map={snapshot:'get_market_snapshot',snap:'get_market_snapshot',price:'get_market_snapshot',
+        brief:'get_desk_brief',detail:'get_signal_detail',levels:'get_signal_detail',history:'get_price_history',
+        route:'preview_signal_routing',size:'preview_signal_routing',overview:'get_market_overview',markets:'get_market_overview',
+        all:'get_market_overview',instruments:'list_instruments',portfolio:'get_portfolio_summary',accounts:'get_portfolio_summary'};
+      const noSym=['get_market_overview','list_instruments','get_portfolio_summary'];
+      if(map[first]) return {tool:map[first],args:noSym.includes(map[first])?{}:{symbol:sym}};
+      return {tool:'ask_desk',args:{symbol:sym,question:raw}};
+    },
+    async agentSend(text){
+      const q=(text??this.agentQ).trim(); if(!q) return; this.agentQ='';
+      const {tool,args}=this.parseAgent(q);
+      const titles={get_market_snapshot:'Snapshot',get_desk_brief:'Desk brief',get_signal_detail:'Signal detail',
+        get_price_history:'Price history',preview_signal_routing:'Route preview',get_market_overview:'All markets',
+        list_instruments:'Instruments',get_portfolio_summary:'Portfolio',ask_desk:'Desk answer'};
+      this.agentLog.push({id:++this.agentId,me:true,text:q});
+      const card={id:++this.agentId,tool,title:(titles[tool]||tool)+(args.symbol&&tool!=='get_market_overview'?' · '+args.symbol:''),pending:true,ok:true,res:null,ms:0};
+      this.agentLog.push(card); this.scrollAgent();
+      const t0=performance.now();
+      try{ const r=await fetch('/api/agent/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool,args})});
+        const j=await r.json(); card.ok=!!j.ok; card.res=j.result;
+      }catch(e){ card.ok=false; card.res={error:String(e)} }
+      card.ms=Math.round(performance.now()-t0); card.pending=false;
+      const i=this.agentLog.findIndex(x=>x.id===card.id); if(i>=0) this.agentLog.splice(i,1,{...card});
+      if(this.agentLog.length>60) this.agentLog.splice(0,this.agentLog.length-60);
+      this.scrollAgent(); this.fetchAgentFeed();
+    },
+    scrollAgent(){ this.$nextTick(()=>{const el=this.$refs.arun; if(el) el.scrollTop=el.scrollHeight}) },
+    async copyMcp(){ try{ await navigator.clipboard.writeText(this.agentStatus.mcp_url); this.toast('MCP URL copied') }catch(e){ this.toast(this.agentStatus.mcp_url) } },
+    async revokeAgents(){ if(!confirm('Sign out every connected agent? They will need your desk password to reconnect.')) return;
+      await fetch('/api/agent/revoke',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+      this.toast('All agents signed out'); this.fetchAgentStatus() },
+    ago(ts){ const s=Math.max(0,Math.round(this.now/1000-ts)); return s<60?s+'s ago':s<3600?Math.round(s/60)+'m ago':Math.round(s/3600)+'h ago' },
+
     googleFlow(){ this.tverrMsg=''; window.open('https://www.tradingview.com/#signin','_blank');
       this.authStep='cookies'; this.$nextTick(()=>this.$refs.sidbox&&this.$refs.sidbox.focus()) },
     async tvLogin(){ this.tverrMsg='';this.authLoading=true;
@@ -1045,14 +1259,20 @@ createApp({
       this.darkMode=(localStorage.getItem('sd-theme-v2')==='dark');
     }catch(e){}
     this.applyTheme();
-    this.tick(); this.fetchRoster(); this.fetchInbox();
+    try{ this.agentSeenTs=+(localStorage.getItem('nc-agent-seen')||0) }catch(e){}
+    this.tick(); this.fetchRoster(); this.fetchInbox(); this.fetchAgentFeed();
+    setInterval(()=>this.fetchAgentFeed(),10000);
+    if(location.hash==='#agents') this.toggleAgent(true);
     setInterval(()=>this.fetchInbox(),60000);
     setInterval(()=>this.tick(),15000);
     setInterval(()=>this.fetchRoster(),15000);
     setInterval(()=>{this.now=Date.now()},1000);
     window.addEventListener('resize',()=>{this.drawSpark();this.drawEquity();this.drawDaily()});
     window.addEventListener('keydown',e=>{
+      if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){ e.preventDefault(); this.agentTab='run'; this.toggleAgent(true); return }
+      if(e.key==='Escape'&&this.agentOpen){ this.toggleAgent(false); return }
       if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
+      if(e.key==='/'){ e.preventDefault(); this.agentTab='run'; this.toggleAgent(true); return }
       const i='123456789'.indexOf(e.key);
       if(i>=0&&this.flatSyms[i])this.switchSym(this.flatSyms[i][0]);
       if(e.key==='Escape')this.closeAuth();
