@@ -368,7 +368,7 @@ class DeskAgent:
         rows = sorted([r for r in macro.get("rows") or [] if r.get("impact")],
                       key=lambda r: -(r.get("strength") or 0))[:2]
         if rows:
-            out.append(f"\n**Macro** score {_fmt(macro.get('score'))}: " + " ".join(
+            out.append(f"\n**Macro** score {_fmt(macro.get('score'), 2)}: " + " ".join(
                 f"{r.get('name')} {r.get('chg'):+}{'bp' if r.get('unit') == 'bps' else '%'}, {r.get('note', '')}"
                 for r in rows))
         warns = [w for w in (d.get("warnings") or []) if "closed" not in w.lower() or da.get("mode") != "CLOSED"]
