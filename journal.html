@@ -30,7 +30,7 @@ td{padding:7px 10px;border-bottom:1px solid var(--bd);white-space:nowrap;vertica
 tr:hover td{background:var(--p2)}
 td.n{font-family:var(--nc-mono);font-variant-numeric:tabular-nums}
 td.wrap{white-space:normal;min-width:220px;max-width:340px}
-.pill{font:800 9.5px var(--nc-font);letter-spacing:.6px;padding:2px 7px;border-radius:999px;text-transform:uppercase}
+.pill{white-space:nowrap;font:800 9.5px var(--nc-font);letter-spacing:.6px;padding:2px 7px;border-radius:999px;text-transform:uppercase}
 .pill.ok{color:var(--g);background:var(--gt)}.pill.need{color:var(--a);background:var(--at)}.pill.paper{color:var(--dim);background:var(--p3)}
 .side{font:700 11px var(--nc-mono)}.side.BUY{color:var(--g)}.side.SELL{color:var(--r)}
 .al{font-size:11.5px}.al.with{color:var(--g)}.al.against{color:var(--r)}
@@ -39,7 +39,12 @@ font:12.5px var(--nc-font);color:var(--tx)}
 .cell:hover{border-color:var(--bd2)}.cell:focus{background:var(--p1);border-color:var(--b);box-shadow:0 0 0 3px var(--bt);outline:none}
 .cell.num{font-family:var(--nc-mono);text-align:right;width:96px;min-width:96px}
 .cell.need{border-color:var(--a);background:var(--at)}
-select.cell{min-width:110px;cursor:pointer}
+select.cell{width:136px;min-width:136px;cursor:pointer}
+td.emo{white-space:normal;min-width:150px}
+td.emo .mini{display:block}
+td.wrap{min-width:260px!important}
+.sheet td:first-child{white-space:normal;min-width:96px}
+.sheet td:first-child .mini{display:block;margin-top:4px}
 .empty{padding:44px 20px;text-align:center;color:var(--dim)}
 .empty h3{color:var(--tx);font-size:16px;margin-bottom:6px}
 .empty p{max-width:520px;margin:0 auto;font-size:13px;line-height:1.6}
@@ -49,6 +54,40 @@ color:var(--tx);padding:10px 14px;font-size:12.5px;box-shadow:var(--shadow-lg);b
 transition:all .2s;z-index:60;pointer-events:none}
 .toast.show{opacity:1;transform:none}.toast.err{border-left-color:var(--r)}
 @media(max-width:700px){main{padding:8px}.strip>div{padding:7px 12px;min-width:92px}.strip .v{font-size:15px}}
+
+.tag{display:inline-block;font:700 8.5px var(--nc-font);letter-spacing:.6px;text-transform:uppercase;padding:1px 5px;border-radius:4px;margin-left:4px;vertical-align:middle;white-space:nowrap}
+.tag.Broker{color:var(--b);background:var(--bt)}.tag.Desk{color:var(--a);background:var(--at)}.tag.You{color:var(--g);background:var(--gt)}
+.tag.Draft,.tag.Suggested{color:var(--dim);background:transparent;border:1px dashed var(--bd2)}
+.flag{display:inline-block;font:600 10px var(--nc-font);padding:2px 7px;border-radius:999px;margin:1px 3px 1px 0;background:var(--p3);color:var(--dim)}
+.flag.bad{color:var(--r);background:var(--rt)}.flag.warn{color:var(--a);background:var(--at)}
+.pill.no{color:var(--r);background:var(--rt)}.pill.rev{color:var(--b);background:var(--bt)}
+textarea.cell{resize:vertical;min-height:34px;line-height:1.4;white-space:normal;display:block}
+textarea.cell::placeholder{color:var(--dim2);font-style:italic}
+.mini{font:600 10.5px var(--nc-font);border:1px solid var(--bd2);background:var(--p2);color:var(--dim);border-radius:5px;padding:2px 7px;cursor:pointer;margin-top:3px}
+.mini:hover{color:var(--tx);background:var(--p3)}.mini.go{color:var(--g);border-color:var(--g)}
+.stopwrap{display:flex;align-items:center;justify-content:flex-end;gap:2px}
+.primary{font:600 12px var(--nc-font);background:var(--tx);color:var(--bg);border:0;border-radius:var(--radius-sm);padding:7px 13px;cursor:pointer}
+.primary[disabled]{opacity:.4;cursor:default}
+.scrim{position:fixed;inset:0;background:rgba(10,12,16,.45);display:none;align-items:flex-start;justify-content:center;z-index:50;padding:5vh 12px;overflow:auto}
+.scrim.on{display:flex}
+.card2{background:var(--p1);border:1px solid var(--bd2);border-radius:14px;box-shadow:var(--shadow-lg);width:min(640px,100%);padding:20px 22px}
+.card2 h2{font:700 17px var(--nc-font);display:flex;align-items:center;gap:8px}
+.card2 .meta{color:var(--dim);font-size:12px;margin:3px 0 14px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.grid>div{background:var(--p2);border:1px solid var(--bd);border-radius:8px;padding:7px 9px}
+.grid .lb{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);font-weight:600;display:block}
+.grid .v{font:600 13.5px var(--nc-mono)}
+.fld{margin-bottom:13px}.fld>label{display:block;font:600 10px var(--nc-font);letter-spacing:.9px;text-transform:uppercase;color:var(--dim);margin-bottom:5px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:500 12px var(--nc-font);padding:6px 10px;border-radius:999px;border:1px solid var(--bd2);background:var(--p2);color:var(--tx);cursor:pointer}
+.chip kbd{font:600 10px var(--nc-mono);color:var(--dim);margin-right:5px}
+.chip.sug{border-style:dashed;border-color:var(--a)}.chip.on{background:var(--tx);color:var(--bg);border-color:var(--tx)}.chip.on kbd{color:var(--bg)}
+.inp{font:13px var(--nc-font);padding:7px 9px;border:1px solid var(--bd2);border-radius:var(--radius-sm);background:var(--p1);color:var(--tx)}
+.inp:focus{outline:none;border-color:var(--b);box-shadow:0 0 0 3px var(--bt)}
+textarea.inp{width:100%;min-height:96px;resize:vertical;line-height:1.5}
+.acts{display:flex;align-items:center;gap:8px;margin-top:6px}
+.hint{font-size:11px;color:var(--dim)}
+@media(max-width:640px){.grid{grid-template-columns:repeat(2,1fr)}}
 </style>
 <!--NC:HEAD-->
 </head>
@@ -56,12 +95,13 @@ transition:all .2s;z-index:60;pointer-events:none}
 <!--NC:NAV-->
 <div class="nc-sec bar2">
   <div class="seg" role="group" aria-label="Status">
-    <button data-f="all" class="on">All</button><button data-f="Complete">Complete</button><button data-f="Needs stop">Needs stop</button>
+    <button data-f="all" class="on">All</button><button data-f="To review">To review</button><button data-f="Complete">Complete</button><button data-f="Needs stop">Needs stop</button><button data-f="No stop used">No stop</button>
   </div>
   <select class="sel" id="acct" aria-label="Account"><option value="">All accounts</option></select>
   <select class="sel" id="inst" aria-label="Instrument"><option value="">All instruments</option></select>
   <label class="chk"><input type="checkbox" id="paper"> Include desk paper trades</label>
   <span class="sp"></span>
+  <button class="primary" id="reviewBtn" disabled>Review</button>
   <button class="nc-pill" id="sync" title="Journal any synced trades now">Sync now</button>
   <a class="nc-pill" href="/api/tracker/export?kind=trades" title="Journal as CSV">CSV</a>
   <a class="nc-pill" href="/api/tracker/workbook.xlsx" title="Excel workbook with live formulas">Excel</a>
@@ -69,11 +109,16 @@ transition:all .2s;z-index:60;pointer-events:none}
 <div class="strip" id="stats" aria-label="Journal statistics"></div>
 <main>
   <div class="sheet" id="sheet"><div class="empty">Loading your journal…</div></div>
-  <p class="note">Trades arrive automatically from TradingView trade sync and broker imports. Each one is matched to the
-  desk's view when you entered: bias, grade, regime and session. The stop comes from your broker, or from the desk when
-  you traded its signal; risk and R are worked out from the trade's own profit per point. A trade without a stop waits
-  here as <b>Needs stop</b>: type the stop in and it joins the sealed journal. Edits are saved as corrections, never overwrites.</p>
+  <p class="note">Trades arrive by themselves from TradingView trade sync and broker connections, matched to the desk's view
+  when you entered. Each stop, emotion and note shows where it came from: <span class="tag Broker">Broker</span>
+  <span class="tag Desk">Desk</span> <span class="tag Draft">Draft</span> <span class="tag You">You</span>. Your entry always
+  wins and nothing automatic overwrites it. Emotion is only ever set by you; flags such as Revenge or FOMO suggest one for a
+  one-click confirm. Edits to journalled trades are saved as corrections, never overwrites.</p>
 </main>
+
+<div class="scrim" id="scrim" role="dialog" aria-modal="true" aria-labelledby="rvTitle">
+  <div class="card2" id="card"></div>
+</div>
 <div class="toast" id="toast" role="status"></div>
 <script>
 "use strict";
@@ -83,12 +128,19 @@ const num=(v,d)=>v==null||v===""?"":Number(v).toLocaleString("en-GB",{minimumFra
 const money=v=>v==null?"":(v<0?"-":"")+Math.abs(v).toLocaleString("en-GB",{minimumFractionDigits:2,maximumFractionDigits:2});
 const when=iso=>{ if(!iso) return ""; const d=new Date(iso); if(isNaN(d)) return esc(iso);
   return d.toLocaleDateString("en-GB",{day:"2-digit",month:"short"})+" "+d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}) };
+const tag=by=>by?`<span class="tag ${esc(by)}">${esc(by)}</span>`:"";
+const BAD=new Set(["Revenge","No stop","Moved stop"]), WARN=new Set(["FOMO","Overtrading","Early exit","Against desk"]);
+const flagChip=f=>`<span class="flag ${BAD.has(f)?"bad":WARN.has(f)?"warn":""}">${esc(f)}</span>`;
+const dpOf=r=>Number.isInteger(r.dp)?r.dp:(r.entry!=null&&Math.abs(r.entry)<10?5:r.entry!=null&&Math.abs(r.entry)<1000?3:2);
 let data={rows:[],stats:{},emotions:[]}, filter="all", sortKey="opened", sortDir=-1, editing=false;
+let queue=[], qi=0, rv=null;
 
 function toast(msg,err){ const t=$("toast"); t.textContent=msg; t.className="toast show"+(err?" err":""); clearTimeout(t._h); t._h=setTimeout(()=>t.className="toast",2600) }
+async function api(path,body){ const r=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});
+  const j=await r.json(); if(!r.ok||j.ok===false) throw new Error(j.error||"not saved"); return j }
 
 async function load(){
-  if(editing) return;
+  if(editing||rv) return;
   try{ const r=await fetch("/api/journal/sheet"+($("paper").checked?"?paper=1":"")); data=await r.json(); }
   catch(e){ $("sheet").innerHTML='<div class="empty"><h3>Could not load the journal</h3><p>'+esc(e.message)+'</p></div>'; return }
   fillFilters(); render();
@@ -101,48 +153,61 @@ function fillFilters(){
 }
 function stats(){
   const s=data.stats||{}, net=Object.entries(s.net_by_currency||{});
-  const cells=[["Trades",s.trades??0,""],["Win rate",s.win_rate==null?"—":s.win_rate+"%",""],
+  const cells=[["To review",s.to_review??0,s.to_review?"neg":""],["Trades",s.trades??0,""],["Win rate",s.win_rate==null?"—":s.win_rate+"%",""],
     ["Total R",s.total_r==null?"—":(s.total_r>0?"+":"")+s.total_r+"R",s.total_r>0?"pos":s.total_r<0?"neg":""],
     ["Average R",s.avg_r==null?"—":(s.avg_r>0?"+":"")+s.avg_r+"R",s.avg_r>0?"pos":s.avg_r<0?"neg":""],
     ["Net P/L",net.length?net.map(([c,v])=>money(v)+" "+c).join(" · "):"—",net.length&&net[0][1]>0?"pos":net.length&&net[0][1]<0?"neg":""],
     ["Losing streak",s.max_losing_streak??0,""],["With / against desk",(s.with_desk??0)+" / "+(s.against_desk??0),""],
-    ["Needs stop",s.needs_stop??0,s.needs_stop?"neg":""]];
+    ["Discipline breaches",s.discipline_breaches??0,s.discipline_breaches?"neg":""],["Needs stop",s.needs_stop??0,s.needs_stop?"neg":""]];
   $("stats").innerHTML=cells.map(([l,v,c])=>`<div><span class="lb">${l}</span><span class="v ${c}">${esc(v)}</span></div>`).join("");
+  const n=s.to_review||0; $("reviewBtn").disabled=!n; $("reviewBtn").textContent=n?`Review ${n} trade${n>1?"s":""}`:"All reviewed";
 }
-const COLS=[["status","Status"],["opened","Opened"],["account","Account"],["instrument","Instrument"],["side","Side"],
+const COLS=[["status","Status"],["opened","Opened"],["instrument","Trade"],
   ["volume","Size","n"],["entry","Entry","n"],["stop","Stop","n"],["exit","Exit","n"],["risk","Risk","n"],["net","Net P/L","n"],
-  ["r","R","n"],["setup","Desk at entry"],["session","Session"],["emotion","Emotion"],["notes","Notes"]];
+  ["r","R","n"],["setup","Desk at entry"],["flags","Flags"],["emotion","Emotion"],["notes","Notes"]];
 function rowsView(){
-  let rows=data.rows.filter(r=>(filter==="all"||r.status===filter)&&(!$("acct").value||r.account===$("acct").value)
-    &&(!$("inst").value||r.instrument===$("inst").value));
-  rows.sort((a,b)=>{ const x=a[sortKey],y=b[sortKey]; if(x==null&&y==null) return 0; if(x==null) return 1; if(y==null) return -1;
+  let rows=data.rows.filter(r=>(filter==="all"||r.status===filter||(filter==="To review"&&r.review==="To review"))
+    &&(!$("acct").value||r.account===$("acct").value)&&(!$("inst").value||r.instrument===$("inst").value));
+  rows.sort((a,b)=>{ let x=a[sortKey],y=b[sortKey]; if(Array.isArray(x)){x=x.length;y=y.length}
+    if(x==null&&y==null) return 0; if(x==null) return 1; if(y==null) return -1;
     return (typeof x==="number"?x-y:String(x).localeCompare(String(y)))*sortDir });
   return rows;
+}
+function statusPill(r){
+  if(r.origin==="Desk paper") return '<span class="pill paper">Desk paper</span>';
+  const p=r.status==="Complete"?'<span class="pill ok">Complete</span>':r.status==="No stop used"?'<span class="pill no">No stop</span>':'<span class="pill need">Needs stop</span>';
+  return p+(r.review==="To review"?` <button class="mini" data-review="${esc(r.id)}">Review</button>`:"");
 }
 function render(){
   stats();
   const rows=rowsView();
   if(!data.rows.length){
-    $("sheet").innerHTML=`<div class="empty"><h3>No trades yet</h3><p>Your trades appear here by themselves once TradingView
-      trade sync is running (<code>tools/start_tradingview_sync.ps1</code>) or a broker import arrives. Nothing to type: each
-      trade is matched to the desk's view at entry and its risk is worked out for you.</p></div>`; return }
+    $("sheet").innerHTML=`<div class="empty"><h3>No trades yet</h3><p>Your trades appear here by themselves once a broker is
+      connected or TradingView trade sync is running. Each trade is matched to the desk's view at entry, its risk is worked
+      out for you, and a draft note is written for you to accept or edit.</p></div>`; return }
   const emo=data.emotions||[];
   const head="<tr>"+COLS.map(([k,l,n])=>`<th class="${n||""}" data-k="${k}">${l}${sortKey===k?`<span class="ar">${sortDir>0?"▲":"▼"}</span>`:""}</th>`).join("")+"</tr>";
   const body=rows.map(r=>{
-    const st=r.origin==="Desk paper"?'<span class="pill paper">Desk paper</span>':r.status==="Complete"?'<span class="pill ok">Complete</span>':'<span class="pill need">Needs stop</span>';
+    const paper=r.origin==="Desk paper", id=esc(r.id);
     const al=r.setup.startsWith("With")?"with":r.setup.startsWith("Against")?"against":"";
-    const dp=Number.isInteger(r.dp)?r.dp:(r.entry!=null&&Math.abs(r.entry)<10?5:r.entry!=null&&Math.abs(r.entry)<1000?3:2);
-    const stopCell=`<input class="cell num${r.status==="Needs stop"?" need":""}" data-id="${esc(r.id)}" data-f="stop" value="${r.stop==null?"":Number(r.stop).toFixed(dp)}" placeholder="${r.status==="Needs stop"?"add stop":""}" inputmode="decimal" aria-label="Stop for ${esc(r.instrument)}">`;
-    const locked=r.status!=="Complete";
-    const emoCell=locked?'<span class="mut">—</span>':`<select class="cell" data-id="${esc(r.id)}" data-f="emotion" aria-label="Emotion"><option value=""></option>${emo.map(e=>`<option${e===r.emotion?" selected":""}>${e}</option>`).join("")}</select>`;
-    const noteCell=locked?'<span class="mut">after the stop</span>':`<input class="cell" data-id="${esc(r.id)}" data-f="notes" value="${esc(r.notes)}" placeholder="add a note" aria-label="Notes">`;
-    return `<tr><td>${st}</td><td>${when(r.opened)}</td><td>${esc(r.account)}</td><td title="${esc(r.instrument_raw)}"><b>${esc(r.instrument)}</b></td>
-      <td><span class="side ${esc(r.side)}">${esc(r.side)}</span></td><td class="n">${num(r.volume)}</td><td class="n">${num(r.entry,dp)}</td>
+    const dp=dpOf(r);
+    const stopCell=paper?num(r.stop,dp):r.status==="No stop used"
+      ?`<div class="stopwrap"><span class="mut">none</span><button class="mini" data-nostop="${id}" data-on="0" title="Undo: add a stop instead">Undo</button></div>`
+      :`<div class="stopwrap"><input class="cell num${r.status==="Needs stop"?" need":""}" data-id="${id}" data-f="stop" value="${r.stop==null?"":Number(r.stop).toFixed(dp)}" placeholder="add stop" inputmode="decimal" aria-label="Stop for ${esc(r.instrument)}">${tag(r.stop_by)}</div>`
+        +(r.status==="Needs stop"?`<button class="mini" data-nostop="${id}" data-on="1">No stop used</button>`:"");
+    const sug=!r.emotion&&r.emotion_suggest;
+    const emoCell=paper?esc(r.emotion):`<select class="cell" data-id="${id}" data-f="emotion" aria-label="Emotion">
+      <option value="">Pick…</option>${emo.map(e=>`<option${e===r.emotion?" selected":""}>${e}</option>`).join("")}</select>`
+      +(r.emotion?tag("You"):sug?`<button class="mini go" data-emo="${id}" data-v="${esc(r.emotion_suggest)}">Confirm ${esc(r.emotion_suggest)}</button>`:"");
+    const noteCell=paper?esc(r.notes):`<textarea class="cell" rows="2" data-id="${id}" data-f="notes" placeholder="${esc(r.notes_draft)}" aria-label="Notes">${esc(r.notes)}</textarea>`
+      +(r.notes?tag("You"):`${tag("Draft")} <button class="mini go" data-accept="${id}">Accept draft</button>`);
+    return `<tr><td>${statusPill(r)}</td><td>${when(r.opened)}</td><td title="${esc(r.instrument_raw)}"><span class="side ${esc(r.side)}">${esc(r.side)}</span> <b>${esc(r.instrument)}</b><div class="hint">${esc(r.account)}</div></td><td class="n">${num(r.volume)}</td><td class="n">${num(r.entry,dp)}</td>
       <td class="n">${stopCell}</td><td class="n">${num(r.exit,dp)}</td><td class="n">${r.risk==null?"":money(r.risk)}</td>
       <td class="n ${r.net>0?"pos":r.net<0?"neg":""}">${r.net==null?"":money(r.net)}</td>
       <td class="n ${r.r>0?"pos":r.r<0?"neg":""}"><b>${r.r==null?"":(r.r>0?"+":"")+r.r.toFixed(2)}</b></td>
-      <td><span class="al ${al}" title="${esc(r.conditions)}">${esc(r.setup)}</span></td><td>${esc(r.session)}</td>
-      <td>${emoCell}</td><td class="wrap">${noteCell}</td></tr>`}).join("");
+      <td><span class="al ${al}" title="${esc(r.conditions)}">${esc(r.setup)}</span><div class="hint">${esc(r.session)}</div></td>
+      <td style="white-space:normal;min-width:120px">${(r.flags||[]).map(flagChip).join("")||'<span class="mut">—</span>'}</td>
+      <td class="emo">${emoCell}</td><td class="wrap">${noteCell}</td></tr>`}).join("");
   $("sheet").innerHTML=`<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }
 async function save(el){
@@ -150,23 +215,96 @@ async function save(el){
   const row=data.rows.find(r=>r.id===id); if(!row) return;
   const before=field==="stop"?(row.stop==null?"":String(row.stop)):field==="emotion"?row.emotion:row.notes;
   if(value===String(before??"")||(field==="stop"&&row.stop!=null&&Number(value)===Number(row.stop))) return;
-  if(field==="stop"&&!value) return;
-  try{ const r=await fetch("/api/journal/update",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,field,value})});
-    const j=await r.json(); if(!j.ok) throw new Error(j.error||"not saved");
+  if((field==="stop"||field==="emotion")&&!value) return;
+  try{ const j=await api("/api/journal/update",{id,field,value});
     toast(j.journaled?"Added to the journal":"Saved"); editing=false; load();
   }catch(e){ toast(e.message,true) }
 }
 document.addEventListener("focusin",e=>{ if(e.target.classList.contains("cell")) editing=true });
 document.addEventListener("focusout",e=>{ if(e.target.classList.contains("cell")){ editing=false; if(e.target.tagName!=="SELECT") save(e.target) } });
 document.addEventListener("change",e=>{ if(e.target.tagName==="SELECT"&&e.target.classList.contains("cell")) save(e.target) });
-document.addEventListener("keydown",e=>{ if(e.key==="Enter"&&e.target.classList.contains("cell")) e.target.blur() });
+document.addEventListener("keydown",e=>{ if(e.key==="Enter"&&e.target.classList.contains("cell")&&(e.target.tagName!=="TEXTAREA"||e.ctrlKey||e.metaKey)){ e.preventDefault(); e.target.blur() } });
 document.querySelector(".seg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return;
   filter=b.dataset.f; document.querySelectorAll(".seg button").forEach(x=>x.classList.toggle("on",x===b)); render() });
 $("acct").onchange=render; $("inst").onchange=render; $("paper").onchange=load;
-$("sheet").addEventListener("click",e=>{ const th=e.target.closest("th"); if(!th) return;
-  const k=th.dataset.k; if(sortKey===k) sortDir*=-1; else { sortKey=k; sortDir=-1 } render() });
-$("sync").onclick=async()=>{ const r=await fetch("/api/journal/sync",{method:"POST"}); const j=await r.json();
-  toast(j.journaled?j.journaled+" trade(s) journalled":"Nothing new to journal"); load() };
+$("sheet").addEventListener("click",async e=>{
+  const th=e.target.closest("th");
+  if(th){ const k=th.dataset.k; if(sortKey===k) sortDir*=-1; else { sortKey=k; sortDir=-1 } return render() }
+  const b=e.target.closest("button"); if(!b) return;
+  try{
+    if(b.dataset.review) return openReview(b.dataset.review);
+    if(b.dataset.nostop){ await api("/api/journal/update",{id:b.dataset.nostop,field:"no_stop",value:b.dataset.on}); toast(b.dataset.on==="1"?"Marked as no stop used":"Stop can be added again") }
+    else if(b.dataset.emo){ await api("/api/journal/update",{id:b.dataset.emo,field:"emotion",value:b.dataset.v}); toast("Emotion confirmed") }
+    else if(b.dataset.accept){ const r=data.rows.find(x=>x.id===b.dataset.accept); await api("/api/journal/update",{id:r.id,field:"notes",value:r.notes_draft}); toast("Draft saved as your note") }
+    editing=false; load();
+  }catch(err){ toast(err.message,true) }
+});
+$("sync").onclick=async()=>{ try{ const j=await api("/api/journal/sync");
+  toast(j.journaled?j.journaled+" trade(s) journalled":"Nothing new to journal") }catch(e){ toast(e.message,true) } load() };
+
+/* ---------------- review card: one trade at a time ---------------- */
+$("reviewBtn").onclick=()=>{ queue=data.rows.filter(r=>r.review==="To review").sort((a,b)=>(a.closed||a.opened).localeCompare(b.closed||b.opened)).map(r=>r.id); qi=0; if(queue.length) showCard() };
+function openReview(id){ queue=[id]; qi=0; showCard() }
+function showCard(){
+  const r=data.rows.find(x=>x.id===queue[qi]); if(!r) return closeCard();
+  const dp=dpOf(r), p=r.path||{}, emo=data.emotions||[];
+  rv={id:r.id, emotion:r.emotion||"", noStop:r.status==="No stop used"};
+  $("card").innerHTML=`
+    <h2 id="rvTitle"><span class="side ${esc(r.side)}">${esc(r.side)}</span> ${esc(r.instrument)} <span class="hint" style="margin-left:auto">${qi+1} of ${queue.length}</span></h2>
+    <div class="meta">${when(r.opened)} to ${when(r.closed)} · ${esc(r.account)} · ${esc(r.setup)}${r.session?" · "+esc(r.session):""}</div>
+    <div class="grid">
+      <div><span class="lb">Entry</span><span class="v">${num(r.entry,dp)}</span></div>
+      <div><span class="lb">Exit</span><span class="v">${num(r.exit,dp)}</span></div>
+      <div><span class="lb">Net P/L</span><span class="v ${r.net>0?"pos":r.net<0?"neg":""}">${r.net==null?"—":money(r.net)+" "+esc(r.currency)}</span></div>
+      <div><span class="lb">Result</span><span class="v ${r.r>0?"pos":r.r<0?"neg":""}">${r.r==null?"—":(r.r>0?"+":"")+r.r.toFixed(2)+"R"}</span></div>
+      ${p.best_r!=null?`<div><span class="lb">Best / worst</span><span class="v">${p.best_r>0?"+":""}${p.best_r} / ${p.worst_r>0?"+":""}${p.worst_r}R</span></div>`:""}
+      ${p.target_hit!=null?`<div><span class="lb">Desk target</span><span class="v">${p.target_hit?"Reached":"Not reached"}</span></div>`:""}
+    </div>
+    ${(r.flags||[]).length?`<div class="fld"><label>Flags</label>${r.flags.map(flagChip).join("")}</div>`:""}
+    <div class="fld"><label for="rvStop">Stop ${tag(r.stop_by)}</label>
+      <div class="acts" style="margin:0"><input class="inp" id="rvStop" inputmode="decimal" style="width:140px;font-family:var(--nc-mono)" value="${r.stop==null?"":Number(r.stop).toFixed(dp)}" placeholder="stop price">
+      <label class="chk"><input type="checkbox" id="rvNoStop" ${rv.noStop?"checked":""} ${r.status==="Complete"?"disabled":""}> No stop used</label></div></div>
+    <div class="fld"><label>Emotion ${r.emotion?tag("You"):r.emotion_suggest?tag("Suggested"):""}</label>
+      <div class="chips">${emo.map((e,i)=>`<button type="button" class="chip${e===rv.emotion?" on":""}${!r.emotion&&e===r.emotion_suggest?" sug":""}" data-e="${esc(e)}"><kbd>${i+1}</kbd>${esc(e)}</button>`).join("")}</div></div>
+    <div class="fld"><label for="rvNotes">Notes ${r.notes?tag("You"):tag("Draft")}</label>
+      <textarea class="inp" id="rvNotes">${esc(r.notes||r.notes_draft)}</textarea>
+      <div class="acts"><button type="button" class="mini" id="rvClaude">Rewrite with Claude</button><span class="hint" id="rvHint"></span></div></div>
+    <div class="acts" style="margin-top:14px">
+      <span class="hint">1 to 8 pick an emotion · Enter saves · Esc closes</span><span class="sp"></span>
+      <button type="button" class="nc-pill" id="rvSkip">Skip</button>
+      <button type="button" class="primary" id="rvSave">${qi+1<queue.length?"Save and next":"Save"}</button>
+    </div>`;
+  $("scrim").classList.add("on");
+  $("card").querySelectorAll(".chip").forEach(c=>c.onclick=()=>pickEmotion(c.dataset.e));
+  $("rvSkip").onclick=next; $("rvSave").onclick=saveCard;
+  $("rvNoStop").onchange=e=>{ $("rvStop").disabled=e.target.checked };
+  $("rvStop").disabled=rv.noStop;
+  $("rvClaude").onclick=async()=>{ $("rvHint").textContent="Writing…";
+    try{ const j=await api("/api/journal/draft",{id:r.id}); $("rvNotes").value=j.draft;
+      $("rvHint").textContent=j.by==="claude"?"Rewritten by Claude. Edit freely.":"No Claude key on this desk; showing the template draft." }
+    catch(e){ $("rvHint").textContent=e.message } };
+  setTimeout(()=>$("rvSave").focus(),30);
+}
+function pickEmotion(e){ rv.emotion=e; $("card").querySelectorAll(".chip").forEach(c=>c.classList.toggle("on",c.dataset.e===e)) }
+async function saveCard(){
+  const body={id:rv.id, emotion:rv.emotion, notes:$("rvNotes").value.trim()};
+  if($("rvNoStop").checked&&!$("rvNoStop").disabled) body.no_stop=true; else if($("rvStop").value.trim()) body.stop=$("rvStop").value.trim();
+  if(!body.no_stop&&!body.stop){ toast("Add the stop or tick No stop used",true); return $("rvStop").focus() }
+  if(!body.emotion){ toast("Pick how you felt (keys 1 to 8)",true); return }
+  try{ const j=await api("/api/journal/review",body); toast(j.journaled?"Reviewed and added to the journal":"Reviewed");
+    const r=await fetch("/api/journal/sheet"+($("paper").checked?"?paper=1":"")); data=await r.json(); next() }
+  catch(e){ toast(e.message,true) }
+}
+function next(){ qi++; if(qi<queue.length) showCard(); else closeCard() }
+function closeCard(){ $("scrim").classList.remove("on"); rv=null; queue=[]; load() }
+$("scrim").addEventListener("click",e=>{ if(e.target===$("scrim")) closeCard() });
+document.addEventListener("keydown",e=>{
+  if(!rv) return;
+  if(e.key==="Escape") return closeCard();
+  const inText=e.target.tagName==="TEXTAREA"||(e.target.tagName==="INPUT"&&e.target.type!=="checkbox");
+  if(!inText&&/^[1-8]$/.test(e.key)){ const em=(data.emotions||[])[Number(e.key)-1]; if(em){ e.preventDefault(); pickEmotion(em) } }
+  if(e.key==="Enter"&&(!inText||e.ctrlKey||e.metaKey||e.target.id==="rvStop")){ e.preventDefault(); saveCard() }
+});
 load(); setInterval(load,30000);
 </script>
 </body></html>

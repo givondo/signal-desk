@@ -537,7 +537,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
           <button type="button" @click="refreshNow" :disabled="refreshing">{{ refreshing?'…':'↻' }}</button></span>
         <span class="clockline">{{ clock }} UTC · 15m {{ countdown }}</span>
         <a class="tvlink here" href="/" aria-current="page" style="text-decoration:none">Desk</a>
-        <a class="tvlink" href="/journal" :title="inboxN?inboxN+' trade(s) need a stop before they count':'Your trades, journalled automatically'" style="text-decoration:none">Journal<span v-if="inboxN" class="inboxbadge">{{ inboxN }}</span></a>
+        <a class="tvlink" href="/journal" :title="inboxN?inboxN+' trade(s) waiting for your review':'Your trades, journalled automatically'" style="text-decoration:none">Journal<span v-if="inboxN" class="inboxbadge">{{ inboxN }}</span></a>
         <button type="button" class="tvlink agentbtn" :class="{on:agentOpen}" @click="toggleAgent()" title="Agent desk: run tools, see what ChatGPT and Claude are doing, connect new agents (Ctrl+K)">
           <span class="adot" :class="{hot:agentUnread>0}"></span>Agents<span v-if="agentUnread" class="inboxbadge">{{ agentUnread }}</span>
         </button>
@@ -1190,8 +1190,8 @@ const app=createApp({
     chipDir(s){ const r=this.roster.find(x=>x.sym===s); return r&&r.direction==='LONG'?'dirL':r&&r.direction==='SHORT'?'dirS':'mut' },
     chipDirLabel(s){ const r=this.roster.find(x=>x.sym===s); if(!r||!r.direction)return '·'; return r.direction==='LONG'?'L':r.direction==='SHORT'?'S':'N' },
     async fetchInbox(){
-      try{ const r=await fetch('/api/tracker/fills/pending'); if(!r.ok) return;
-        const j=await r.json(); this.inboxN=(j.fills||[]).length; }catch(e){}
+      try{ const r=await fetch('/api/journal/queue'); if(!r.ok) return;
+        const j=await r.json(); this.inboxN=j.count||0; }catch(e){}
     },
     async fetchRoster(){ try{
       const r=await fetch('/api/roster'); this.roster=(await r.json()).symbols||[];

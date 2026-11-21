@@ -32,7 +32,7 @@ html[data-theme="dark"]{--bg:#0b0d10;--p1:#12161d;--p2:#181e28;--p3:#222a36;--bd
 --gt:rgba(52,211,153,.14);--rt:rgba(248,113,113,.14);--at:rgba(251,191,36,.16);--bt:rgba(96,165,250,.14);
 --shadow:0 1px 2px rgba(0,0,0,.25),0 4px 20px rgba(0,0,0,.35);--shadow-lg:0 12px 40px rgba(0,0,0,.5);--header-bg:rgba(18,22,29,.92)}
 /* older page variables, mapped onto the shared tokens (tracker and router) */
-:root,html[data-theme="dark"]{--font:var(--nc-font);--mono:var(--nc-mono);--r:var(--radius);
+:root,html[data-theme="dark"]{--font:var(--nc-font);--mono:var(--nc-mono);
 --card:var(--p1);--soft:var(--p2);--soft2:var(--p3);--line:var(--bd);--line2:var(--bd2);--ink:var(--tx);--ink2:var(--tx);
 --mute:var(--dim);--mute2:var(--dim2);--brand:var(--b);--brand2:var(--bt);--good:var(--g);--goodbg:var(--gt);
 --warn:var(--a);--warnbg:var(--at);--bad:var(--r);--badbg:var(--rt);--info:var(--b);--infobg:var(--bt)}

@@ -325,7 +325,10 @@ class AutoJournal(unittest.TestCase):
         self.assertAlmostEqual(row["risk"], 100.0)                # 10 points x $10 per point from the trade's own P/L
         self.assertAlmostEqual(row["r"], 1.8)
         self.assertTrue(row["setup"].startswith("With desk LONG"))
-        self.assertIn("desk stop", row["notes"])
+        self.assertEqual(row["stop_by"], "Desk")                  # provenance tag, notes stay the trader's
+        self.assertEqual(row["notes"], "")
+        self.assertEqual(row["notes_by"], "Draft")
+        self.assertIn("Lesson to consider", row["notes_draft"])
 
     def test_against_the_desk_waits_for_a_stop_then_joins_on_edit(self):
         tid = "S" + os.urandom(3).hex()
@@ -358,3 +361,92 @@ class AutoJournal(unittest.TestCase):
         ok, res = sd.connect_service().run_tool("get_journal", {"limit": 5}, client="test")
         self.assertTrue(ok, res)
         self.assertIn("stats", res)
+
+
+class JournalAutofill(unittest.TestCase):
+    """Stop, emotion and notes: filled automatically where the data allows, always editable by the trader."""
+
+    def setUp(self):
+        seed()
+        self.t0 = int(time.time()) - 5 * 3600
+        sd.journal_service().last_snap.pop("XAUUSD", None)
+        sd.journal_service().record_desk({"XAUUSD": fake_signal()}, now=self.t0 - 120)
+
+    def iso(self, ts):
+        return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ts))
+
+    def fill(self, s, tid, **kw):
+        f = {"broker_trade_id": tid, "instrument": "OANDA:XAUUSD", "direction": "SELL", "volume": 1,
+             "entry_price": 2650.0, "exit_price": 2655.0, "gross_pl": -50.0, "net_pl": -50.0,
+             "open_time_utc": self.iso(self.t0), "close_time_utc": self.iso(self.t0 + 600)}
+        f.update(kw)
+        st, out = post(s.port, "/api/tracker/import/fills", {"source": "tradingview", "broker": "Paper",
+                                                            "account_label": "TV-PAPER", "account_type": "PAPER",
+                                                            "fills": [f]})
+        self.assertEqual(st, 200, out)
+
+    def row(self, s, tid):
+        return next(r for r in get(s.port, "/api/journal/sheet")["rows"] if r["id"].endswith(tid.upper()))
+
+    def test_emotion_and_notes_editable_before_the_stop(self):
+        tid = "E" + os.urandom(3).hex()
+        with DeskServer() as s:
+            self.fill(s, tid)                       # short against a LONG desk: no desk stop, stays pending
+            r = self.row(s, tid)
+            self.assertEqual(r["status"], "Needs stop")
+            self.assertEqual(r["review"], "To review")
+            self.assertIn("Against desk", r["flags"])
+            self.assertEqual(post(s.port, "/api/journal/update", {"id": r["id"], "field": "emotion", "value": "Anxious"})[0], 200)
+            self.assertEqual(post(s.port, "/api/journal/update", {"id": r["id"], "field": "notes", "value": "Chased the drop"})[0], 200)
+            r = self.row(s, tid)
+            self.assertEqual((r["emotion"], r["emotion_by"]), ("Anxious", "You"))
+            self.assertEqual((r["notes"], r["notes_by"]), ("Chased the drop", "You"))
+            # adding the stop journals it and carries the emotion and notes across
+            st, out = post(s.port, "/api/journal/update", {"id": r["id"], "field": "stop", "value": "2660"})
+            self.assertTrue(out.get("journaled"), out)
+            r = self.row(s, tid)
+            self.assertEqual(r["status"], "Complete")
+            self.assertEqual(r["stop_by"], "You")
+            self.assertEqual(r["emotion"], "Anxious")
+            self.assertEqual(r["notes"], "Chased the drop")
+            self.assertEqual(r["review"], "Reviewed")
+
+    def test_no_stop_used_and_revenge_flag(self):
+        a, b = "A" + os.urandom(3).hex(), "B" + os.urandom(3).hex()
+        with DeskServer() as s:
+            self.fill(s, a)                                               # a loss
+            self.fill(s, b, open_time_utc=self.iso(self.t0 + 900),        # 5 minutes after it closed, bigger size
+                      close_time_utc=self.iso(self.t0 + 1500), volume=2, gross_pl=-40.0, net_pl=-40.0,
+                      entry_price=2652.0, exit_price=2654.0)
+            rb = self.row(s, b)
+            self.assertIn("Revenge", rb["flags"])
+            self.assertEqual(rb["emotion_suggest"], "Revenge")
+            self.assertEqual(rb["emotion"], "")                           # never set automatically
+            self.assertIn("cooling-off", rb["notes_draft"])
+            st, out = post(s.port, "/api/journal/review", {"id": rb["id"], "no_stop": True, "emotion": "Revenge",
+                                                           "notes": rb["notes_draft"]})
+            self.assertEqual(st, 200, out)
+            rb = self.row(s, b)
+            self.assertEqual(rb["status"], "No stop used")
+            self.assertIn("No stop", rb["flags"])
+            self.assertEqual(rb["review"], "Reviewed")
+            sheet = get(s.port, "/api/journal/sheet")
+            self.assertGreaterEqual(sheet["stats"]["no_stop"], 1)
+            self.assertGreaterEqual(sheet["stats"]["discipline_breaches"], 1)
+            q = get(s.port, "/api/journal/queue")
+            self.assertEqual(q["count"], sheet["stats"]["to_review"])
+
+    def test_broker_stop_widened_is_flagged(self):
+        tid = "M" + os.urandom(3).hex()
+        with DeskServer() as s:
+            self.fill(s, tid, direction="BUY", entry_price=2650.0, exit_price=2635.0, stop_loss=2635.0,
+                      gross_pl=-150.0, net_pl=-150.0, initial_risk_amount=150.0,
+                      raw=json.dumps({"stop_initial": 2640.0}))
+            r = self.row(s, tid)
+            self.assertEqual(r["status"], "Complete")
+            self.assertEqual(r["stop_by"], "Broker")
+            self.assertIn("Moved stop", r["flags"])
+            self.assertEqual(r["emotion_suggest"], "Anxious")
+            st, out = post(s.port, "/api/journal/draft", {"id": r["id"]})
+            self.assertEqual(out["by"], "template")
+            self.assertIn("widened", out["draft"])

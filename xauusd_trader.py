@@ -2264,7 +2264,7 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path.startswith("/api/agent/"):
             return self._agent_post(parsed)
-        if parsed.path in ("/api/journal/update", "/api/journal/sync"):
+        if parsed.path in ("/api/journal/update", "/api/journal/sync", "/api/journal/review", "/api/journal/draft"):
             ln = int(self.headers.get("Content-Length", 0) or 0)
             try:
                 body = json.loads(self.rfile.read(ln) or b"{}") if ln <= TRACKER_MAX_BODY else {}
@@ -2274,6 +2274,10 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 if parsed.path == "/api/journal/sync":
                     out = {"ok": True, **jn.auto_pass(force=True)}
+                elif parsed.path == "/api/journal/review":
+                    out = jn.review(str(body.get("id") or ""), body)
+                elif parsed.path == "/api/journal/draft":
+                    out = jn.draft_with_claude(str(body.get("id") or ""))
                 else:
                     out = jn.update(str(body.get("id") or ""), str(body.get("field") or ""), body.get("value"))
                 return self._send(json.dumps(out).encode(), "application/json")
@@ -2428,6 +2432,9 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 body = b"<h3>journal.html missing</h3>"
             self._send(body, "text/html; charset=utf-8")
+        elif parsed.path == "/api/journal/queue":
+            q = journal_service().queue()
+            self._send(json.dumps({"count": q["count"]}).encode(), "application/json")
         elif parsed.path == "/api/journal/sheet":
             paper = (qs.get("paper") or ["0"])[0] in ("1", "true")
             self._send(json.dumps(journal_service().sheet(include_paper=paper), default=str).encode(),
