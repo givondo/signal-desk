@@ -25,6 +25,11 @@ body{min-height:100vh;display:flex;flex-direction:column}
 .cta[disabled]{opacity:.5;cursor:default}
 .btn2{font:600 12.5px var(--nc-font);padding:7px 12px;border:1px solid var(--bd2);border-radius:7px;background:var(--p2);color:var(--tx);cursor:pointer}
 .btn2:hover{background:var(--p3)}.btn2.danger{color:var(--r);border-color:var(--r)}
+.gbtn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;font:600 14px var(--nc-font);padding:10px;
+border:1px solid var(--bd2);border-radius:8px;background:var(--p1);color:var(--tx);cursor:pointer;text-decoration:none}
+.gbtn:hover{background:var(--p2)}
+.or{display:flex;align-items:center;gap:10px;color:var(--dim2);font-size:11.5px;margin:14px 0}
+.or:before,.or:after{content:"";flex:1;height:1px;background:var(--bd)}
 .alt{text-align:center;font-size:12.5px;color:var(--dim);margin-top:16px}
 .alt a,.box a{color:var(--b);text-decoration:none}.alt a:hover{text-decoration:underline}
 .msg{display:none;font-size:12.5px;padding:9px 11px;border-radius:8px;margin-bottom:12px;line-height:1.5}
@@ -102,7 +107,12 @@ def _field(name, label, typ="text", auto="", help_="", extra=""):
             + (f'<div class="help">{help_}</div>' if help_ else "") + "</div>")
 
 
-def signin(mode, has_users, smtp):
+def _google_block(href, label):
+    return (f'<a class="gbtn" id="gbtn" href="{html.escape(href)}">{html.escape(label)}</a>'
+            '<div class="or">or with email</div>')
+
+
+def signin(mode, has_users, smtp, google=False):
     if not has_users:
         return setup_page(True)
     signup_link = ('<div class="alt">New here? <a href="/signup">Create an account</a></div>'
@@ -110,16 +120,18 @@ def signin(mode, has_users, smtp):
     inner = f"""<main class="auth"><div class="box">
 <h1>Sign in</h1><p class="lead">Your desk, journal and broker connections.</p>
 <div id="msg" class="msg" role="alert"></div>
+{_google_block("/auth/google/start", "Continue with Google") if google else ""}
 <form id="f" novalidate>
 {_field("email", "Email", "email", "email", extra='required autofocus')}
 {_field("password", "Password", "password", "current-password", extra='required')}
 <button class="cta" type="submit">Sign in</button></form>
 <div class="alt"><a href="/forgot">Forgot your password?</a></div>{signup_link}{FOOT}</div></main>"""
-    script = """<script>wire("f",async d=>{ await post("/api/auth/signin",d); location.href=nextUrl() })</script>"""
+    script = """<script>wire("f",async d=>{ await post("/api/auth/signin",d); location.href=nextUrl() });
+const g=document.getElementById("gbtn"); if(g) g.href="/auth/google/start?next="+encodeURIComponent(nextUrl());</script>"""
     return page("Sign in", inner, script)
 
 
-def signup(mode, invite=""):
+def signup(mode, invite="", google=False):
     if mode == "closed":
         inner = ('<main class="auth"><div class="box"><h1>Sign-up is closed</h1><p class="lead">This desk is not '
                  'taking new accounts. <a href="/signin">Sign in</a> if you already have one.</p></div></main>')
@@ -131,6 +143,7 @@ def signup(mode, invite=""):
 <h1>Create your account</h1><p class="lead">Connect your broker and every trade you take is journalled for you,
 matched to the desk's view at entry. Read-only: Northchart never places trades.</p>
 <div id="msg" class="msg" role="alert"></div>
+{_google_block("/auth/google/start", "Sign up with Google") if google else ""}
 <form id="f" novalidate>
 {_field("name", "Your name", "text", "name", extra='required autofocus')}
 {_field("email", "Email", "email", "email", extra='required')}
@@ -141,7 +154,11 @@ matched to the desk's view at entry. Read-only: Northchart never places trades.<
 <p class="fine">By creating an account you accept the <a href="/legal/terms">terms</a> and the
 <a href="/legal/privacy">privacy notice</a>, and confirm you have read the <a href="/legal/risk">risk notice</a>.</p>
 </div></main>"""
-    script = """<script>wire("f",async d=>{ await post("/api/auth/signup",d); location.href="/account?welcome=1" })</script>"""
+    script = """<script>wire("f",async d=>{ await post("/api/auth/signup",d); location.href="/account?welcome=1" });
+const g=document.getElementById("gbtn");
+if(g) g.addEventListener("click",e=>{ const i=document.getElementById("invite");
+  if(i&&!i.value.trim()){ e.preventDefault(); show($("msg"),"Enter your invite code first, then choose Sign up with Google."); i.focus(); return }
+  g.href="/auth/google/start"+(i?"?invite="+encodeURIComponent(i.value.trim()):"") });</script>"""
     return page("Create account", inner, script)
 
 
@@ -203,7 +220,10 @@ def account():
 <section class="sec"><h2>Profile</h2><p class="lead" id="who">Loading…</p>
   <div class="row"><div class="f"><label for="name">Name</label><input id="name"></div>
   <button class="btn2" id="saveName">Save</button><button class="btn2" id="resend" hidden>Resend confirmation email</button>
-  <button class="btn2" id="signout">Sign out</button></div></section>
+  <button class="btn2" id="signout">Sign out</button></div>
+  <div class="row" id="gRow" hidden style="margin-top:12px;align-items:center"><span class="lead" style="margin:0;flex:1" id="gText"></span>
+  <a class="btn2" id="gLink" href="/auth/google/start?mode=link" style="text-decoration:none">Connect Google</a>
+  <button class="btn2" id="gUnlink" hidden>Disconnect Google</button></div></section>
 
 <section class="sec" id="brokers"><h2>Brokers and data</h2>
   <p class="lead">Connect the accounts you trade from and every closed trade lands in your journal by itself.
@@ -255,6 +275,10 @@ async function load(){
   $("who").innerHTML=`${escH(u.email)} · <span class="badge ${u.role==="owner"?"ok":"mut"}">${u.role==="owner"?"Owner":"Member"}</span> `+
     (u.verified?'<span class="badge ok">Email confirmed</span>':'<span class="badge warn">Email not confirmed</span>');
   $("name").value=u.name||""; $("resend").hidden=!!u.verified;
+  $("gRow").hidden=!me.google&&!u.google;
+  $("gText").innerHTML=u.google?`Signs in with Google as <b>${escH(u.google_email)}</b>`:"Sign in faster with your Google account.";
+  $("gLink").hidden=!!u.google; $("gUnlink").hidden=!u.google;
+  $("oldpw").closest(".f").hidden=!u.has_password; $("savePw").textContent=u.has_password?"Change password":"Set a password";
   $("invSec").hidden=!(u.role==="owner"&&me.signup_mode==="invite"); $("tvRow").hidden=u.role!=="owner";
   const t=await (await fetch("/api/auth/tokens")).json();
   $("toks").innerHTML=(t.tokens||[]).length?"<tr><th>Label</th><th>Created</th><th>Last used</th><th></th></tr>"+t.tokens.map(k=>
@@ -270,6 +294,8 @@ if(new URLSearchParams(location.search).get("welcome")) show($("welcome"),"Welco
 const act=(id,fn)=>$(id).onclick=async()=>{ try{ await fn() }catch(e){ flash(e.message) } };
 act("saveName",async()=>{ await post("/api/auth/profile",{name:$("name").value}); flash("Saved",true) });
 act("resend",async()=>{ await post("/api/auth/verify/resend"); flash("Confirmation email sent",true) });
+act("gUnlink",async()=>{ await post("/api/auth/google/unlink"); flash("Google disconnected",true); load() });
+if(new URLSearchParams(location.search).get("google")==="linked") show($("welcome"),"Google connected. You can now sign in with it.",true);
 act("signout",async()=>{ await post("/api/auth/signout"); location.href="/signin" });
 act("savePw",async()=>{ await post("/api/auth/password",{old:$("oldpw").value,new:$("newpw").value}); $("oldpw").value=$("newpw").value=""; flash("Password changed. Other devices were signed out.",true); load() });
 act("others",async()=>{ await post("/api/auth/sessions/revoke",{others:true}); flash("Signed out everywhere else",true); load() });
@@ -278,7 +304,7 @@ act("newTok",async()=>{ const j=await post("/api/auth/tokens",{label:$("tokLabel
 act("newInv",async()=>{ const j=await post("/api/auth/invites",{email:$("invEmail").value});
   const link=location.origin+"/signup?invite="+encodeURIComponent(j.code);
   $("invOut").innerHTML=`<p class="lead" style="margin:10px 0 0">Send this link; it is shown once.</p><code class="k">${escH(link)}</code>`; load() });
-act("del",async()=>{ const pw=prompt("Type your password to delete your account and journal from this desk. This cannot be undone.");
+act("del",async()=>{ const pw=prompt("Type your password (or, if you only use Google, your email address) to delete your account and journal from this desk. This cannot be undone.");
   if(!pw) return; await post("/api/auth/delete",{password:pw}); location.href="/signin" });
 document.addEventListener("click",async e=>{ const b=e.target.closest("button[data-tok],button[data-sid],button[data-inv]"); if(!b) return;
   try{ if(b.dataset.tok) await post("/api/auth/tokens/revoke",{id:b.dataset.tok});

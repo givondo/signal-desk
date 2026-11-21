@@ -177,7 +177,9 @@ class Accounts:
         if not u:
             return None
         return {"uid": u["uid"], "email": u["email"], "name": u.get("name") or "", "role": u.get("role"),
-                "verified": bool(u.get("verified")), "created": u.get("created")}
+                "verified": bool(u.get("verified")), "created": u.get("created"),
+                "google": bool(u.get("google_sub")), "google_email": u.get("google_email") or "",
+                "has_password": bool(u.get("pw"))}
 
     def user_dir(self, u) -> str:
         """Where this user's journal lives. The owner keeps the desk's existing journal."""
@@ -248,21 +250,80 @@ class Accounts:
                 raise AuthError("Sign-up is closed on this desk.")
             if self._limited("signup:" + ip):
                 raise AuthError("Too many attempts. Wait 15 minutes.")
-            inv_key = None
-            if mode == "invite":
-                inv_key = _h((invite or "").strip())
-                inv = self.data["invites"].get(inv_key)
-                if not inv or inv.get("used_by") or inv.get("exp", 0) < _now():
-                    self._fail("signup:" + ip)
-                    raise AuthError("That invite code is not valid. Ask the desk owner for a new one.")
-                if inv.get("email") and inv["email"] != (email or "").strip().lower():
-                    raise AuthError("This invite was issued for a different email address.")
+            inv_key = self._check_invite(invite, email, ip) if mode == "invite" else None
             u = self._new_user(email, name, password, "member", verified=False)
-            if inv_key:
-                self.data["invites"][inv_key]["used_by"] = u["uid"]
-                self.data["invites"][inv_key]["used_at"] = _now()
+            self._spend_invite(inv_key, u)
             self._save()
             return u
+
+    def _check_invite(self, invite, email, ip):
+        inv_key = _h((invite or "").strip())
+        inv = self.data["invites"].get(inv_key)
+        if not inv or inv.get("used_by") or inv.get("exp", 0) < _now():
+            self._fail("signup:" + ip)
+            raise AuthError("That invite code is not valid. Ask the desk owner for a new one.")
+        if inv.get("email") and inv["email"] != (email or "").strip().lower():
+            raise AuthError("This invite was issued for a different email address.")
+        return inv_key
+
+    def _spend_invite(self, inv_key, u):
+        if inv_key:
+            self.data["invites"][inv_key]["used_by"] = u["uid"]
+            self.data["invites"][inv_key]["used_at"] = _now()
+
+    def google_user(self, claims, invite="", ip="", mode="signin", uid=None):
+        """Sign in, sign up or link with a verified Google identity."""
+        sub, email = str(claims["sub"]), str(claims["email"]).strip().lower()
+        name = (claims.get("name") or "").strip()[:80]
+        with self.lock:
+            owner_of_sub = next((u for u in self.data["users"].values() if u.get("google_sub") == sub), None)
+            if mode == "link":
+                u = self.get(uid)
+                if not u:
+                    raise AuthError("Sign in first, then connect Google.")
+                if owner_of_sub and owner_of_sub["uid"] != u["uid"]:
+                    raise AuthError("That Google account is already connected to another Northchart account.")
+                u["google_sub"], u["google_email"] = sub, email
+                self._save()
+                return u, False
+            if owner_of_sub:
+                return owner_of_sub, False
+            u = self.by_email(email)
+            if u:                                   # Google has verified this address: connect it
+                u["google_sub"], u["google_email"], u["verified"] = sub, email, True
+                self._save()
+                return u, False
+            if not self.has_users():
+                raise AuthError("This desk has no owner yet. Create the owner account at /setup first.")
+            mode_ = self.signup_mode()
+            if mode_ == "closed":
+                raise AuthError("Sign-up is closed on this desk.")
+            if self._limited("signup:" + ip):
+                raise AuthError("Too many attempts. Wait 15 minutes.")
+            inv_key = None
+            if mode_ == "invite":
+                if not invite:
+                    raise AuthError("New accounts need an invite. Open the invite link from the desk owner, "
+                                    "then choose Continue with Google.")
+                inv_key = self._check_invite(invite, email, ip)
+            if not EMAIL_RE.match(email):
+                raise AuthError("Your Google account has no usable email address.")
+            new_uid = "u_" + secrets.token_hex(8)
+            u = {"uid": new_uid, "email": email, "name": name, "role": "member", "created": _now(),
+                 "verified": True, "pw": None, "google_sub": sub, "google_email": email}
+            self.data["users"][new_uid] = u
+            self._spend_invite(inv_key, u)
+            self._save()
+            return u, True
+
+    def unlink_google(self, uid):
+        with self.lock:
+            u = self.get(uid)
+            if not u.get("pw"):
+                raise AuthError("Set a password first, so you can still sign in without Google.")
+            u.pop("google_sub", None)
+            u.pop("google_email", None)
+            self._save()
 
     # ---------------------------------------------------------- sessions
     def login(self, email, password, ip, ua=""):
@@ -271,7 +332,9 @@ class Accounts:
             raise AuthError("Too many attempts. Wait 15 minutes and try again.")
         with self.lock:
             u = self.by_email(email)
-            ok = verify_password(password or "", u["pw"]) if u else verify_password(password or "", _DUMMY)
+            ok = verify_password(password or "", u.get("pw") or _DUMMY) if u else verify_password(password or "", _DUMMY)
+            if u and not u.get("pw") and u.get("google_sub"):
+                raise AuthError("This account signs in with Google. Use Continue with Google.")
             if not u or not ok:
                 self._fail("email:" + email, "ip:" + ip)
                 raise AuthError("Wrong email or password.")
@@ -336,7 +399,7 @@ class Accounts:
         if "@" not in u_name or self._limited("email:" + u_name.lower()):
             return None
         u = self.by_email(u_name)
-        if u and verify_password(pw, u["pw"]):
+        if u and u.get("pw") and verify_password(pw, u["pw"]):
             return u
         self._fail("email:" + u_name.lower())
         return None
@@ -464,7 +527,7 @@ class Accounts:
     def change_password(self, uid, old, new, keep_token=None):
         with self.lock:
             u = self.get(uid)
-            if not u or not verify_password(old or "", u["pw"]):
+            if not u or (u.get("pw") and not verify_password(old or "", u["pw"])):
                 raise AuthError("Your current password is not right.")
             prob = password_problem(new, u["email"])
             if prob:
@@ -483,8 +546,11 @@ class Accounts:
     def delete(self, uid, password):
         with self.lock:
             u = self.get(uid)
-            if not u or not verify_password(password or "", u["pw"]):
-                raise AuthError("Your password is not right.")
+            ok = verify_password(password or "", u["pw"]) if u and u.get("pw") else \
+                bool(u) and (password or "").strip().lower() == u["email"]
+            if not ok:
+                raise AuthError("Your password is not right." if u and u.get("pw") else
+                                "Type your email address to confirm.")
             if u.get("role") == "owner":
                 raise AuthError("The owner account holds the desk itself and cannot be deleted here.")
             del self.data["users"][uid]

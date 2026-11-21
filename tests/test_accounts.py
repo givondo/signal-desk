@@ -252,3 +252,106 @@ class Accounts(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MockGoogle:
+    """Stand-in for Google's token endpoint: returns an ID token for whatever nonce the desk sent."""
+    claims = {}
+
+    @classmethod
+    def start(cls):
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        import threading as th
+
+        class H(BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_POST(self):
+                form = urllib.parse.parse_qs(self.rfile.read(int(self.headers["Content-Length"])).decode())
+                if form.get("code") != ["good-code"] or not form.get("code_verifier"):
+                    self.send_response(400)
+                    self.end_headers()
+                    return
+                enc = lambda o: base64.urlsafe_b64encode(json.dumps(o).encode()).rstrip(b"=").decode()
+                tok = enc({"alg": "RS256"}) + "." + enc(MockGoogle.claims) + ".sig"
+                body = json.dumps({"id_token": tok, "access_token": "x"}).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+        srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+        th.Thread(target=srv.serve_forever, daemon=True).start()
+        return srv
+
+
+class GoogleSignIn(Accounts):
+    def setUp(self):
+        super().setUp()
+        self.g = MockGoogle.start()
+        os.environ.update({"GOOGLE_CLIENT_ID": "cid.apps.googleusercontent.com", "GOOGLE_CLIENT_SECRET": "sec",
+                           "GOOGLE_TOKEN_URL": f"http://127.0.0.1:{self.g.server_address[1]}/token"})
+        sd._google = None
+
+    def tearDown(self):
+        super().tearDown()
+        self.g.shutdown()
+        self.g.server_close()
+        for k in ("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_TOKEN_URL"):
+            os.environ.pop(k, None)
+
+    def google(self, s, browser, claims, query=""):
+        st, _, r = browser.req("GET", "/auth/google/start" + query, headers={"Accept": "text/html"})
+        self.assertEqual(st, 302)
+        loc = urllib.parse.urlsplit(r.getheader("Location"))
+        params = urllib.parse.parse_qs(loc.query)
+        self.assertEqual(params["code_challenge_method"], ["S256"])
+        self.assertTrue(params["redirect_uri"][0].endswith("/auth/google/callback"))
+        state_cookie = r.getheader("Set-Cookie").split(";")[0]
+        MockGoogle.claims = {"iss": "https://accounts.google.com", "aud": "cid.apps.googleusercontent.com",
+                             "exp": int(time.time()) + 600, "nonce": params["nonce"][0], "email_verified": True,
+                             **claims}
+        cb = "/auth/google/callback?" + urllib.parse.urlencode({"code": "good-code", "state": params["state"][0]})
+        return browser.req("GET", cb, headers={"Accept": "text/html", "Cookie": state_cookie +
+                                               ("; nc_s=" + browser.cookie if browser.cookie else "")})
+
+    def test_owner_email_links_and_member_needs_invite(self):
+        with DeskServer() as s:
+            owner = self.setup_owner(s)
+            g = Client(s.port)
+            self.assertIn("Continue with Google", g.req("GET", "/signin", headers={"Accept": "text/html"})[1].decode())
+            st, _, r = self.google(s, g, {"sub": "g-owner", "email": "david@example.com", "name": "David"})
+            self.assertEqual(st, 302, _)
+            self.assertEqual(r.getheader("Location"), "/")
+            self.assertEqual(g.req("GET", "/api/auth/me")[1]["user"]["role"], "owner")   # same verified email: linked
+            # a stranger without an invite is turned away
+            st, page, _ = self.google(s, Client(s.port), {"sub": "g-x", "email": "x@gmail.com"})
+            self.assertEqual(st, 400)
+            self.assertIn(b"invite", page)
+            # with an invite they get a member account, no password needed
+            code = owner.req("POST", "/api/auth/invites", {})[1]["code"]
+            m = Client(s.port)
+            st, _, r = self.google(s, m, {"sub": "g-amon", "email": "amon@gmail.com", "name": "Amon K"},
+                                   "?invite=" + urllib.parse.quote(code))
+            self.assertEqual(r.getheader("Location"), "/account?welcome=1")
+            me = m.req("GET", "/api/auth/me")[1]["user"]
+            self.assertEqual((me["role"], me["google"], me["has_password"], me["verified"]), ("member", True, False, True))
+            st, out, _ = Client(s.port).req("POST", "/api/auth/signin", {"email": "amon@gmail.com", "password": "anything-long"})
+            self.assertIn("Google", out["error"])
+            # they can set a password later, then disconnect Google
+            self.assertEqual(m.req("POST", "/api/auth/google/unlink", {})[0], 400)
+            self.assertEqual(m.req("POST", "/api/auth/password", {"old": "", "new": "new-member-pass-1"})[0], 200)
+            self.assertEqual(m.req("POST", "/api/auth/google/unlink", {})[0], 200)
+
+    def test_state_must_match_the_browser(self):
+        with DeskServer() as s:
+            self.setup_owner(s)
+            a = Client(s.port)
+            st, _, r = a.req("GET", "/auth/google/start", headers={"Accept": "text/html"})
+            state = urllib.parse.parse_qs(urllib.parse.urlsplit(r.getheader("Location")).query)["state"][0]
+            st, page, _ = Client(s.port).req("GET", "/auth/google/callback?code=good-code&state=" + state,
+                                             headers={"Accept": "text/html"})
+            self.assertEqual(st, 400)
+            self.assertIn(b"another browser", page)

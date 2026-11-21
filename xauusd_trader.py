@@ -471,6 +471,23 @@ def sync_all_brokers(min_age=600):
     enter_user(None)
 
 
+_google = None
+
+
+def _google_enabled():
+    import northchart_google as ng
+    return ng.enabled()
+
+
+def _google_service():
+    global _google
+    import northchart_google as ng
+    with _connect_lock:
+        if _google is None:
+            _google = ng.GoogleAuth()
+        return _google
+
+
 def _account_login(email, password):
     import northchart_accounts as na
     try:
@@ -2263,13 +2280,47 @@ class Handler(BaseHTTPRequestHandler):
 
     # ------------------------------------------------------------ accounts: pages and API
     AUTH_PAGES = ("/signin", "/signup", "/setup", "/forgot", "/reset", "/verify", "/account",
-                  "/legal/terms", "/legal/privacy", "/legal/risk")
+                  "/legal/terms", "/legal/privacy", "/legal/risk", "/auth/google/start", "/auth/google/callback")
 
     def _session_cookie(self, token, max_age=30 * 86400):
         parts = [f"nc_s={token}", "Path=/", "HttpOnly", "SameSite=Lax", f"Max-Age={max_age}"]
         if self._is_https():
             parts.append("Secure")
         return "; ".join(parts)
+
+    def _google(self, path, q, acc, pages, u, via, base):
+        import northchart_accounts as na
+        import northchart_google as ng
+        bad = lambda msg, st=400: self._send_full(st, "text/html; charset=utf-8", pages.message(
+            "Google sign-in", msg, "/signin", "Back to sign in"))
+        if not ng.enabled():
+            return bad("Google sign-in is not switched on for this desk yet. Sign in with email and password.")
+        nxt = q("next") if q("next").startswith("/") and not q("next").startswith("//") else "/"
+        if path == "/auth/google/start":
+            mode = "link" if q("mode") == "link" else "signin"
+            if mode == "link" and via != "session":
+                return bad("Sign in first, then connect Google from your account page.")
+            url, state = _google_service().start(base, nxt, q("invite")[:40], mode, u["uid"] if mode == "link" else None)
+            cookie = f"nc_g={state}; Path=/auth/google; HttpOnly; SameSite=Lax; Max-Age=600" + \
+                ("; Secure" if self._is_https() else "")
+            return self._send_full(302, "text/plain", b"", {"Location": url, "Set-Cookie": cookie})
+        if q("error"):
+            return bad("Google sign-in was cancelled.")
+        try:
+            claims, p = _google_service().finish(base, q("code"), q("state"), self._cookie("nc_g"))
+            user, created = acc.google_user(claims, p.get("invite") or "", self._client_ip(), p["mode"], p.get("uid"))
+        except (ValueError, na.AuthError) as e:
+            return bad(str(e))
+        if p["mode"] == "link":
+            dest = "/account?google=linked"
+            tok = self._cookie("nc_s")
+        else:
+            tok = acc.new_session(user["uid"], self._client_ip(), self.headers.get("User-Agent") or "")
+            dest = "/account?welcome=1" if created else (p.get("next") or "/")
+        headers = {"Location": dest}
+        if tok:
+            headers["Set-Cookie"] = self._session_cookie(tok)
+        return self._send_full(302, "text/plain", b"", headers)
 
     def _auth_http(self, method, parsed):
         """Handle sign-in pages and /api/auth/*. Returns True when the request was answered."""
@@ -2287,17 +2338,21 @@ class Handler(BaseHTTPRequestHandler):
                                                                json.dumps(obj, default=str).encode(), extra)
         u, via = self._identify()
         self.user, self.via = u, via
+        if method == "GET" and path.startswith("/auth/google/"):
+            return self._google(path, q, acc, pages, u, via, base) or True
         if method == "GET":
             if path == "/signin":
                 if u and via != "open" and acc.has_users():
                     return self._send_full(302, "text/plain", b"", {"Location": "/"}) or True
-                return html_(pages.signin(acc.signup_mode(), acc.has_users(), acc.smtp_ready())) or True
+                return html_(pages.signin(acc.signup_mode(), acc.has_users(), acc.smtp_ready(),
+                                          _google_enabled())) or True
             if path == "/setup":
                 if acc.has_users():
                     return self._send_full(302, "text/plain", b"", {"Location": "/signin"}) or True
                 return html_(pages.setup_page(bool(self._auth_creds()[1]))) or True
             if path == "/signup":
-                return html_(pages.signup(acc.signup_mode() if acc.has_users() else "closed", q("invite"))) or True
+                return html_(pages.signup(acc.signup_mode() if acc.has_users() else "closed", q("invite"),
+                                          _google_enabled())) or True
             if path == "/forgot":
                 return html_(pages.forgot(acc.smtp_ready())) or True
             if path == "/reset":
@@ -2312,11 +2367,11 @@ class Handler(BaseHTTPRequestHandler):
                 return html_(pages.legal(path.split("/")[-1])) or True
             if path == "/api/auth/state":
                 return js({"has_users": acc.has_users(), "signup_mode": acc.signup_mode(),
-                           "smtp": acc.smtp_ready()}) or True
+                           "smtp": acc.smtp_ready(), "google": _google_enabled()}) or True
             if path == "/api/auth/me":
                 return js({"user": acc.public(u) if via in ("session", "basic", "open") else None,
                            "signup_mode": acc.signup_mode(), "has_users": acc.has_users(),
-                           "via": via}) or True
+                           "via": via, "google": _google_enabled()}) or True
         # everything below needs a signed-in user
         public_post = ("/api/auth/signin", "/api/auth/signup", "/api/auth/setup", "/api/auth/forgot",
                        "/api/auth/reset")
@@ -2387,6 +2442,9 @@ class Handler(BaseHTTPRequestHandler):
                     return js({"ok": True}, 200, {"Set-Cookie": self._session_cookie("", 0)}) or True
                 if path == "/api/auth/profile":
                     acc.update_profile(uid, b("name"))
+                    return js({"ok": True}) or True
+                if path == "/api/auth/google/unlink":
+                    acc.unlink_google(uid)
                     return js({"ok": True}) or True
                 if path == "/api/auth/password":
                     acc.change_password(uid, b("old"), b("new"), keep_token=tok)
