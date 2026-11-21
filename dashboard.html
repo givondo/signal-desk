@@ -2,12 +2,14 @@
 <html lang="en" data-theme="light"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="Signal Desk — multi-asset trading terminal with live confluence scores, macro context, and performance analytics.">
+<meta name="description" content="Northchart: multi-asset charts, live confluence signals and an agent desk that works with ChatGPT and Claude.">
 <meta name="theme-color" content="#ffffff" id="meta-theme">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>SIGNAL DESK</title>
+<title>Northchart</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230b0d10'/%3E%3Ctext x='32' y='44' font-size='30' font-weight='bold' text-anchor='middle' fill='%23c9a227' font-family='Consolas'%3ESD%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -70,11 +72,15 @@ cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:
 .clusters .cl{padding:2px 7px;border-radius:var(--radius-sm);border:1px solid var(--bd);color:var(--dim)}
 .clusters .cl.full{border-color:var(--a);color:var(--a)}
 .clusters .cl small{color:var(--dim2);margin-left:3px}
+.avatar{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--tx,#111827);color:var(--bg,#fff);font-size:9.5px;font-weight:700;margin-right:6px;letter-spacing:.2px}
 .inboxbadge{display:inline-block;margin-left:6px;min-width:16px;padding:0 5px;border-radius:8px;background:var(--a);color:#fff;font-size:10px;line-height:16px;text-align:center;font-weight:600}
 .tvlink{font-size:11px;color:var(--dim);padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--bd);
 background:var(--p2);cursor:pointer;transition:all .15s;white-space:nowrap}
 .tvlink:hover{color:var(--tx);border-color:var(--bd2)}
 .tvlink.on{color:var(--g);border-color:rgba(13,155,110,.35);background:var(--gt)}
+.tvlink.here{color:var(--tx);border-color:var(--bd2);background:var(--p3);font-weight:600}
+.tvlink{display:inline-flex;align-items:center;gap:6px}
+.tvdot{width:7px;height:7px;border-radius:50%;background:var(--dim2)}.tvdot.on{background:var(--g)}
 .clockline{font-size:11px;color:var(--dim2);font-family:var(--mono);white-space:nowrap}
 
 /* ---------- metrics strip ---------- */
@@ -293,27 +299,34 @@ padding:10px 14px;font-size:12px;box-shadow:var(--shadow-lg);border-radius:var(-
 .overlay{position:fixed;inset:0;background:rgba(16,24,40,.55);z-index:70;display:flex;align-items:center;justify-content:center;padding:20px;
 backdrop-filter:blur(4px);animation:fadeIn .2s ease}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-.modal{background:var(--p1);border:1px solid var(--bd2);width:100%;max-width:400px;padding:26px 28px;position:relative;
+.modal{background:var(--p1);border:1px solid var(--bd2);width:100%;max-width:420px;padding:22px 24px 20px;position:relative;
 border-radius:14px;box-shadow:var(--shadow-lg);animation:modalIn .25s ease}
 @keyframes modalIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
-.modal .x{position:absolute;top:8px;right:12px;background:none;border:none;color:var(--dim);font-size:16px;cursor:pointer}
-.modal h2{font-size:14px;font-weight:600;text-align:center;margin-bottom:16px;color:var(--tx)}
-.field{margin-bottom:10px}
-.field label{display:block;font-size:10px;color:var(--dim);margin-bottom:3px;letter-spacing:.5px;text-transform:uppercase}
-.field input{width:100%;background:var(--p2);border:1px solid var(--bd2);color:var(--tx);padding:9px 11px;font-size:12.5px;border-radius:var(--radius-sm)}
+.modal .x{position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:8px;background:none;border:none;color:var(--dim);
+font-size:15px;cursor:pointer}
+.modal .x:hover{background:var(--p3);color:var(--tx)}
+.mhead{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.modal h2{font-size:16px;font-weight:800;color:var(--tx)}
+.msub{font-size:12.5px;color:var(--dim);margin-bottom:16px;line-height:1.5}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--tx);margin-bottom:5px}
+.field input{width:100%;background:var(--p2);border:1px solid var(--bd2);color:var(--tx);padding:10px 12px;font-size:13.5px;border-radius:9px;font-family:var(--font)}
 .field input:focus{border-color:var(--b);outline:none;box-shadow:0 0 0 3px var(--bt)}
-.mbtn{width:100%;background:var(--b);border:none;color:#fff;padding:10px;font-weight:700;cursor:pointer;font-size:12px;margin-top:4px;
-border-radius:var(--radius-sm);transition:filter .15s}
+.mbtn{width:100%;background:var(--b);border:none;color:#fff;padding:11px;font-weight:700;cursor:pointer;font-size:13.5px;margin-top:2px;
+border-radius:9px;transition:filter .15s;font-family:var(--font)}
 .mbtn:hover:not(:disabled){filter:brightness(1.06)}.mbtn:disabled{opacity:.55;cursor:not-allowed}
 .gbtn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--p1);color:var(--tx);
-border:1px solid var(--bd2);padding:9px;font-weight:600;font-size:12.5px;cursor:pointer;border-radius:var(--radius-sm);transition:background .15s}
+border:1px solid var(--bd2);padding:10px;font-weight:600;font-size:13.5px;cursor:pointer;border-radius:9px;transition:background .15s;font-family:var(--font)}
 .gbtn:hover{background:var(--p2)}
-.divider{display:flex;align-items:center;gap:10px;color:var(--dim2);font-size:10px;margin:12px 0}
+.divider{display:flex;align-items:center;gap:10px;color:var(--dim2);font-size:11.5px;margin:14px 0}
 .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--bd)}
-.merr{border:1px solid var(--r);background:var(--rt);color:var(--r);padding:7px 10px;font-size:11px;margin-bottom:10px}
-.mnote{font-size:9.5px;color:var(--dim2);text-align:center;margin-top:12px;line-height:1.5}
-.blink{border:none;background:none;color:var(--b);font-size:11px;cursor:pointer;padding:6px 0 0}
-.gsteps{background:var(--p2);border:1px solid var(--bd);padding:9px 11px;font-size:11px;line-height:1.7;color:var(--dim);margin-bottom:10px}
+.merr{border:1px solid rgba(208,68,56,.35);background:var(--rt);color:var(--r);padding:8px 11px;font-size:12.5px;margin-bottom:12px;border-radius:9px}
+.mnote{font-size:11.5px;color:var(--dim);margin-top:14px;line-height:1.55;padding-top:12px;border-top:1px solid var(--bd)}
+.blink{border:none;background:none;color:var(--b);font-size:12.5px;cursor:pointer;padding:10px 0 0;font-family:var(--font)}
+.blink:hover{text-decoration:underline}
+.mconn{display:flex;align-items:center;gap:10px;background:var(--gt);border:1px solid rgba(13,155,110,.3);border-radius:9px;padding:10px 12px;
+font-size:13px;margin-bottom:14px}
+.gsteps{background:var(--p2);border:1px solid var(--bd);border-radius:9px;padding:10px 12px;font-size:12.5px;line-height:1.7;color:var(--tx);margin-bottom:12px}
 .spin{display:inline-block;width:11px;height:11px;border:2px solid rgba(77,127,209,.35);border-top-color:var(--b);border-radius:50%;animation:rot .7s linear infinite;margin-right:6px;vertical-align:-1px}
 @keyframes rot{to{transform:rotate(360deg)}}
 .loadwrap{padding:12px;max-width:1920px;margin:0 auto}
@@ -346,6 +359,158 @@ color:var(--r);font-size:12px;text-align:center}
   .mtx .hc{height:24px;line-height:24px}
   .foot{padding-bottom:max(20px,env(safe-area-inset-bottom))}
 }
+/* ---------- agent desk (agentic UI) ---------- */
+.agentbtn{display:inline-flex;align-items:center;gap:6px}
+.adot{width:7px;height:7px;border-radius:50%;background:var(--dim2)}
+.adot.hot{background:var(--b);box-shadow:0 0 0 3px var(--bt);animation:bl 1.6s infinite}
+.agentbtn.on{color:var(--b);border-color:rgba(37,99,235,.4);background:var(--bt)}
+.adrawer{position:fixed;top:0;right:0;bottom:0;width:min(640px,100vw);z-index:65;background:var(--p1);
+border-left:1px solid var(--bd2);box-shadow:var(--shadow-lg);display:flex;flex-direction:column;transform:translateX(102%);
+transition:transform .22s ease}
+.adrawer.open{transform:none}
+.adrawer.wide{width:min(1120px,100vw)}
+.ahead{display:flex;align-items:center;gap:6px;padding:9px 10px 9px 14px;border-bottom:1px solid var(--bd);min-height:50px}
+.ahead h2{font-size:14px;font-weight:700;letter-spacing:.2px;flex:1;margin-left:4px}
+.hbtn{position:relative;width:32px;height:32px;border-radius:8px;border:none;background:none;color:var(--dim);cursor:pointer;
+display:grid;place-items:center;font-size:20px;line-height:1}
+.hbtn:hover{background:var(--p3);color:var(--tx)}
+.hdot{position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--b);box-shadow:0 0 0 2px var(--p1)}
+.dlbtn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--bd2);background:var(--p2);color:var(--tx);
+font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:9px;cursor:pointer}
+.dlbtn:hover{border-color:var(--b);color:var(--b)}
+.dlhelp{right:10px;top:46px;min-width:280px;max-width:320px;padding:12px 14px;gap:6px;font-size:12.5px;line-height:1.55}
+.dlhelp p{margin:0}
+.ahead{position:relative}
+.hmenu{position:relative}
+.hpop{position:absolute;right:0;top:38px;z-index:5;min-width:220px;background:var(--p1);border:1px solid var(--bd2);border-radius:10px;
+box-shadow:var(--shadow-lg);padding:5px;display:flex;flex-direction:column}
+.hpop button{text-align:left;background:none;border:none;color:var(--tx);font-size:13px;padding:8px 10px;border-radius:7px;cursor:pointer;
+display:flex;justify-content:space-between;align-items:center;gap:8px}
+.hpop button:hover{background:var(--p2)}
+.abody{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.abody>*{flex-shrink:0}
+.acmd{display:flex;gap:6px;padding:12px 14px;border-top:1px solid var(--bd);background:var(--p2)}
+.acmd input{flex:1;background:var(--p1);border:1px solid var(--bd2);color:var(--tx);border-radius:9px;padding:10px 12px;font-size:13px}
+.acmd input:focus{outline:none;border-color:var(--b);box-shadow:0 0 0 3px var(--bt)}
+.acmd button{background:var(--b);color:#fff;border:none;border-radius:9px;padding:0 14px;font-weight:700;cursor:pointer}
+.achips{display:flex;flex-wrap:wrap;gap:6px}
+.achips button{background:var(--p2);border:1px solid var(--bd);color:var(--tx);font-size:11px;border-radius:999px;padding:5px 10px;cursor:pointer}
+.achips button:hover{border-color:var(--b)}
+.amsg{max-width:92%;font-size:12.5px}
+.amsg.me{align-self:flex-end;background:var(--b);color:#fff;padding:8px 11px;border-radius:12px 12px 2px 12px}
+.acard{border:1px solid var(--bd);border-radius:10px;background:var(--p2);overflow:hidden}
+.acard .top{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--bd);
+font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:var(--dim);font-weight:700}
+.acard .top .ok{color:var(--g)}.acard .top .bad{color:var(--r)}
+.acard .in{padding:10px}
+.acard pre{white-space:pre-wrap;font-family:var(--mono);font-size:11px;line-height:1.5;margin:0;max-height:340px;overflow:auto}
+.akv{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.akv div{background:var(--p1);border:1px solid var(--bd);border-radius:8px;padding:6px 8px}
+.akv span{display:block;font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.9px;font-weight:600}
+.akv b{font-family:var(--mono);font-size:13px}
+.atbl{width:100%;border-collapse:collapse;font-size:11.5px}
+.atbl td,.atbl th{padding:5px 6px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}
+.atbl th{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.8px}
+.dec{font-weight:800;font-size:10px;padding:2px 6px;border-radius:5px}
+.dec.TICKET{color:var(--g);background:var(--gt)}.dec.WATCH,.dec.DRY_RUN{color:var(--a);background:var(--at)}.dec.BLOCKED{color:var(--r);background:var(--rt)}
+.afeed{display:flex;flex-direction:column;gap:6px}
+.afeed .row{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;border:1px solid var(--bd);border-radius:9px;padding:7px 9px;background:var(--p2)}
+.afeed .who{font-size:10px;font-weight:800;padding:2px 7px;border-radius:999px;background:var(--bt);color:var(--b);white-space:nowrap}
+.afeed .who.ui{background:var(--p3);color:var(--dim)}
+.afeed .what{font-family:var(--mono);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.afeed .when{font-size:10px;color:var(--dim2);white-space:nowrap}
+.afeed .err{grid-column:1/-1;color:var(--r);font-size:11px}
+.aurl{display:flex;gap:6px;align-items:center;background:var(--p2);border:1px solid var(--bd);border-radius:9px;padding:8px 10px;font-family:var(--mono);font-size:12px}
+.aurl span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.asteps{font-size:12.5px;line-height:1.6;padding-left:18px;color:var(--tx)}
+.asteps li{margin-bottom:3px}
+.anote{font-size:11.5px;color:var(--dim);line-height:1.55}
+/* agent chat: streaming answers, tool trail, inline charts */
+.chat{display:flex;flex-direction:column;gap:18px;max-width:860px;width:100%;margin:0 auto}
+.turn-u{align-self:flex-end;max-width:85%;background:var(--p3);color:var(--tx);padding:9px 13px;border-radius:16px 16px 4px 16px;
+font-size:13.5px;white-space:pre-wrap}
+.turn-a{display:flex;gap:10px;align-items:flex-start}
+.turn-a .av{width:26px;height:26px;border-radius:8px;background:#0b0d10;color:var(--gold);font:800 11px var(--mono);
+display:grid;place-items:center;flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(201,162,39,.35);margin-top:1px}
+.turn-a .col{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.modebadge{font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;font-weight:700;color:var(--dim)}
+.modebadge b{color:var(--b)}
+.trail{border:1px solid var(--bd);border-radius:10px;background:var(--p2);font-size:12px;overflow:hidden}
+.trail summary{list-style:none;cursor:pointer;padding:7px 10px;color:var(--dim);display:flex;align-items:center;gap:8px}
+.trail summary::-webkit-details-marker{display:none}
+.trail summary .chev{margin-left:auto;transition:transform .15s}
+.trail[open] summary .chev{transform:rotate(90deg)}
+.trail .step{display:grid;grid-template-columns:16px 1fr auto;gap:8px;align-items:center;padding:6px 10px;border-top:1px solid var(--bd)}
+.trail .step .nm{font-weight:600}
+.trail .step .sm{color:var(--dim);font-family:var(--mono);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trail .step .ms{color:var(--dim2);font-size:10.5px;font-family:var(--mono)}
+.spin-s{width:12px;height:12px;border:2px solid var(--bd2);border-top-color:var(--b);border-radius:50%;animation:sp .7s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+.md{font-size:13.5px;line-height:1.62;color:var(--tx);word-wrap:break-word}
+.md p{margin:0 0 8px}.md p:last-child{margin-bottom:0}
+.md ul,.md ol{margin:2px 0 8px;padding-left:20px}.md li{margin:2px 0}
+.md h4{font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim);margin:12px 0 4px}
+.md code{font-family:var(--mono);font-size:12px;background:var(--p3);padding:1px 5px;border-radius:5px}
+.md pre{font-family:var(--mono);font-size:11.5px;background:var(--p2);border:1px solid var(--bd);border-radius:9px;padding:10px;white-space:pre-wrap;margin:0 0 8px}
+.md em{color:var(--dim)}
+.caret{display:inline-block;width:7px;height:15px;background:var(--b);vertical-align:-2px;margin-left:2px;border-radius:1px;animation:bl 1s steps(2) infinite}
+.ncchart{border:1px solid var(--bd);border-radius:12px;background:var(--chart-bg);overflow:hidden;position:relative}
+.ncchart .hd{display:flex;align-items:baseline;gap:10px;padding:9px 12px 0}
+.ncchart .hd b{font-size:13px}.ncchart .hd .sub{font-size:11px;color:var(--dim)}
+.ncchart .hd .px{margin-left:auto;font-family:var(--mono);font-weight:700;font-size:13px}
+.ncchart svg{display:block;width:100%;height:auto;touch-action:none;user-select:none}
+.ncchart .ft{font-size:10px;color:var(--dim2);padding:0 12px 8px;display:flex;gap:12px;flex-wrap:wrap}
+.ncchart .tip{position:absolute;pointer-events:none;background:var(--p1);border:1px solid var(--bd2);border-radius:8px;
+padding:6px 8px;font:11px/1.45 var(--mono);box-shadow:var(--shadow);white-space:nowrap;z-index:2}
+.dirbadge{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:999px;letter-spacing:.6px}
+.dirbadge.LONG{color:var(--g);background:var(--gt)}.dirbadge.SHORT{color:var(--r);background:var(--rt)}.dirbadge.NEUTRAL{color:var(--a);background:var(--at)}
+.sugg{display:flex;flex-wrap:wrap;gap:6px}
+.sugg button{background:none;border:1px solid var(--bd2);color:var(--tx);font-size:11.5px;border-radius:999px;padding:5px 11px;cursor:pointer}
+.sugg button:hover{border-color:var(--b);color:var(--b)}
+.hero{margin:auto 0;text-align:center;padding:26px 6px}
+.hero .big{width:46px;height:46px;border-radius:13px;background:#0b0d10;color:var(--gold);font:800 18px var(--mono);display:grid;place-items:center;
+margin:0 auto 12px;box-shadow:inset 0 0 0 1px rgba(201,162,39,.35)}
+.hero h3{font-size:19px;font-weight:800;margin-bottom:4px}
+.hero p{color:var(--dim);font-size:12.5px;margin-bottom:16px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:left}
+.tiles button{background:var(--p2);border:1px solid var(--bd);border-radius:11px;padding:10px 12px;cursor:pointer;color:var(--tx);font-size:12.5px;line-height:1.4}
+.tiles button small{display:block;color:var(--dim);font-size:11px;margin-top:2px}
+.tiles button:hover{border-color:var(--b)}
+.composer{padding:10px 14px 14px;border-top:1px solid var(--bd);background:var(--p1)}
+.composer .box{display:flex;gap:8px;align-items:flex-end;border:1px solid var(--bd2);border-radius:16px;background:var(--p2);padding:8px 8px 8px 14px;
+max-width:860px;margin:0 auto;transition:border-color .15s,box-shadow .15s}
+.composer .box:focus-within{border-color:var(--b);box-shadow:0 0 0 3px var(--bt)}
+.composer textarea{flex:1;border:none;background:none;resize:none;color:var(--tx);font:13.5px/1.5 var(--font);max-height:160px;outline:none;padding:4px 0}
+.composer .send{width:34px;height:34px;border-radius:50%;border:none;background:var(--b);color:#fff;cursor:pointer;font-size:15px;display:grid;place-items:center;flex-shrink:0}
+.composer .send:disabled{opacity:.35;cursor:default}
+.composer .send.stop{background:var(--tx);color:var(--p1)}
+.composer .hint{max-width:860px;margin:6px auto 0;font-size:10.5px;color:var(--dim2);display:flex;gap:10px;justify-content:space-between}
+/* desk team, voice, speed */
+.team{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}
+.agentt{border:1px solid var(--bd);border-radius:11px;background:var(--p2);padding:9px 11px;cursor:pointer;text-align:left;color:var(--tx);
+font:inherit;transition:border-color .15s}
+.agentt:hover{border-color:var(--bd2)}
+.agentt .r1{display:flex;align-items:center;gap:7px}
+.agentt .ic{width:20px;height:20px;border-radius:6px;background:var(--p3);display:grid;place-items:center;font:800 10px var(--mono);color:var(--dim)}
+.agentt .nm{font-size:12px;font-weight:700;flex:1}
+.agentt .sm{font-size:11.5px;color:var(--dim);margin-top:5px;line-height:1.4}
+.agentt ul{margin:6px 0 0;padding-left:16px;font-size:11.5px;color:var(--tx);line-height:1.45}
+.vpill{font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:var(--p3);color:var(--dim)}
+.vpill.bullish,.vpill.clear{color:var(--g);background:var(--gt)}
+.vpill.bearish,.vpill.blocked{color:var(--r);background:var(--rt)}
+.vpill.caution{color:var(--a);background:var(--at)}
+.mic{width:34px;height:34px;border-radius:50%;border:none;background:none;color:var(--dim);cursor:pointer;display:grid;place-items:center;flex-shrink:0;position:relative}
+.mic:hover{background:var(--p3);color:var(--tx)}
+.mic.on{color:#fff;background:var(--r)}
+.mic.on::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:2px solid var(--r);animation:ring 1.2s ease-out infinite}
+@keyframes ring{from{opacity:.8;transform:scale(.9)}to{opacity:0;transform:scale(1.35)}}
+.speedbtn{background:none;border:none;color:var(--dim2);font-size:10.5px;cursor:pointer;padding:0}
+.speedbtn:hover{color:var(--b)}
+@media(max-width:520px){.team{grid-template-columns:1fr}}
+.noticebar{font-size:11.5px;color:var(--a);background:var(--at);border-radius:8px;padding:6px 9px}
+.aempty{color:var(--dim);font-size:12px;text-align:center;padding:24px 10px}
+.ascrim{position:fixed;inset:0;z-index:64;background:rgba(16,24,40,.25)}
+@media(min-width:1500px){.ascrim{display:none}}
 .foot{color:var(--dim2);font-size:10px;text-align:center;padding:14px 16px 20px;line-height:1.65;max-width:920px;margin:0 auto}
 kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:10px;font-family:var(--mono);border-radius:4px}
 </style></head><body>
@@ -354,10 +519,10 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
   <header class="apphead">
     <div class="appbar">
       <div class="brand">
-        <div class="brand-mark" aria-hidden="true">SD</div>
+        <div class="brand-mark" aria-hidden="true">N</div>
         <div class="brand-txt">
-          <div class="name">Signal Desk</div>
-          <div class="sub">Multi-asset confluence terminal</div>
+          <div class="name">Northchart</div>
+          <div class="sub">Charts · signals · agents</div>
         </div>
       </div>
       <div class="instr">
@@ -372,11 +537,13 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
         <span class="head-sync"><span class="live" aria-hidden="true"></span>Updated {{ d.ts||'—' }}
           <button type="button" @click="refreshNow" :disabled="refreshing">{{ refreshing?'…':'↻' }}</button></span>
         <span class="clockline">{{ clock }} UTC · 15m {{ countdown }}</span>
-        <a class="tvlink" :href="inboxN?'/tracker#journal':'/tracker'" :title="inboxN?inboxN+' TradingView trade(s) waiting in the journal inbox':'Trading OS tracker: journal, prop accounts, capital'" style="text-decoration:none">Tracker<span v-if="inboxN" class="inboxbadge">{{ inboxN }}</span></a>
-        <a class="tvlink" href="/router" title="Live/prop router: this signal sized for every account (route and gate, you place the orders)" style="text-decoration:none">Router</a>
-        <button type="button" class="tvlink" :class="{on:d.tv_user}" @click="openAuth" :title="d.tv_user?'TradingView connected':'Connect TradingView'">
-          TV {{ d.tv_user||'Connect' }}
+        <a class="tvlink here" href="/" aria-current="page" style="text-decoration:none">Desk</a>
+        <a class="tvlink" href="/journal" :title="inboxN?inboxN+' trade(s) waiting for your review':'Your trades, journalled automatically'" style="text-decoration:none">Journal<span v-if="inboxN" class="inboxbadge">{{ inboxN }}</span></a>
+        <button type="button" class="tvlink agentbtn" :class="{on:agentOpen}" @click="toggleAgent()" title="Agent desk: run tools, see what ChatGPT and Claude are doing, connect new agents (Ctrl+K)">
+          <span class="adot" :class="{hot:agentUnread>0}"></span>Agents<span v-if="agentUnread" class="inboxbadge">{{ agentUnread }}</span>
         </button>
+        <a v-if="me&&me.email" class="tvlink acct" href="/account" :title="'Signed in as '+me.email" style="text-decoration:none"><span class="avatar">{{ initials }}</span>{{ me.name?me.name.split(' ')[0]:'Account' }}</a>
+        <a v-else class="tvlink" :href="hasUsers?'/signin':'/setup'" style="text-decoration:none">{{ hasUsers?'Sign in':'Set up account' }}</a>
         <button type="button" class="iconbtn" @click="toggleTheme" :aria-label="darkMode?'Switch to light mode':'Switch to dark mode'" :title="darkMode?'Light mode':'Dark mode'">{{ darkMode?'☀':'☾' }}</button>
       </div>
     </div>
@@ -745,34 +912,166 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
   </div>
 
   <footer class="foot">15 instruments · Metals, Crypto, FX, Indices, Energy · hotkeys <kbd>1</kbd>–<kbd>9</kbd> · refresh 15s · TradingView + Yahoo<br>
-  Rule-based copilot (no LLM). All R figures net of estimated spread. <strong style="font-weight:600;color:var(--dim)">Educational only — not financial advice.</strong></footer>
+  Rule-based copilot (no LLM) · agent desk <kbd>Ctrl</kbd>+<kbd>K</kbd> · ChatGPT and Claude via Northchart Connect. All R figures net of estimated spread. <strong style="font-weight:600;color:var(--dim)">Educational only — not financial advice.</strong></footer>
 
   <!-- auth modal -->
   <div class="overlay" v-if="authOpen" @click.self="closeAuth">
     <div class="modal">
       <button class="x" @click="closeAuth">✕</button>
-      <h2>Connect TradingView</h2>
+      <div class="mhead"><div class="brand-mark" style="width:30px;height:30px;font-size:11px" aria-hidden="true">N</div><h2>Connect TradingView</h2></div>
+      <p class="msub">Links your TradingView session so the desk can read TradingView data and sync your trades.</p>
+      <div v-if="d.tv_user" class="mconn"><span class="tvdot on"></span><span style="flex:1">Connected as <b>{{ d.tv_user }}</b></span>
+        <button class="blink" style="padding:0;color:var(--r)" @click="tvLogout">Disconnect</button></div>
       <div v-if="tverrMsg" class="merr">{{ tverrMsg }}</div>
       <template v-if="authStep==='signin'">
-        <button class="gbtn" @click="googleFlow"><svg width="15" height="15" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg> Continue with Google</button>
-        <div class="divider">OR EMAIL</div>
-        <div class="field"><label>Email / username</label><input v-model="tvu" @keyup.enter="tvLogin"></div>
-        <div class="field"><label>Password</label><input v-model="tvp" type="password" @keyup.enter="tvLogin"></div>
-        <button class="mbtn" :disabled="authLoading" @click="tvLogin"><span v-if="authLoading" class="spin"></span>{{ authLoading?'SIGNING IN…':'SIGN IN' }}</button>
-        <button class="blink" @click="authStep='cookies';tverrMsg=''">Use session cookies (2FA accounts)</button>
-        <button class="blink" v-if="d.tv_user" @click="tvLogout" style="color:var(--r)">Disconnect {{ d.tv_user }}</button>
+        <button class="gbtn" @click="googleFlow"><svg width="15" height="15" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Continue with Google</button>
+        <div class="divider">or use your TradingView login</div>
+        <div class="field"><label for="tvu">Email or username</label><input id="tvu" v-model="tvu" autocomplete="username" @keyup.enter="tvLogin"></div>
+        <div class="field"><label for="tvp">Password</label><input id="tvp" v-model="tvp" type="password" autocomplete="current-password" @keyup.enter="tvLogin"></div>
+        <button class="mbtn" :disabled="authLoading" @click="tvLogin"><span v-if="authLoading" class="spin"></span>{{ authLoading?'Signing in…':'Sign in' }}</button>
+        <button class="blink" @click="authStep='cookies';tverrMsg=''">Two-factor account? Use session cookies instead</button>
       </template>
       <template v-else>
-        <div class="gsteps"><b>1.</b> Finish signing in on the tradingview.com tab.<br><b>2.</b> F12 → Application → Cookies → tradingview.com.<br><b>3.</b> Copy both values below.</div>
-        <div class="field"><label>sessionid</label><input ref="sidbox" v-model="tvsid"></div>
-        <div class="field"><label>sessionid_sign</label><input v-model="tvsign" placeholder="v3:…"></div>
-        <button class="mbtn" :disabled="authLoading" @click="tvCookie"><span v-if="authLoading" class="spin"></span>{{ authLoading?'CONNECTING…':'CONNECT' }}</button>
-        <button class="blink" @click="authStep='signin';tverrMsg=''">← Back</button>
+        <div class="gsteps"><b>1.</b> Sign in on tradingview.com in this browser.<br><b>2.</b> Press F12, then Application, Cookies, tradingview.com.<br><b>3.</b> Copy the two values below.</div>
+        <div class="field"><label for="tvsid">sessionid</label><input id="tvsid" ref="sidbox" v-model="tvsid"></div>
+        <div class="field"><label for="tvsign">sessionid_sign</label><input id="tvsign" v-model="tvsign" placeholder="v3:…"></div>
+        <button class="mbtn" :disabled="authLoading" @click="tvCookie"><span v-if="authLoading" class="spin"></span>{{ authLoading?'Connecting…':'Connect' }}</button>
+        <button class="blink" @click="authStep='signin';tverrMsg=''">‹ Back to sign in</button>
       </template>
-      <div class="mnote">Credentials go from this PC directly to tradingview.com.<br>Only the session token is stored locally — never your password.</div>
+      <div class="mnote">Your login goes from this computer straight to tradingview.com. Only the session token is kept here, never your password.</div>
     </div>
   </div>
 
+
+  <!-- agent desk: the human view of Northchart Connect -->
+  <div class="ascrim" v-if="agentOpen" @click="toggleAgent(false)"></div>
+  <aside class="adrawer" :class="{open:agentOpen,wide:agentWide}" aria-label="Agent desk" :aria-hidden="!agentOpen">
+    <div class="ahead">
+      <button v-if="agentTab!=='run'" class="hbtn" @click="setAgentTab('run')" title="Back to chat" aria-label="Back to chat">‹</button>
+      <div v-else class="brand-mark" style="width:26px;height:26px;font-size:11px" aria-hidden="true">N</div>
+      <h2>{{ agentTab==='run'?'Agent desk':agentTab==='activity'?'Activity':'Connect agents' }}</h2>
+      <button v-if="!isStandalone" class="dlbtn" @click.stop="installDesktop" title="Install Northchart as a desktop app">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        Download desktop</button>
+      <div v-if="installHelp" class="hpop dlhelp" @click.stop>
+        <b>Install Northchart</b>
+        <p v-if="installHint==='chromium'">In Chrome or Edge, open the browser menu (⋮), choose <b>Cast, save and share</b>, then <b>Install page as app</b>. You can also use the install icon at the right of the address bar.</p>
+        <p v-else-if="installHint==='safari'">In Safari on a Mac, choose <b>File</b>, then <b>Add to Dock</b>.</p>
+        <p v-else-if="installHint==='ios'">Tap <b>Share</b>, then <b>Add to Home Screen</b>.</p>
+        <p v-else>Open this page in Chrome or Edge and choose <b>Install page as app</b> from the browser menu.</p>
+        <p class="anote">It opens in its own window from your Start menu, dock or taskbar and updates itself.</p>
+      </div>
+    </div>
+
+    <div class="abody" v-if="agentTab==='run'" ref="arun" @scroll.passive="onChatScroll">
+      <div v-if="!chat.length" class="hero">
+        <div class="big">N</div>
+        <h3>What should we look at?</h3>
+        <p>Answers stream from the desk's live tools, with charts. Read-only: nothing here places an order.</p>
+        <div class="tiles">
+          <button v-for="t in heroTiles" :key="t[0]" @click="ask(t[0])">{{ t[0] }}<small>{{ t[1] }}</small></button>
+        </div>
+      </div>
+      <div class="chat" v-else>
+        <template v-for="t in chat" :key="t.id">
+          <div v-if="t.role==='user'" class="turn-u">{{ t.text }}</div>
+          <div v-else class="turn-a">
+            <div class="av">N</div>
+            <div class="col">
+              <div class="modebadge" v-if="t.mode">{{ t.mode==='claude'?'Claude team':'Desk team' }} · <b>{{ t.symbol }}</b></div>
+              <div v-if="t.notice" class="noticebar">{{ t.notice }}</div>
+              <details v-if="t.steps.length" class="trail" :open="t.streaming">
+                <summary><span v-if="t.streaming&&t.steps.some(x=>x.status==='running')" class="spin-s"></span><span v-else>✓</span>
+                  {{ t.streaming?'Working':'Used' }} {{ t.steps.length }} tool{{ t.steps.length>1?'s':'' }}<template v-if="!t.streaming"> · {{ t.steps.reduce((a,x)=>a+(x.ms||0),0) }} ms</template>
+                  <span class="chev">›</span></summary>
+                <div class="step" v-for="st in t.steps" :key="st.id">
+                  <span><span v-if="st.status==='running'" class="spin-s"></span><span v-else :class="st.ok?'dirL':'dirS'">{{ st.ok?'✓':'✕' }}</span></span>
+                  <span style="min-width:0"><span class="nm">{{ toolTitle(st.name) }}</span> <span class="sm">{{ st.summary || argText(st.args) }}</span></span>
+                  <span class="ms">{{ st.ms!=null?st.ms+' ms':'' }}</span>
+                </div>
+              </details>
+              <template v-for="(bk,bi) in visibleBlocks(t)" :key="bi">
+                <div v-if="bk.type==='text'" class="md" v-html="mdCaret(bk.text,(t.streaming||t.revealing)&&bk.text.length<bk.full.length||t.streaming&&bi===t.blocks.length-1)"></div>
+                <nc-chart v-else-if="bk.type==='chart'" :chart="bk.chart" :dark="darkMode"></nc-chart>
+                <div v-else-if="bk.type==='team'" class="team" role="list" aria-label="Desk team">
+                  <button v-for="ag in bk.agents" :key="ag.id" class="agentt" role="listitem" @click="ag.open=!ag.open" :aria-expanded="!!ag.open">
+                    <div class="r1"><span class="ic">{{ ag.name[0] }}</span><span class="nm">{{ ag.name }}</span>
+                      <span v-if="ag.status==='running'" class="spin-s"></span><span v-else class="vpill" :class="ag.verdict.replace(' ','')">{{ ag.verdict }}</span></div>
+                    <div class="sm">{{ ag.status==='running'?ag.role:ag.summary }}</div>
+                    <ul v-if="ag.open&&ag.points&&ag.points.length"><li v-for="(pt,pi) in ag.points" :key="pi">{{ pt }}</li></ul>
+                  </button>
+                </div>
+                <div v-else-if="bk.type==='card'&&bk.card.kind==='route'" class="acard">
+                  <div class="top"><span>Route preview · {{ bk.card.symbol }}</span><span>preview only</span></div>
+                  <div class="in"><table class="atbl"><tr><th>Account</th><th>Answer</th><th>Size</th><th>Risk</th></tr>
+                    <tr v-for="ac in bk.card.accounts" :key="ac.account"><td><b>{{ ac.account }}</b> <span class="anote">{{ ac.type }}</span>
+                      <div class="anote" v-if="ac.reasons.length">{{ ac.reasons.join(' · ') }}</div></td>
+                      <td><span class="dec" :class="ac.decision">{{ ac.decision }}</span></td><td class="num">{{ ac.lots }} lots</td><td class="num">{{ ac.risk ?? '—' }}</td></tr>
+                  </table></div></div>
+                <details v-else-if="bk.type==='card'" class="trail"><summary>{{ bk.card.title||'Data' }} <span class="chev">›</span></summary>
+                  <pre style="padding:10px;margin:0;font:11px var(--mono);white-space:pre-wrap;max-height:320px;overflow:auto">{{ JSON.stringify(bk.card.data,null,2) }}</pre></details>
+              </template>
+              <div v-if="t.streaming&&!t.blocks.length&&!t.steps.length" class="anote"><span class="spin-s"></span> Thinking…</div>
+              <div v-if="t.error" class="noticebar" style="color:var(--r);background:var(--rt)">{{ t.error }}</div>
+              <div class="sugg" v-if="!t.streaming&&!t.revealing&&t.suggestions.length&&t===chat[chat.length-1]">
+                <button v-for="sg in t.suggestions" :key="sg" @click="ask(sg)">{{ sg }}</button>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <div class="abody" v-else-if="agentTab==='activity'">
+      <div class="anote">Every tool call, from this panel and from connected agents, newest first.</div>
+      <div v-if="!agentFeed.length" class="aempty">No agent activity yet. Connect ChatGPT or Claude from the Connect tab.</div>
+      <div class="afeed">
+        <div class="row" v-for="(a,i) in agentFeed" :key="i">
+          <span class="who" :class="{ui:a.client==='Northchart UI'}">{{ a.client }}</span>
+          <span class="what">{{ a.tool }}<template v-if="a.args&&a.args.symbol"> · {{ a.args.symbol }}</template><template v-if="a.args&&a.args.question"> · “{{ a.args.question }}”</template></span>
+          <span class="when"><span :class="a.ok?'dirL':'dirS'">{{ a.ok?'✓':'✕' }}</span> {{ ago(a.ts) }} · {{ a.ms }}ms</span>
+          <span v-if="!a.ok" class="err">{{ a.error }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="abody" v-else>
+      <div class="anote">Northchart Connect is a remote MCP server. Add it once and ChatGPT or Claude can read the desk with the same tools you use here.</div>
+      <div class="aurl"><span>{{ agentStatus.mcp_url || '…' }}</span><button class="tvlink" @click="copyMcp">Copy</button></div>
+      <div class="acard"><div class="top"><span>Claude</span></div><div class="in"><ol class="asteps">
+        <li>Open <b>Settings → Connectors</b> (claude.ai or the desktop app).</li>
+        <li>Choose <b>Add custom connector</b> and paste the URL above.</li>
+        <li>Approve on the Northchart page with your desk password.</li></ol></div></div>
+      <div class="acard"><div class="top"><span>ChatGPT</span></div><div class="in"><ol class="asteps">
+        <li>Open <b>Settings → Apps</b>, then <b>Create</b> (developer mode must be on for your plan).</li>
+        <li>Paste the URL above and choose <b>OAuth</b> authentication.</li>
+        <li>Approve on the Northchart page with your desk password.</li></ol></div></div>
+      <div class="acard"><div class="top"><span>Claude Code and scripts</span></div><div class="in">
+        <p class="anote">Set <code>NORTHCHART_MCP_TOKEN</code> on the server, then:</p>
+        <pre>claude mcp add --transport http northchart {{ agentStatus.mcp_url }} --header "Authorization: Bearer $NORTHCHART_MCP_TOKEN"</pre>
+        <p class="anote" style="margin-top:6px">Token configured: <b>{{ agentStatus.static_token?'yes':'no' }}</b></p></div></div>
+      <div class="acard"><div class="top"><span>Connected agents</span><button class="tvlink" @click="revokeAgents" style="color:var(--r)">Sign out all</button></div><div class="in">
+        <div v-if="!(agentStatus.clients||[]).length" class="anote">None yet.</div>
+        <table v-else class="atbl"><tr><th>Agent</th><th>Returns to</th><th>Status</th></tr>
+          <tr v-for="c in agentStatus.clients" :key="c.created+c.name"><td><b>{{ c.name }}</b></td><td>{{ c.redirect_host }}</td>
+          <td :class="c.connected?'dirL':'mut'">{{ c.connected?'signed in':'signed out' }}</td></tr></table></div></div>
+      <div class="anote">{{ (agentStatus.tools||[]).length }} tools, all read-only: {{ (agentStatus.tools||[]).map(t=>t.name).join(', ') }}.</div>
+      <div v-if="agentStatus.owner_password_set===false" class="anote" style="color:var(--r)">No desk password is set on this server. Set SIGNALDESK_PASS before connecting agents.</div>
+    </div>
+
+    <div class="composer" v-if="agentTab==='run'">
+      <div class="box">
+        <textarea ref="ainput" v-model="agentQ" rows="1" :placeholder="listening?'Listening… speak your question':'Ask about '+sym+', or any market…'" aria-label="Agent command"
+          @keydown.enter.exact.prevent="ask()" @input="autoGrow"></textarea>
+        <button v-if="speechOk" class="mic" :class="{on:listening}" @click="toggleMic" :title="listening?'Stop listening':'Speak your question'" :aria-label="listening?'Stop listening':'Voice input'" :aria-pressed="listening">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v4"/></svg></button>
+        <button v-if="streaming||(chat.length&&chat[chat.length-1].revealing)" class="send stop" @click="stopStream" title="Stop" aria-label="Stop">■</button>
+        <button v-else class="send" :disabled="!agentQ.trim()" @click="ask()" title="Send (Enter)" aria-label="Send">↑</button>
+      </div>
+      <div class="hint"><span>Read-only research: nothing here places orders.</span>
+        <span><button class="speedbtn" @click="cycleSpeed" title="Reading speed of answers">Speed: {{ speeds[speed].label }}</button> · {{ agentMode==='claude'?'Claude team':'Desk team' }}</span></div>
+    </div>
+  </aside>
   <div class="toastwrap"><transition-group name="toast">
     <div class="toast" v-for="t in toasts" :key="t.id">{{ t.msg }}</div>
   </transition-group></div>
@@ -780,9 +1079,9 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
 
 <script>
 const {createApp} = Vue;
-createApp({
+const app=createApp({
   data(){return{
-    sym:'XAUUSD', inboxN:0,
+    sym:'XAUUSD', inboxN:0, me:null, hasUsers:true,
     symGroups:[
       ['Metals',[['XAUUSD','Gold · XAU/USD'],['XAGUSD','Silver · XAG/USD']]],
       ['Crypto',[['BTCUSD','Bitcoin · BTC'],['ETHUSD','Ethereum · ETH'],['SOLUSD','Solana · SOL'],['XRPUSD','XRP']]],
@@ -797,8 +1096,16 @@ createApp({
     tvu:'',tvp:'',tvsid:'',tvsign:'',tverrMsg:'',authOpen:false,authStep:'signin',authLoading:false,
     tvWidgetSym:null, curvePts:[], macroHelp:false,
     darkMode:false, roster:[], refreshing:false,
+    agentOpen:false, agentTab:'run', agentQ:'', agentFeed:[], agentStatus:{}, agentUnread:0, agentSeenTs:0, agentId:0,
+    chat:[], streaming:false, abortCtl:null, agentWide:false, agentMode:'desk', stick:true, menuOpen:false, installPrompt:null, isStandalone:false, installHelp:false, installHint:'other',
+    listening:false, speechOk:false, speed:'normal',
+    speeds:{slow:{label:'Slow',cps:30,sentence:420,para:650},normal:{label:'Normal',cps:55,sentence:200,para:340},fast:{label:'Fast',cps:120,sentence:90,para:160}},
+    heroTiles:[['Why no trade on gold?','Levels, evidence and what would change the view'],['Scan all markets','Conviction across all 15 instruments'],
+      ['Chart USDJPY','15-minute candles with desk levels'],['Route XAUUSD','Sized for every account, preview only']],
   }},
   computed:{
+    initials(){ const m=this.me||{}; const src=(m.name||m.email||'?').trim();
+      const p=src.split(/[\s@.]+/).filter(Boolean); return ((p[0]||'?')[0]+((m.name&&p[1])?p[1][0]:'')).toUpperCase() },
     perf(){ return this.d.perf||{} },
     gov(){ return this.d.governor||{} },
     clusterList(){
@@ -884,9 +1191,10 @@ createApp({
       setTimeout(()=>{this.toasts=this.toasts.filter(t=>t.id!==id)},4500) },
     chipDir(s){ const r=this.roster.find(x=>x.sym===s); return r&&r.direction==='LONG'?'dirL':r&&r.direction==='SHORT'?'dirS':'mut' },
     chipDirLabel(s){ const r=this.roster.find(x=>x.sym===s); if(!r||!r.direction)return '·'; return r.direction==='LONG'?'L':r.direction==='SHORT'?'S':'N' },
+    async fetchMe(){ try{ const j=await (await fetch('/api/auth/me')).json(); this.me=j.user; this.hasUsers=j.has_users }catch(e){} },
     async fetchInbox(){
-      try{ const r=await fetch('/api/tracker/fills/pending'); if(!r.ok) return;
-        const j=await r.json(); this.inboxN=(j.fills||[]).length; }catch(e){}
+      try{ const r=await fetch('/api/journal/queue'); if(!r.ok) return;
+        const j=await r.json(); this.inboxN=j.count||0; }catch(e){}
     },
     async fetchRoster(){ try{
       const r=await fetch('/api/roster'); this.roster=(await r.json()).symbols||[];
@@ -1023,6 +1331,147 @@ createApp({
       headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}); return r.json() },
     openAuth(){ this.authOpen=true; this.authStep='signin'; this.tverrMsg='' },
     closeAuth(){ if(!this.authLoading){this.authOpen=false;this.tverrMsg=''} },
+    // ---------------- agent desk ----------------
+    toggleAgent(v){ this.agentOpen = (v===undefined)?!this.agentOpen:v;
+      if(this.agentOpen){ this.fetchAgentStatus(); this.fetchAgentFeed();
+        if(this.agentTab==='activity') this.markAgentSeen();
+        this.$nextTick(()=>this.$refs.ainput&&this.$refs.ainput.focus()) } },
+    setAgentTab(t){ this.agentTab=t; if(t==='activity') this.markAgentSeen(); if(t==='connect') this.fetchAgentStatus();
+      if(t==='run') this.$nextTick(()=>this.$refs.ainput&&this.$refs.ainput.focus()) },
+    markAgentSeen(){ this.agentUnread=0; this.agentSeenTs=Math.max(this.agentSeenTs,...this.agentFeed.map(a=>a.ts),0);
+      try{localStorage.setItem('nc-agent-seen',String(this.agentSeenTs))}catch(e){} },
+    async fetchAgentStatus(){ try{ const r=await fetch('/api/agent/status'); if(r.ok) this.agentStatus=await r.json() }catch(e){} },
+    async fetchAgentFeed(){ try{ const r=await fetch('/api/agent/activity?limit=60'); if(!r.ok) return;
+        const j=await r.json(); this.agentFeed=j.activity||[];
+        this.agentUnread=this.agentFeed.filter(a=>a.client!=='Northchart UI'&&a.ts>this.agentSeenTs).length;
+        if(this.agentOpen&&this.agentTab==='activity') this.markAgentSeen();
+      }catch(e){} },
+    toolTitle(n){ return ({get_market_snapshot:'Snapshot',get_signal_detail:'Signal detail',get_candles:'Candles',
+      ask_desk:'Desk copilot',get_market_overview:'Market overview',preview_signal_routing:'Route preview',
+      get_desk_brief:'Desk brief',get_portfolio_summary:'Portfolio',get_price_history:'Price history',list_instruments:'Instruments'})[n]||n },
+    argText(a){ return a?Object.values(a).join(' · '):'' },
+    md(src){
+      const esc=x=>x.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const inline=x=>esc(x).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>')
+        .replace(/(^|[\s(])_([^_]+)_(?=[\s).,]|$)/g,'$1<em>$2</em>');
+      const lines=(src||'').split('\n'); let html='', list=null, para=[], pre=null;
+      const flushP=()=>{ if(para.length){ html+='<p>'+para.map(inline).join('<br>')+'</p>'; para=[] } };
+      const flushL=()=>{ if(list){ html+='<'+list.t+'>'+list.items.map(i=>'<li>'+inline(i)+'</li>').join('')+'</'+list.t+'>'; list=null } };
+      for(const ln of lines){
+        if(/^```/.test(ln)){ if(pre===null){flushP();flushL();pre=[]} else {html+='<pre>'+esc(pre.join('\n'))+'</pre>';pre=null} continue }
+        if(pre!==null){ pre.push(ln); continue }
+        let m;
+        if((m=ln.match(/^\s*[-*]\s+(.*)/))){ flushP(); if(!list||list.t!=='ul'){flushL();list={t:'ul',items:[]}} list.items.push(m[1]); continue }
+        if((m=ln.match(/^#{1,4}\s+(.*)/))){ flushP(); flushL(); html+='<h4>'+inline(m[1])+'</h4>'; continue }
+        if(!ln.trim()){ flushP(); flushL(); continue }
+        flushL(); para.push(ln);
+      }
+      if(pre!==null) html+='<pre>'+esc(pre.join('\n'))+'</pre>';
+      flushP(); flushL(); return html;
+    },
+    mdCaret(text,on){ const h=this.md(text); if(!on) return h; const c='<span class="caret"></span>';
+      const m=h.match(/<\/(p|li|h4|pre)>(<\/(ul|ol)>)?$/); return m?h.slice(0,m.index)+c+h.slice(m.index):h+c },
+    autoGrow(e){ const el=e?e.target:this.$refs.ainput; if(!el) return; el.style.height='auto'; el.style.height=Math.min(160,el.scrollHeight)+'px' },
+    newChat(){ this.stopStream(); this.chat=[]; this.agentTab='run'; this.$nextTick(()=>this.$refs.ainput&&this.$refs.ainput.focus()) },
+    async installDesktop(){
+      if(this.installPrompt){ const p=this.installPrompt; this.installPrompt=null; p.prompt();
+        try{ const r=await p.userChoice; if(r&&r.outcome==='accepted') this.toast('Installing Northchart') }catch(e){} return }
+      const ua=navigator.userAgent;
+      this.installHint=/iPhone|iPad/.test(ua)?'ios':/Edg\/|Chrome\//.test(ua)?'chromium':/Safari\//.test(ua)?'safari':'other';
+      this.installHelp=!this.installHelp },
+    stopStream(){ if(this.abortCtl){ try{this.abortCtl.abort()}catch(e){} }
+      const t=this.chat[this.chat.length-1]; if(t&&t.revealing){ t.blocks.forEach(b=>{ if(b.type==='text') b.text=b.full }); t.revealing=false } },
+    async ask(text){
+      const q=(text??this.agentQ).trim(); if(!q||this.streaming) return;
+      const prev=this.chat[this.chat.length-1]; if(prev&&prev.revealing){ prev.blocks.forEach(b=>{ if(b.type==='text') b.text=b.full }); prev.revealing=false }
+      this.agentQ=''; this.$nextTick(()=>this.autoGrow());
+      const history=this.chat.filter(t=>!t.streaming).map(t=>t.role==='user'?{role:'user',content:t.text}
+        :{role:'assistant',content:t.blocks.filter(b=>b.type==='text').map(b=>b.full).join('\n')}).slice(-10);
+      this.chat.push({id:++this.agentId,role:'user',text:q});
+      this.chat.push({id:++this.agentId,role:'assistant',mode:null,symbol:this.sym,steps:[],blocks:[],suggestions:[],streaming:true,revealing:false,error:null,notice:null});
+      const t=this.chat[this.chat.length-1];
+      this.streaming=true; this.abortCtl=new AbortController(); this.scrollAgent(true);
+      try{
+        const r=await fetch('/api/agent/stream',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({question:q,symbol:this.sym,history}),signal:this.abortCtl.signal});
+        if(!r.ok||!r.body) throw new Error('HTTP '+r.status);
+        const rd=r.body.getReader(), dec=new TextDecoder(); let buf='';
+        while(true){
+          const {value,done}=await rd.read(); if(done) break;
+          buf+=dec.decode(value,{stream:true});
+          let i; while((i=buf.indexOf('\n\n'))>=0){
+            const chunk=buf.slice(0,i); buf=buf.slice(i+2);
+            const data=chunk.split('\n').filter(l=>l.startsWith('data:')).map(l=>l.slice(5).trim()).join('\n');
+            if(data){ try{ this.onAgentEvent(t,JSON.parse(data)) }catch(e){} }
+          }
+        }
+      }catch(e){ if(e.name!=='AbortError') t.error='Stream failed: '+e.message; else t.notice='Stopped.' }
+      t.streaming=false; this.streaming=false; this.abortCtl=null;
+      t.steps.forEach(x=>{ if(x.status==='running'){x.status='done';x.ok=false;x.summary='stopped'} });
+      this.scrollAgent(); this.fetchAgentFeed();
+    },
+    onAgentEvent(t,ev){
+      if(ev.type==='start'){ t.mode=ev.mode; t.symbol=ev.symbol; this.agentMode=ev.mode }
+      else if(ev.type==='tool'){ const st=t.steps.find(x=>x.id===ev.id);
+        if(st) Object.assign(st,ev); else t.steps.push({...ev}) }
+      else if(ev.type==='text'){ const last=t.blocks[t.blocks.length-1];
+        if(last&&last.type==='text') last.full+=ev.delta; else t.blocks.push({type:'text',full:ev.delta,text:''});
+        this.pace(t) }
+      else if(ev.type==='chart') t.blocks.push({type:'chart',chart:ev.chart});
+      else if(ev.type==='team') t.blocks.push({type:'team',agents:ev.agents.map(a=>({...a,status:'running',verdict:'',summary:'',points:[],open:false}))});
+      else if(ev.type==='agent'){ const tb=[...t.blocks].reverse().find(b=>b.type==='team'); const ag=tb&&tb.agents.find(a=>a.id===ev.id);
+        if(ag) Object.assign(ag,ev) }
+      else if(ev.type==='card') t.blocks.push({type:'card',card:ev.card});
+      else if(ev.type==='suggestions') t.suggestions=ev.items||[];
+      else if(ev.type==='notice') t.notice=ev.message;
+      else if(ev.type==='error') t.error=ev.message;
+      this.scrollAgent();
+    },
+    // Reveal streamed text at a human reading pace. Speed is the user's choice (Slow, Normal, Fast);
+    // there is a short pause after each sentence and paragraph, and only a very long answer speeds up.
+    pace(t){ if(t._raf) return; let prev=performance.now(), carry=0, hold=0;
+      const step=now=>{ const dt=Math.min(100,now-prev); prev=now;
+        const blk=t.blocks.find(b=>b.type==='text'&&b.text.length<b.full.length);
+        if(!blk){ t._raf=null; t.revealing=false; return }
+        t.revealing=true;
+        if(hold>0){ hold-=dt; t._raf=requestAnimationFrame(step); return }
+        const sp=this.speeds[this.speed]; const backlog=t.blocks.filter(b=>b.type==='text').reduce((a,b)=>a+b.full.length-b.text.length,0);
+        const cps=sp.cps+Math.max(0,backlog-1500)*0.25;      // characters per second
+        carry+=cps*dt/1000;
+        if(carry>=1){ const len=blk.text.length; let end=len+Math.floor(carry);
+          const ws=blk.full.indexOf(' ',end); if(ws>-1&&ws-end<8) end=ws+1;       // whole words only
+          end=Math.min(end,blk.full.length);
+          const seg=blk.full.slice(len,end), m=seg.search(/[.!?]\s|\n/);      // stop at a sentence end and breathe
+          if(m>-1){ end=len+m+1; hold=blk.full[len+m]==='\n'?sp.para:sp.sentence }
+          carry-=end-len; blk.text=blk.full.slice(0,end); this.scrollAgent() }
+        t._raf=requestAnimationFrame(step) };
+      t._raf=requestAnimationFrame(step) },
+    cycleSpeed(){ const order=['slow','normal','fast']; this.speed=order[(order.indexOf(this.speed)+1)%3];
+      try{localStorage.setItem('nc-speed',this.speed)}catch(e){} },
+    // voice input (Web Speech API: Chrome, Edge, Safari)
+    toggleMic(){
+      const SR=window.SpeechRecognition||window.webkitSpeechRecognition; if(!SR) return;
+      if(this.listening&&this._rec){ this._rec.stop(); return }
+      const r=new SR(); r.lang=navigator.language||'en-GB'; r.interimResults=true; r.continuous=false; r.maxAlternatives=1;
+      const base=this.agentQ.trim()?this.agentQ.trim()+' ':''; let fin='';
+      r.onresult=e=>{ let interim=''; for(let i=e.resultIndex;i<e.results.length;i++){ const tx=e.results[i][0].transcript;
+          if(e.results[i].isFinal) fin+=tx; else interim+=tx }
+        this.agentQ=base+fin+interim; this.$nextTick(()=>this.autoGrow()) };
+      r.onerror=e=>{ if(e.error==='not-allowed'||e.error==='service-not-allowed') this.toast('Microphone blocked: allow it from the address bar');
+        else if(e.error!=='no-speech'&&e.error!=='aborted') this.toast('Voice input stopped: '+e.error) };
+      r.onend=()=>{ this.listening=false; this._rec=null; if(fin.trim()&&!this.streaming) this.ask() };
+      try{ r.start(); this.listening=true; this._rec=r }catch(e){ this.toast('Voice input is not available here') } },
+    visibleBlocks(t){ const out=[]; for(const b of t.blocks){ out.push(b); if(b.type==='text'&&b.text.length<b.full.length) break } return out },
+    onChatScroll(){ const el=this.$refs.arun; if(!el||this._autoScrolling) return;
+      this.stick=(el.scrollHeight-el.scrollTop-el.clientHeight)<80 },
+    scrollAgent(force){ if(force) this.stick=true; this.$nextTick(()=>{ const el=this.$refs.arun; if(!el||!this.stick) return;
+      this._autoScrolling=true; el.scrollTop=el.scrollHeight; requestAnimationFrame(()=>{this._autoScrolling=false}) }) },
+    async copyMcp(){ try{ await navigator.clipboard.writeText(this.agentStatus.mcp_url); this.toast('MCP URL copied') }catch(e){ this.toast(this.agentStatus.mcp_url) } },
+    async revokeAgents(){ if(!confirm('Sign out every connected agent? They will need your desk password to reconnect.')) return;
+      await fetch('/api/agent/revoke',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+      this.toast('All agents signed out'); this.fetchAgentStatus() },
+    ago(ts){ const s=Math.max(0,Math.round(this.now/1000-ts)); return s<60?s+'s ago':s<3600?Math.round(s/60)+'m ago':Math.round(s/3600)+'h ago' },
+
     googleFlow(){ this.tverrMsg=''; window.open('https://www.tradingview.com/#signin','_blank');
       this.authStep='cookies'; this.$nextTick(()=>this.$refs.sidbox&&this.$refs.sidbox.focus()) },
     async tvLogin(){ this.tverrMsg='';this.authLoading=true;
@@ -1045,14 +1494,31 @@ createApp({
       this.darkMode=(localStorage.getItem('sd-theme-v2')==='dark');
     }catch(e){}
     this.applyTheme();
-    this.tick(); this.fetchRoster(); this.fetchInbox();
+    try{ this.agentSeenTs=+(localStorage.getItem('nc-agent-seen')||0) }catch(e){}
+    this.tick(); this.fetchRoster(); this.fetchInbox(); this.fetchAgentFeed(); this.fetchMe();
+    if(location.hash==='#tradingview') this.openAuth();
+    setInterval(()=>this.fetchAgentFeed(),10000);
+    if(location.hash==='#agents') this.toggleAgent(true);
+    document.addEventListener('click',()=>{this.menuOpen=false;this.installHelp=false});
+    this.isStandalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+    this.speechOk=!!(window.SpeechRecognition||window.webkitSpeechRecognition);
+    try{ const sp=localStorage.getItem('nc-speed'); if(sp&&this.speeds[sp]) this.speed=sp }catch(e){}
+    window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); this.installPrompt=e });
+    window.addEventListener('appinstalled',()=>{ this.isStandalone=true; this.installPrompt=null; this.installHelp=false; this.toast('Northchart installed') });
+    if('serviceWorker' in navigator){ navigator.serviceWorker.register('/sw.js').catch(()=>{}) }
+    if(location.hash==='#agents-activity'||location.hash==='#agents-connect'){ this.toggleAgent(true); this.setAgentTab(location.hash.slice(8)) }
     setInterval(()=>this.fetchInbox(),60000);
     setInterval(()=>this.tick(),15000);
     setInterval(()=>this.fetchRoster(),15000);
     setInterval(()=>{this.now=Date.now()},1000);
     window.addEventListener('resize',()=>{this.drawSpark();this.drawEquity();this.drawDaily()});
     window.addEventListener('keydown',e=>{
+      if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key.toLowerCase()==='o'){ e.preventDefault(); this.toggleAgent(true); this.newChat(); return }
+      if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){ e.preventDefault(); this.agentTab='run'; this.toggleAgent(true); return }
+      if(e.key==='Escape'&&(this.menuOpen||this.installHelp)){ this.menuOpen=false; this.installHelp=false; return }
+      if(e.key==='Escape'&&this.agentOpen){ this.toggleAgent(false); return }
       if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
+      if(e.key==='/'){ e.preventDefault(); this.agentTab='run'; this.toggleAgent(true); return }
       const i='123456789'.indexOf(e.key);
       if(i>=0&&this.flatSyms[i])this.switchSym(this.flatSyms[i][0]);
       if(e.key==='Escape')this.closeAuth();
@@ -1060,5 +1526,105 @@ createApp({
     const s=document.createElement('script'); s.src='https://s3.tradingview.com/tv.js';
     s.onload=()=>this.mountChart(); document.head.appendChild(s);
   },
-}).mount('#app');
+});
+
+// ---------------- nc-chart: inline charts for agent answers ----------------
+app.component('nc-chart',{
+  props:{chart:Object,dark:Boolean},
+  data(){return{hover:null,W:640,H:290}},
+  computed:{
+    c(){return this.chart||{}},
+    dp(){ if(Number.isInteger(this.c.dp)) return this.c.dp; const p=this.c.price??(this.c.bars&&this.c.bars.length?this.c.bars[this.c.bars.length-1].c:1);
+      return Math.abs(p)>=1000?2:Math.abs(p)>=10?(Math.abs(p)>=100?2:3):4 },
+    pad(){return{l:8,r:100,t:10,b:24}},
+    bars(){return this.c.bars||[]},
+    yr(){ if(this.c.kind!=='candles'||!this.bars.length) return [0,1];
+      let lo=Math.min(...this.bars.map(b=>b.l)), hi=Math.max(...this.bars.map(b=>b.h));
+      const span=hi-lo||Math.abs(hi)*0.001||1;
+      for(const lv of (this.c.levels||[])){ if(lv.value>lo-span*1.5&&lv.value<hi+span*1.5){ lo=Math.min(lo,lv.value); hi=Math.max(hi,lv.value) } }
+      const m=(hi-lo)*0.08||span*0.08; return [lo-m,hi+m] },
+    pw(){return this.W-this.pad.l-this.pad.r}, ph(){return this.H-this.pad.t-this.pad.b},
+    step(){return this.pw/Math.max(1,this.bars.length)},
+    candles(){ const y=this.y, w=Math.max(1,this.step*0.64);
+      return this.bars.map((b,i)=>{ const x=this.pad.l+this.step*(i+0.5), up=b.c>=b.o;
+        return {x,w,up,yh:y(b.h),yl:y(b.l),yo:y(b.o),yc:y(b.c),top:Math.min(y(b.o),y(b.c)),hgt:Math.max(1,Math.abs(y(b.o)-y(b.c)))} }) },
+    grid(){ const [lo,hi]=this.yr, n=5, out=[]; for(let i=0;i<=n;i++){ const v=lo+(hi-lo)*i/n; out.push({v,y:this.y(v)}) } return out },
+    times(){ const n=this.bars.length; if(!n) return []; const k=Math.max(1,Math.floor(n/5)), out=[];
+      for(let i=k>>1;i<n;i+=k){ const d=new Date(this.bars[i].t*1000);
+        out.push({x:this.pad.l+this.step*(i+0.5),t:d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}) } return out },
+    levels(){ const [lo,hi]=this.yr; return (this.c.levels||[]).filter(l=>l.value>=lo&&l.value<=hi).map(l=>({...l,y:this.y(l.value)})) },
+    tags(){ // right-axis labels for levels and last price, pushed apart so they never overlap
+      const t=this.levels.map(l=>({key:l.label,text:l.label+' '+this.f(l.value),y:l.y,fill:this.tone(l.tone)}));
+      if(this.last) t.push({key:'last',text:this.f(this.last.v),y:this.last.y,fill:this.last.up?'var(--g)':'var(--r)'});
+      t.sort((a,b)=>a.y-b.y); const gap=17, top=this.pad.t+8, bot=this.H-this.pad.b-8;
+      for(let i=1;i<t.length;i++) if(t[i].y-t[i-1].y<gap) t[i].y=t[i-1].y+gap;
+      for(let i=t.length-1;i>=0;i--){ const lim=i===t.length-1?bot:t[i+1].y-gap; if(t[i].y>lim) t[i].y=lim }
+      t.forEach(x=>{x.y=Math.max(top,x.y)}); return t },
+    hidden(){ const [lo,hi]=this.yr; return (this.c.levels||[]).filter(l=>l.value<lo||l.value>hi) },
+    last(){ const b=this.bars[this.bars.length-1]; return b?{v:b.c,y:this.y(b.c),up:b.c>=b.o}:null },
+    hb(){ return this.hover!=null?this.bars[this.hover]:null },
+    // bar chart
+    brows(){ return (this.c.bars||[]) },
+    bH(){ return 26+this.brows.length*22 },
+  },
+  methods:{
+    y(v){ const [lo,hi]=this.yr; return this.pad.t+this.ph*(1-(v-lo)/((hi-lo)||1)) },
+    f(v){ return v==null?'—':Number(v).toLocaleString(undefined,{minimumFractionDigits:this.dp,maximumFractionDigits:this.dp}) },
+    tone(t){ return t==='stop'?'var(--r)':t==='target'?'var(--g)':'var(--b)' },
+    move(e){ if(this.c.kind!=='candles'||!this.bars.length) return;
+      const r=this.$refs.svg.getBoundingClientRect(), x=(e.clientX-r.left)*this.W/r.width;
+      const i=Math.floor((x-this.pad.l)/this.step); this.hover=(i>=0&&i<this.bars.length)?i:null;
+      this.hy=(e.clientY-r.top)*this.H/r.height; this.tipX=(e.clientX-r.left); this.tipW=r.width },
+    tipStyle(){ const left=this.tipX>this.tipW*0.6?this.tipX-170:this.tipX+14; return {left:left+'px',top:'38px'} },
+    when(t){ const d=new Date(t*1000); return d.toLocaleDateString([], {weekday:'short'})+' '+d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) },
+  },
+  template:`
+  <div class="ncchart">
+    <div class="hd"><b>{{ c.title }}</b>
+      <span v-if="c.direction" class="dirbadge" :class="c.direction">{{ c.direction }}</span>
+      <span class="sub" v-if="c.subtitle">{{ c.subtitle }}</span>
+      <span class="px" v-if="c.kind==='candles'&&last">{{ f(c.price??last.v) }}</span></div>
+    <template v-if="c.kind==='candles'">
+      <svg ref="svg" :viewBox="'0 0 '+W+' '+H" @pointermove="move" @pointerleave="hover=null" role="img" :aria-label="c.title+' candlestick chart'">
+        <g v-for="g in grid" :key="'g'+g.y">
+          <line :x1="pad.l" :x2="W-pad.r" :y1="g.y" :y2="g.y" stroke="var(--bd)" stroke-width="1"/>
+          <text v-if="!tags.some(t=>Math.abs(t.y-g.y)<12)" :x="W-pad.r+6" :y="g.y+3.5" font-size="10" fill="var(--dim2)" font-family="var(--mono)">{{ f(g.v) }}</text>
+        </g>
+        <text v-for="tm in times" :key="'t'+tm.x" :x="tm.x" :y="H-7" font-size="10" fill="var(--dim2)" text-anchor="middle">{{ tm.t }}</text>
+        <g v-for="(k,i) in candles" :key="i" :opacity="hover==null||hover===i?1:.55">
+          <line :x1="k.x" :x2="k.x" :y1="k.yh" :y2="k.yl" :stroke="k.up?'var(--g)':'var(--r)'" stroke-width="1"/>
+          <rect :x="k.x-k.w/2" :y="k.top" :width="k.w" :height="k.hgt" :fill="k.up?'var(--g)':'var(--r)'" rx="0.5"/>
+        </g>
+        <line v-for="lv in levels" :key="'l'+lv.label" :x1="pad.l" :x2="W-pad.r" :y1="lv.y" :y2="lv.y" :stroke="tone(lv.tone)" stroke-width="1.2" stroke-dasharray="5 4"/>
+        <line v-if="last" :x1="pad.l" :x2="W-pad.r" :y1="last.y" :y2="last.y" stroke="var(--dim)" stroke-width=".8" stroke-dasharray="1 3"/>
+        <g v-for="tg in tags" :key="'tg'+tg.key">
+          <rect :x="W-pad.r+2" :y="tg.y-8" :width="pad.r-4" height="16" rx="3" :fill="tg.fill"/>
+          <text :x="W-pad.r+6" :y="tg.y+3.6" font-size="9.5" fill="#fff" font-family="var(--mono)" font-weight="700">{{ tg.text }}</text>
+        </g>
+        <g v-if="hb">
+          <line :x1="candles[hover].x" :x2="candles[hover].x" :y1="pad.t" :y2="H-pad.b" stroke="var(--dim)" stroke-width=".8" stroke-dasharray="3 3"/>
+          <line v-if="hy>pad.t&&hy<H-pad.b" :x1="pad.l" :x2="W-pad.r" :y1="hy" :y2="hy" stroke="var(--dim)" stroke-width=".8" stroke-dasharray="3 3"/>
+        </g>
+      </svg>
+      <div v-if="hb" class="tip" :style="tipStyle()">{{ when(hb.t) }}<br>O {{ f(hb.o) }} H {{ f(hb.h) }}<br>L {{ f(hb.l) }} C <b :class="hb.c>=hb.o?'dirL':'dirS'">{{ f(hb.c) }}</b></div>
+      <div class="ft"><span>{{ bars.length }} × 15m</span><span v-if="c.source">{{ c.source }}</span>
+        <span v-for="h in hidden" :key="h.label">{{ h.label }} {{ f(h.value) }} off chart</span></div>
+    </template>
+    <template v-else-if="c.kind==='bars'">
+      <svg :viewBox="'0 0 '+W+' '+bH" role="img" :aria-label="c.title" style="max-width:760px;margin:0 auto">
+        <line :x1="W/2" :x2="W/2" y1="6" :y2="bH-16" stroke="var(--bd2)"/>
+        <text :x="W*0.27" :y="bH-4" font-size="10" fill="var(--dim2)" text-anchor="middle">◀ short</text>
+        <text :x="W*0.73" :y="bH-4" font-size="10" fill="var(--dim2)" text-anchor="middle">long ▶</text>
+        <g v-for="(r,i) in brows" :key="r.label">
+          <text x="8" :y="18+i*22" font-size="11" fill="var(--tx)" font-family="var(--mono)" font-weight="700">{{ r.label }}</text>
+          <rect :x="r.value>=0?W/2:W/2+(W/2-84)*r.value/100" :y="8+i*22" :width="Math.max(2,Math.abs((W/2-84)*r.value/100))" height="14" rx="3"
+            :fill="r.value>0?'var(--g)':r.value<0?'var(--r)':'var(--a)'" opacity=".85"/>
+          <text :x="r.value>=0?W/2+Math.abs((W/2-84)*r.value/100)+6:W/2-Math.abs((W/2-84)*r.value/100)-6" :y="19+i*22" font-size="10"
+            :text-anchor="r.value>=0?'start':'end'" fill="var(--dim)" font-family="var(--mono)">{{ Math.abs(r.value) }}% {{ r.note }}</text>
+        </g>
+      </svg>
+    </template>
+  </div>`
+});
+app.mount('#app');
 </script></body></html>

@@ -1,6 +1,14 @@
-# Signal Desk
+# Northchart
 
-Multi-asset confluence terminal for discretionary-systematic trading. XAU/USD first; metals, crypto, FX majors, indices and WTI also covered. Stdlib Python backend, single-file Vue dashboard.
+Multi-asset charts, confluence signals and an agent desk. XAU/USD first; metals, crypto, FX majors, indices and WTI also covered. Stdlib Python backend, single-file Vue dashboard. This repository was called Signal Desk; the code, service names and data paths keep the old names so existing deployments update in place.
+
+| Name | What it is |
+|---|---|
+| Northchart | The platform: dashboard, tracker and router |
+| Northchart Connect | The agent-facing interface: a remote MCP server for ChatGPT, Claude and other MCP clients |
+| Agent desk | The panel in the dashboard (Ctrl+K or `/`) that runs the same tools and shows what agents are doing |
+
+Strategy and competitive notes: `docs/TRADINGVIEW_TEARDOWN.md`.
 
 ```
 python xauusd_trader.py          # http://localhost:8899
@@ -19,6 +27,42 @@ Tradeable signals are paper-executed and journaled so the statistics are honest:
 - MFE and MAE are recorded per ticket
 
 A desk-wide risk governor sits above every instrument: a daily stop in R, a cap on open tickets, one open ticket per correlated group, and A-grade only after a losing streak. Correlated groups are crypto, metals, indices and energy, with FX majors grouped by the direction they put on the US dollar (short EURUSD and long USDJPY are both long USD), so three crypto shorts cannot fill the desk as if they were three separate bets. When the daily stop is hit the whole desk shows HALT until the next EAT trading day.
+
+## Journal (automatic)
+
+`/journal` (**Journal** in the header) is a sheet of every trade you take, filled in by itself. Trades arrive from TradingView trade sync and broker imports (`/api/tracker/import/fills`). `northchart_journal.py` then:
+
+- matches each trade to the desk's view when it opened (bias, grade, mode, regime, session) from a snapshot the engine keeps every five minutes, and labels it With desk, Against desk or Desk neutral;
+- takes the stop from the broker, or, when you traded in the desk's direction near its entry, from the desk's stop at that moment (labelled as such);
+- works out money at risk from the trade's own profit per point, so R multiples are exact without contract-size guesses;
+- writes the trade into the sealed, append-only journal. A trade with no stop it can trust stays in the sheet as **Needs stop** until you type one in. Notes, emotion and later stop changes are stored as corrections, never overwrites.
+
+Every stop, emotion and note carries its source, shown as a coloured edge on the field: blue for your **broker**, gold for the **desk**, green for **you**, grey italic for a **draft** not yet confirmed (✓ accepts it). Each cell stays on one line; "No stop used" sits in the small ▾ menu beside the stop. Your entry always wins and nothing automatic overwrites it. Emotion is never set automatically: behaviour flags (Revenge, FOMO, Overtrading, Against desk, Moved stop, Early exit, No stop) suggest one for a one-click confirm. Notes start as a draft paragraph built from what the desk recorded (setup, desk call, time held, best and worst R on the desk's 5-minute prices, whether the target was reached, one lesson); Claude rewrites it when `ANTHROPIC_API_KEY` is set. A trade with no stop can be marked **No stop used**, which keeps it out of R statistics and counts it as a discipline breach. **Review** walks through unreviewed trades one at a time (keys 1 to 8 pick an emotion, Enter saves); the header badge shows how many wait.
+
+The strip above the sheet shows trades, win rate, total and average R, net P/L, the longest losing streak, how often you traded with or against the desk, and how many trades still need a stop. CSV and Excel exports are one click. Agents read it through the `get_journal` tool.
+
+The Tracker and Router pages were removed in favour of the journal; `/tracker` and `/router` redirect here. Their APIs stay: TradingView sync posts fills to `/api/tracker/*`, and the agent's `preview_signal_routing` tool uses the router.
+
+## Accounts
+
+Sign in at `/signin`. The first account is the owner, created at `/setup` with the current desk password (`SIGNALDESK_PASS`), or from the computer running the desk when none is set. The owner keeps the existing journal and invites other traders from **Account**; sign-up is invite-only unless `NORTHCHART_SIGNUP=open` (or `closed`). Every member gets an empty journal of their own under `DATA_DIR/users/<id>/`; market data and desk signals are shared.
+
+Passwords are stored as scrypt hashes; sessions are HttpOnly, SameSite=Lax cookies (Secure over HTTPS) and the server keeps only their SHA-256; every cookie-authenticated write must come from the same origin; five failed sign-ins lock an email or address for 15 minutes. Verification and reset emails go out over SMTP when `SMTP_HOST` is set, otherwise they are written to `DATA_DIR/accounts/outbox.log`. The account page covers profile, password, active sessions, sync tokens, invites, data export (zip of CSVs) and deleting the account. ChatGPT and Claude now sign in with a Northchart email and password when connecting, and see only that user's journal; routing and portfolio tools stay owner-only.
+
+**Sign in with Google.** Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from a "Web application" OAuth client in Google Cloud whose authorised redirect URI is `<desk address>/auth/google/callback`. "Continue with Google" then appears on the sign-in and sign-up pages. It uses the authorisation code flow with PKCE, a state bound to the browser and a nonce; issuer, audience, expiry, nonce and verified email are checked. A Google address that matches an existing account connects to it; a new address needs an invite unless sign-up is open. Google-only accounts can set a password later on the account page, and any account can connect or disconnect Google there.
+
+Scripts use a **sync token** (`Bearer nci_...`, made on the account page) that can only send trades, or the account email and password as HTTP Basic. The old desk password keeps working as the owner for one release; `NORTHCHART_LEGACY_BASIC=0` turns it off.
+
+## Broker connections
+
+**Account > Brokers and data**: search for your broker (CMA-licensed brokers are marked) and pick a route. All of them are read-only and feed the same journal pipeline.
+
+- **Northchart Bridge** (MetaTrader 4 and 5, free): `tools/northchart_bridge/NorthchartBridge.mq5` and `.mq4`, downloadable from the account page with the desk address filled in. It reads closed trades from the terminal's history and posts them to `/api/ingest/bridge` with a sync token. It contains no trading calls and the password never leaves the terminal. MT5 sends the stop at entry and the stop at the close, so a widened stop is flagged.
+- **Investor password via MetaApi** (paid, owner's choice): set `NORTHCHART_METAAPI_TOKEN`. The trader enters account number, server and the investor password once; the desk creates the MetaApi account, refuses a master password using MetaApi's `investorMode` flag, keeps only the sealed MetaApi account id and pulls new trades every ten minutes.
+- **Statement import**: MT5 and MT4 HTML reports, cTrader and prop-firm CSVs, and any CSV whose columns are detected by name or picked by hand. Duplicates are skipped.
+- **TradingView trade sync**: `tools/start_tradingview_sync.ps1` with `DESK_TOKEN` set to a sync token.
+
+Planned: cTrader Open API, Interactive Brokers Flex, Binance read-only keys; OANDA and the Deriv API wait for a read-only option. Secrets are sealed with an HMAC-SHA256 stream cipher plus tag, keyed by `NORTHCHART_SECRET_KEY` (set it in production) or a generated `DATA_DIR/accounts/secret.key`.
 
 ## Trading tracker and Trading OS
 
@@ -69,6 +113,36 @@ Accounts live in `DATA_DIR/trading_os_data/router/accounts.json` on the server (
 
 Neither can place, modify or cancel an order. MCP servers that drive TradingView Desktop through its debug port were left out: they need a paid plan for the Desktop app, and their general click tools can reach the order panel. Details: `tools/README_TRADINGVIEW.md`.
 
+## Northchart Connect (MCP for ChatGPT and Claude)
+
+The server exposes a remote MCP endpoint at `/mcp` (Streamable HTTP, protocol versions 2025-11-25, 2025-06-18 and 2025-03-26). It is part of the same process as the dashboard, so agents and people read the same engine state.
+
+**Tools (all read-only, `readOnlyHint: true`):** `list_instruments`, `get_market_overview`, `get_market_snapshot`, `get_signal_detail`, `get_price_history`, `get_desk_brief`, `ask_desk`, `preview_signal_routing` (nothing is logged, no order is placed) and `get_portfolio_summary`. Nothing in Connect can place, change or cancel an order, edit the journal or change an account (decision D-011).
+
+**Sign-in.** Connect runs its own small OAuth 2.1 server: discovery at `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server`, Dynamic Client Registration at `/oauth/register`, PKCE S256 required, one-hour access tokens and 30-day refresh tokens rotated on every use, all stored hashed in `DATA_DIR/northchart_connect/oauth.json`. A client is approved on a Northchart consent page with the desk password (`SIGNALDESK_PASS`, or `NORTHCHART_OWNER_PASS` if you want a separate one). Five wrong passwords lock the page for 15 minutes per address. Redirects are limited to Claude's and ChatGPT's callbacks and loopback addresses; add others with `NORTHCHART_REDIRECT_ALLOW` (comma-separated prefixes). Tokens are never accepted in a URL.
+
+**Connect Claude:** Settings, Connectors, Add custom connector, paste `https://<your-host>/mcp`, approve with the desk password.
+
+**Connect ChatGPT:** Settings, Apps, Create (developer mode must be available on the plan), paste the same URL, choose OAuth, approve with the desk password.
+
+**Claude Code and scripts:** set a long random `NORTHCHART_MCP_TOKEN` (24+ characters) on the server, then
+`claude mcp add --transport http northchart https://<your-host>/mcp --header "Authorization: Bearer <token>"`.
+
+**Server settings** (in `/etc/signaldesk.env`, then restart the service):
+
+| Variable | Purpose |
+|---|---|
+| `NORTHCHART_PUBLIC_URL` | The public base URL, for example `https://desktrading-today.precifarm.com`. Recommended behind Cloudflare so OAuth metadata always names the right host |
+| `NORTHCHART_OWNER_PASS` | Optional consent password; defaults to `SIGNALDESK_PASS` |
+| `NORTHCHART_MCP_TOKEN` | Optional fixed bearer token for header-based clients |
+| `NORTHCHART_REDIRECT_ALLOW` | Optional extra redirect URI prefixes |
+
+`/mcp`, `/.well-known/oauth-*` and `/oauth/*` bypass HTTP Basic auth because they handle their own; every other route still needs the desk login.
+
+**Agent desk.** The Agents button in the header (or Ctrl+K, or `/`) opens a panel with three tabs: Run, a streaming chat (`northchart_agent.py`, served at `POST /api/agent/stream` as Server-Sent Events): each answer shows the tools it ran as they run, draws interactive 15-minute candle charts with the desk's entry, stop and target lines (or a conviction chart for market scans), then streams the written answer. It runs on the built-in desk engine, which writes only from tool output. Set `ANTHROPIC_API_KEY` on the server to have Claude run the conversation with the same read-only tools instead (`NORTHCHART_AGENT_MODEL` picks the model, default `claude-sonnet-5-5`; any API failure falls back to the desk engine for that answer); Activity (every tool call by the UI, ChatGPT or Claude, with timing and errors) and Connect (the MCP URL, setup steps, connected agents and a sign-out-all button). UI calls go through `/api/agent/run`, `/api/agent/activity`, `/api/agent/status` and `/api/agent/revoke`, which stay behind the desk login.
+
+Tests: `python -m unittest tests.test_connect` runs the full OAuth flow and MCP calls against a real local server.
+
 ## API
 
 | Route | Purpose |
@@ -78,6 +152,8 @@ Neither can place, modify or cancel an order. MCP servers that drive TradingView
 | `/api/desk/brief?sym=XAUUSD` | Precifarm analyst brief (plain text; `format=json`) |
 | `/api/ask?sym=..&q=..` | rule-based copilot from live state |
 | `/api/health` | unauthenticated health probe |
+| `/mcp` | Northchart Connect MCP endpoint (OAuth or bearer token) |
+| `/api/agent/*` | agent desk: streaming chat (`/stream`), run a tool, activity feed, status, sign out agents |
 | `/tracker` | trading tracker page |
 | `/api/tracker/summary` | journal metrics, prop status, prop economics, capital (syncs paper tickets) |
 | `/api/tracker/records?kind=` / `export?kind=` / `backup` | read rows, CSV export, zip backup |
@@ -96,7 +172,13 @@ Neither can place, modify or cancel an order. MCP servers that drive TradingView
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `SIGNALDESK_PASS` / `SIGNALDESK_USER` | unset / `trader` | HTTP Basic auth on every route except health |
+| `SIGNALDESK_PASS` / `SIGNALDESK_USER` | unset / `trader` | the old desk password: proves ownership at `/setup`, and works for scripts this release |
+| `NORTHCHART_SIGNUP` | `invite` | `invite`, `open` or `closed` |
+| `NORTHCHART_LEGACY_BASIC` | `1` | `0` stops accepting the old desk password |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | unset | email for verification and password reset |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | unset | switches on Sign in with Google |
+| `NORTHCHART_SECRET_KEY` | generated file | key that seals broker secrets (24+ characters) |
+| `NORTHCHART_METAAPI_TOKEN` | unset | switches on the investor-password route via MetaApi |
 | `DATA_DIR` | app dir | where journals and state persist |
 | `DESK_DAILY_STOP_R` | `4` | desk halts at this daily loss in R |
 | `DESK_MAX_OPEN` | `4` | maximum open or working tickets across the desk |

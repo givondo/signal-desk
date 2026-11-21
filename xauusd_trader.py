@@ -1,5 +1,5 @@
 """
-Signal Desk v4.4 - institutional-grade terminal backend
+Northchart engine v4.4 (formerly Signal Desk) - terminal backend
 -----------------------------------------------------
 Serves http://localhost:8899 (dashboard.html) and a JSON API:
 
@@ -305,8 +305,7 @@ except Exception:          # unknown DESK_TZ without tzdata: fixed UTC session h
     _LON = _NY = DESK_TZ = None
 AUTH_FILE = os.path.join(DATA_DIR, "tv_auth.json")
 DASH_FILE = os.path.join(BASE_DIR, "dashboard.html")   # read-only shipped asset
-TRACKER_FILE = os.path.join(BASE_DIR, "tracker.html")  # Trading OS tracker page
-ROUTER_FILE = os.path.join(BASE_DIR, "router.html")  # live/prop portfolio router page
+JOURNAL_FILE = os.path.join(BASE_DIR, "journal.html")  # automatic trade journal sheet
 TRACKER_MAX_BODY = 1024 * 1024  # broker history imports can be large
 
 
@@ -332,6 +331,231 @@ def _tracker_module():
 
 def _paper_tickets():
     return {s: list(t.resolved) for s, t in trackers.items()}
+
+
+# ---------------------------------------------------------- Northchart Connect
+# One backend, two channels: the agent panel in the UI and remote MCP clients
+# (ChatGPT, Claude) run the same read-only tools over the same engine state.
+_connect = None
+_connect_lock = threading.RLock()
+
+
+def _owner_password():
+    return (os.environ.get("NORTHCHART_OWNER_PASS") or os.environ.get("SIGNALDESK_PASS")
+            or AUTH_PASS or None)
+
+
+def roster_payload():
+    with state_lock:
+        rows = []
+        for s, c in SYMBOLS.items():
+            st = latest.get(s) or {}
+            rows.append({
+                "sym": s, "grp": c.get("grp"), "name": c.get("name"),
+                "status": st.get("status", "starting"),
+                "direction": st.get("direction"),
+                "price": st.get("price"),
+                "grade": st.get("grade"),
+                "confidence": st.get("confidence"),
+                "tradeable": st.get("tradeable"),
+                "mode": (st.get("desk_action") or {}).get("mode"),
+            })
+        gov = dict(governor_state)
+    return {"ts": time.strftime("%H:%M:%S"), "symbols": rows, "governor": gov}
+
+
+def _latest_copy(sym):
+    with state_lock:
+        return json.loads(json.dumps(latest.get(sym) or {}, default=str))
+
+
+def _route_preview(sym):
+    mod = _router_module()
+    if mod is None:
+        return {"ok": False, "error": "router not installed"}
+    _, _, out, _ = mod.handle("GET", "/api/router/route", {"sym": [sym], "preview": ["1"]}, None,
+                              latest_signal=_latest_copy)
+    return json.loads(out)
+
+
+def _portfolio_summary():
+    mod = _tracker_module()
+    if mod is None:
+        return {"ok": False, "error": "tracker not installed"}
+    _, _, out, _ = mod.handle("GET", "/api/tracker/summary", {}, None, paper_source=_paper_tickets)
+    return json.loads(out)
+
+
+def _candles(sym, limit=96):
+    """15m OHLC bars for charts. Futures proxies (GC=F, SI=F, CL=F) are shifted
+    by the spot-futures basis so they line up with the desk's spot levels, and
+    the response says so."""
+    with state_lock:
+        cc = dict(candle_cache.get(sym) or {})
+        st = latest.get(sym) or {}
+    bars = [list(b) for b in (cc.get("ohlc") or [])][-max(10, min(160, int(limit))):]
+    src = cc.get("source") or SYMBOLS[sym].get("candles")
+    out = {"symbol": sym, "interval": "15m", "source": f"Yahoo Finance {src}", "basis": 0.0,
+           "bars": [], "price": st.get("price"), "updated": cc.get("ts")}
+    if not bars:
+        return out
+    dp = SYMBOLS[sym].get("dp", 2)
+    px = st.get("price")
+    if src and src.endswith("=F") and isinstance(px, (int, float)) and bars[-1][4]:
+        basis = px - bars[-1][4]
+        if abs(basis) / px < 0.03:
+            out["basis"] = round(basis, dp)
+            out["source"] += (f" futures, shifted {basis:+.{dp}f} to spot" if round(basis, dp)
+                              else " futures")
+            bars = [[b[0]] + [v + basis for v in b[1:]] for b in bars]
+    out["bars"] = [{"t": int(b[0]), "o": round(b[1], dp), "h": round(b[2], dp), "l": round(b[3], dp),
+                    "c": round(b[4], dp)} for b in bars]
+    return out
+
+
+_journal = None
+_accounts = None
+_user_journals = {}
+OWNER_ONLY_PREFIXES = ("/api/router/", "/api/tv_login", "/api/agent/revoke")
+INGEST_PATHS = ("/api/tracker/import/fills", "/api/ingest/")
+
+
+def accounts_service():
+    global _accounts
+    with _connect_lock:
+        if _accounts is None:
+            import northchart_accounts as na
+            _accounts = na.Accounts(DATA_DIR, lambda: os.environ.get("SIGNALDESK_USER") or AUTH_USER,
+                                    lambda: os.environ.get("SIGNALDESK_PASS") or AUTH_PASS)
+        return _accounts
+
+
+_vault = None
+
+
+def broker_connections(u=None):
+    """This request's user's broker connections."""
+    global _vault
+    import northchart_accounts as na
+    import northchart_brokers as nb
+    u = u or na.current_user.get()
+    with _connect_lock:
+        if _vault is None:
+            _vault = nb.Vault(DATA_DIR)
+    return nb.Connections(accounts_service().user_dir(u), _vault, _tracker_module)
+
+
+def metaapi_client():
+    tok = os.environ.get("NORTHCHART_METAAPI_TOKEN")
+    if not tok:
+        return None
+    import northchart_brokers as nb
+    return nb.MetaApi(tok)
+
+
+def sync_all_brokers(min_age=600):
+    """Pull MetaApi trades for every user (called by the poller)."""
+    api = metaapi_client()
+    if api is None:
+        return
+    users = [None] + [u for u in accounts_service().data["users"].values() if not _is_owner(u)]
+    for u in users:
+        enter_user(u)
+        conns = broker_connections(u)
+        for c in conns.list():
+            if c.get("kind") == "metaapi" and time.time() - (c.get("last_sync") or 0) >= min_age:
+                try:
+                    conns.sync_metaapi(c["id"], api)
+                except Exception as e:
+                    print(f"brokers: {c['id']}: {e}", file=sys.stderr)
+    enter_user(None)
+
+
+_google = None
+
+
+def _google_enabled():
+    import northchart_google as ng
+    return ng.enabled()
+
+
+def _google_service():
+    global _google
+    import northchart_google as ng
+    with _connect_lock:
+        if _google is None:
+            _google = ng.GoogleAuth()
+        return _google
+
+
+def _account_login(email, password):
+    import northchart_accounts as na
+    try:
+        u, tok = accounts_service().login(email, password, "oauth")
+        accounts_service().logout(tok)          # OAuth only needs to know who approved
+        return u["uid"]
+    except na.AuthError:
+        return None
+
+
+def _is_owner(u):
+    return not u or u.get("role") == "owner"
+
+
+def enter_user(u):
+    """Point this request thread at one user's data (journal, tracker)."""
+    import northchart_accounts as na
+    na.current_user.set(u)
+    mod = _tracker_module()
+    if mod is not None and hasattr(mod, "set_root"):
+        mod.set_root(None if _is_owner(u) else os.path.join(accounts_service().user_dir(u), "trading_os_data"))
+
+
+def journal_service(user=None):
+    """The journal for this request's user. Desk history is shared; review notes are per user."""
+    global _journal
+    import northchart_accounts as na
+    u = user or na.current_user.get()
+    with _connect_lock:
+        if _journal is None:
+            import northchart_journal as nj
+            _journal = nj.Journal(DATA_DIR, lambda: SYMBOLS, _tracker_module)
+        if _is_owner(u):
+            return _journal
+        j = _user_journals.get(u["uid"])
+        if j is None:
+            import northchart_journal as nj
+            _journal._load()
+            j = nj.Journal(accounts_service().user_dir(u), lambda: SYMBOLS, _tracker_module)
+            j.history, j.last_snap, j.lock, j.hist_path, j._loaded = (
+                _journal.history, _journal.last_snap, _journal.lock, _journal.hist_path, True)
+            _user_journals[u["uid"]] = j
+        return j
+
+
+def connect_service():
+    global _connect
+    with _connect_lock:
+        if _connect is None:
+            import northchart_connect as nc
+            _connect = nc.Connect({
+                "symbols": lambda: SYMBOLS,
+                "latest": _latest_copy,
+                "roster": roster_payload,
+                "brief": lambda s: precifarm_brief_for(s, None),
+                "ask": copilot_answer,
+                "route_preview": _route_preview,
+                "portfolio": _portfolio_summary,
+                "candles": _candles,
+                "journal": lambda limit: journal_service().sheet(limit=limit),
+                "owner_password": _owner_password,
+                "accounts_enabled": lambda: accounts_service().has_users(),
+                "account_login": _account_login,
+                "user_exists": lambda uid: bool(accounts_service().get(uid)),
+                "enter_user": lambda uid: enter_user(accounts_service().get(uid) if uid else None),
+                "is_owner": lambda: _is_owner(__import__("northchart_accounts").current_user.get()),
+            }, DATA_DIR)
+        return _connect
 
 state_lock = threading.Lock()
 latest = {s: {"status": "starting"} for s in SYMBOLS}
@@ -536,13 +760,22 @@ def refresh_candles(sym):
     data = http_json("https://query1.finance.yahoo.com/v8/finance/chart/"
                      f"{urllib.parse.quote(SYMBOLS[sym]['candles'])}"
                      "?interval=15m&range=2d")
-    q = data["chart"]["result"][0]["indicators"]["quote"][0]
+    res0 = data["chart"]["result"][0]
+    q = res0["indicators"]["quote"][0]
+    stamps = res0.get("timestamp") or []
     hs, ls, cs = [], [], []
-    for h, l, c in zip(q["high"], q["low"], q["close"]):
+    ohlc = []
+    for i, (h, l, c) in enumerate(zip(q["high"], q["low"], q["close"])):
         if h is not None and l is not None and c is not None:
             hs.append(h)
             ls.append(l)
             cs.append(c)
+            o = (q.get("open") or [None] * len(q["close"]))[i]
+            if i < len(stamps):
+                ohlc.append([stamps[i], o if o is not None else c, h, l, c])
+    # Keep the bars for charts (agent desk and the get_candles tool).
+    candle_cache[sym]["ohlc"] = ohlc[-160:]
+    candle_cache[sym]["source"] = SYMBOLS[sym]["candles"]
     if len(cs) < 10:
         return
     ref = cs[-1]
@@ -1940,6 +2173,22 @@ def poller():
                     latest[sym] = {"status": "error", "error": str(e),
                                    "ts": time.strftime("%H:%M:%S"),
                                    "history": list(price_history[sym])}
+        try:   # automatic journal: desk context every 5 min, pending fills every 60 s
+            with state_lock:
+                snap = {k: v for k, v in latest.items()}
+            jn = journal_service()
+            jn.record_desk(snap)
+            if n % 4 == 0:
+                jn.auto_pass()
+                if n % 40 == 0:
+                    sync_all_brokers()
+                for u in list(accounts_service().data["users"].values()):   # every member's journal too
+                    if not _is_owner(u):
+                        enter_user(u)
+                        journal_service(u).auto_pass()
+                enter_user(None)
+        except Exception as e:
+            print(f"journal: {e}", file=sys.stderr)
         n += 1
         time.sleep(POLL_SECONDS)
 
@@ -1947,6 +2196,8 @@ def poller():
 # ---------------------------------------------------------------- http
 
 class Handler(BaseHTTPRequestHandler):
+    user = via = deny_reason = None
+
     def log_message(self, *a):
         pass
 
@@ -1957,31 +2208,271 @@ class Handler(BaseHTTPRequestHandler):
             passwd = AUTH_PASS
         return user, passwd
 
-    def _authorized(self):
-        user, passwd = self._auth_creds()
-        if not passwd:
-            return True
+    # ------------------------------------------------------------ identity
+    def _cookie(self, name):
+        from http.cookies import SimpleCookie
+        try:
+            c = SimpleCookie(self.headers.get("Cookie") or "")
+            return c[name].value if name in c else None
+        except Exception:
+            return None
+
+    def _client_ip(self):
+        peer = self.client_address[0] if self.client_address else ""
+        fwd = self.headers.get("CF-Connecting-IP") or (self.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+        return fwd or peer
+
+    def _is_https(self):
+        return (self.headers.get("X-Forwarded-Proto") == "https"
+                or (os.environ.get("NORTHCHART_PUBLIC_URL") or "").startswith("https://"))
+
+    def _identify(self):
+        acc = accounts_service()
+        tok = self._cookie("nc_s")
+        if tok:
+            u = acc.session_user(tok)
+            if u:
+                return u, "session"
         h = self.headers.get("Authorization", "")
         if h.startswith("Basic "):
-            try:
-                u, _, p = base64.b64decode(h[6:]).decode().partition(":")
-                return (hmac.compare_digest(u.encode(), user.encode())
-                        & hmac.compare_digest(p.encode(), passwd.encode()))
-            except Exception:
-                return False
-        return False
+            u = acc.basic_user(h)
+            return (u, "basic") if u else (None, "bad")
+        if h[:7].lower() == "bearer " and h[7:].strip().startswith("nci_"):
+            u = acc.ingest_user(h[7:].strip())
+            return (u, "ingest") if u else (None, "bad")
+        if not acc.has_users() and not self._auth_creds()[1]:
+            return {"uid": "owner", "email": "", "name": "", "role": "owner", "verified": True}, "open"
+        return None, None
+
+    def _same_origin(self):
+        src = self.headers.get("Origin") or self.headers.get("Referer") or ""
+        host = self.headers.get("X-Forwarded-Host") or self.headers.get("Host") or ""
+        return bool(src) and urllib.parse.urlsplit(src).netloc == host
+
+    def _authorized(self):
+        u, via = self._identify()
+        self.user, self.via, self.deny_reason = u, via, None
+        if not u:
+            return False
+        path = urllib.parse.urlparse(self.path).path
+        if via == "ingest" and not path.startswith(INGEST_PATHS):
+            self.deny_reason = "a sync token can only send trades"
+            return False
+        if via == "session" and self.command in ("POST", "PUT", "DELETE") and not self._same_origin():
+            self.deny_reason = "cross-site request refused"
+            return False
+        if not _is_owner(u) and path.startswith(OWNER_ONLY_PREFIXES):
+            self.deny_reason = "only the desk owner can do this"
+            return False
+        enter_user(u)
+        return True
 
     def _deny(self):
-        body = (b"<html><body><h3>Signal Desk</h3>"
-                b"<p>Login required. User: <b>trader</b> (unless you changed "
-                b"SIGNALDESK_USER). Cancel and retry if the password failed."
-                b"</p></body></html>")
-        self.send_response(401)
-        self.send_header("WWW-Authenticate", 'Basic realm="Signal Desk"')
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        path = urllib.parse.urlparse(self.path).path
+        wants_html = self.command == "GET" and not path.startswith("/api/") \
+            and "text/html" in (self.headers.get("Accept") or "text/html")
+        if self.user is None and wants_html:
+            nxt = urllib.parse.quote(self.path, safe="/?=&")
+            return self._send_full(302, "text/plain", b"", {"Location": "/signin?next=" + nxt})
+        status = 403 if self.user else 401
+        msg = self.deny_reason or "sign in to Northchart"
+        return self._send_full(status, "application/json", json.dumps({"ok": False, "error": msg}).encode())
+
+    # ------------------------------------------------------------ accounts: pages and API
+    AUTH_PAGES = ("/signin", "/signup", "/setup", "/forgot", "/reset", "/verify", "/account",
+                  "/legal/terms", "/legal/privacy", "/legal/risk", "/auth/google/start", "/auth/google/callback")
+
+    def _session_cookie(self, token, max_age=30 * 86400):
+        parts = [f"nc_s={token}", "Path=/", "HttpOnly", "SameSite=Lax", f"Max-Age={max_age}"]
+        if self._is_https():
+            parts.append("Secure")
+        return "; ".join(parts)
+
+    def _google(self, path, q, acc, pages, u, via, base):
+        import northchart_accounts as na
+        import northchart_google as ng
+        bad = lambda msg, st=400: self._send_full(st, "text/html; charset=utf-8", pages.message(
+            "Google sign-in", msg, "/signin", "Back to sign in"))
+        if not ng.enabled():
+            return bad("Google sign-in is not switched on for this desk yet. Sign in with email and password.")
+        nxt = q("next") if q("next").startswith("/") and not q("next").startswith("//") else "/"
+        if path == "/auth/google/start":
+            mode = "link" if q("mode") == "link" else "signin"
+            if mode == "link" and via != "session":
+                return bad("Sign in first, then connect Google from your account page.")
+            url, state = _google_service().start(base, nxt, q("invite")[:40], mode, u["uid"] if mode == "link" else None)
+            cookie = f"nc_g={state}; Path=/auth/google; HttpOnly; SameSite=Lax; Max-Age=600" + \
+                ("; Secure" if self._is_https() else "")
+            return self._send_full(302, "text/plain", b"", {"Location": url, "Set-Cookie": cookie})
+        if q("error"):
+            return bad("Google sign-in was cancelled.")
+        try:
+            claims, p = _google_service().finish(base, q("code"), q("state"), self._cookie("nc_g"))
+            user, created = acc.google_user(claims, p.get("invite") or "", self._client_ip(), p["mode"], p.get("uid"))
+        except (ValueError, na.AuthError) as e:
+            return bad(str(e))
+        if p["mode"] == "link":
+            dest = "/account?google=linked"
+            tok = self._cookie("nc_s")
+        else:
+            tok = acc.new_session(user["uid"], self._client_ip(), self.headers.get("User-Agent") or "")
+            dest = "/account?welcome=1" if created else (p.get("next") or "/")
+        headers = {"Location": dest}
+        if tok:
+            headers["Set-Cookie"] = self._session_cookie(tok)
+        return self._send_full(302, "text/plain", b"", headers)
+
+    def _auth_http(self, method, parsed):
+        """Handle sign-in pages and /api/auth/*. Returns True when the request was answered."""
+        path = parsed.path.rstrip("/") or "/"
+        if not (path in self.AUTH_PAGES or path.startswith("/api/auth/")):
+            return False
+        import northchart_accounts as na
+        import northchart_auth_pages as pages
+        acc = accounts_service()
+        qs = urllib.parse.parse_qs(parsed.query)
+        q = lambda k: (qs.get(k) or [""])[0]
+        base = self._base_url()
+        html_ = lambda b, status=200, extra=None: self._send_full(status, "text/html; charset=utf-8", b, extra)
+        js = lambda obj, status=200, extra=None: self._send_full(status, "application/json",
+                                                               json.dumps(obj, default=str).encode(), extra)
+        u, via = self._identify()
+        self.user, self.via = u, via
+        if method == "GET" and path.startswith("/auth/google/"):
+            return self._google(path, q, acc, pages, u, via, base) or True
+        if method == "GET":
+            if path == "/signin":
+                if u and via != "open" and acc.has_users():
+                    return self._send_full(302, "text/plain", b"", {"Location": "/"}) or True
+                return html_(pages.signin(acc.signup_mode(), acc.has_users(), acc.smtp_ready(),
+                                          _google_enabled())) or True
+            if path == "/setup":
+                if acc.has_users():
+                    return self._send_full(302, "text/plain", b"", {"Location": "/signin"}) or True
+                return html_(pages.setup_page(bool(self._auth_creds()[1]))) or True
+            if path == "/signup":
+                return html_(pages.signup(acc.signup_mode() if acc.has_users() else "closed", q("invite"),
+                                          _google_enabled())) or True
+            if path == "/forgot":
+                return html_(pages.forgot(acc.smtp_ready())) or True
+            if path == "/reset":
+                return html_(pages.reset(q("token"))) or True
+            if path == "/verify":
+                try:
+                    acc.verify(q("token"))
+                    return html_(pages.message("Email confirmed", "Thanks. Your email address is confirmed.")) or True
+                except na.AuthError as e:
+                    return html_(pages.message("Link not valid", str(e), "/account", "Go to your account"), 400) or True
+            if path.startswith("/legal/"):
+                return html_(pages.legal(path.split("/")[-1])) or True
+            if path == "/api/auth/state":
+                return js({"has_users": acc.has_users(), "signup_mode": acc.signup_mode(),
+                           "smtp": acc.smtp_ready(), "google": _google_enabled()}) or True
+            if path == "/api/auth/me":
+                return js({"user": acc.public(u) if via in ("session", "basic", "open") else None,
+                           "signup_mode": acc.signup_mode(), "has_users": acc.has_users(),
+                           "via": via, "google": _google_enabled()}) or True
+        # everything below needs a signed-in user
+        public_post = ("/api/auth/signin", "/api/auth/signup", "/api/auth/setup", "/api/auth/forgot",
+                       "/api/auth/reset")
+        if method == "POST" and not self._same_origin() and via != "basic":
+            return js({"ok": False, "error": "cross-site request refused"}, 403) or True
+        body = {}
+        if method == "POST":
+            ln = int(self.headers.get("Content-Length", 0) or 0)
+            if ln > 20000:
+                return js({"ok": False, "error": "body too large"}, 413) or True
+            try:
+                body = json.loads(self.rfile.read(ln) or b"{}")
+                body = body if isinstance(body, dict) else {}
+            except Exception:
+                return js({"ok": False, "error": "invalid JSON"}, 400) or True
+        b = lambda k: str(body.get(k) or "")
+        ip, ua = self._client_ip(), self.headers.get("User-Agent") or ""
+        try:
+            if method == "POST" and path in public_post:
+                if path == "/api/auth/signin":
+                    user, tok = acc.login(b("email"), b("password"), ip, ua)
+                elif path == "/api/auth/setup":
+                    loop_ip = ip if not (self.headers.get("CF-Connecting-IP") or self.headers.get("X-Forwarded-For")) \
+                        else "203.0.113.1"
+                    user = acc.setup_owner(b("email"), b("name"), b("password"), b("legacy_password"), loop_ip)
+                    tok = acc.new_session(user["uid"], ip, ua)
+                elif path == "/api/auth/signup":
+                    user = acc.signup(b("email"), b("name"), b("password"), b("invite"), ip)
+                    tok = acc.new_session(user["uid"], ip, ua)
+                    acc.send_verify(user, base)
+                elif path == "/api/auth/forgot":
+                    acc.start_reset(b("email"), base, ip)
+                    return js({"ok": True}) or True
+                else:   # reset
+                    user = acc.finish_reset(b("token"), b("password"))
+                    tok = acc.new_session(user["uid"], ip, ua)
+                return js({"ok": True, "user": acc.public(user)}, 200,
+                          {"Set-Cookie": self._session_cookie(tok)}) or True
+            if not u or via not in ("session", "basic", "open"):
+                if path == "/account":
+                    return self._send_full(302, "text/plain", b"", {"Location": "/signin?next=/account"}) or True
+                return js({"ok": False, "error": "sign in first"}, 401) or True
+            if via == "open":
+                if path == "/account":
+                    return self._send_full(302, "text/plain", b"", {"Location": "/setup"}) or True
+                return js({"ok": False, "error": "create the owner account first at /setup"}, 400) or True
+            uid, tok = u["uid"], self._cookie("nc_s")
+            enter_user(u)
+            if method == "GET":
+                if path == "/account":
+                    return html_(pages.account()) or True
+                if path == "/api/auth/sessions":
+                    return js({"sessions": acc.sessions(uid, tok)}) or True
+                if path == "/api/auth/tokens":
+                    return js({"tokens": acc.ingest_tokens(uid)}) or True
+                if path == "/api/auth/invites":
+                    if u.get("role") != "owner":
+                        return js({"ok": False, "error": "only the desk owner can invite"}, 403) or True
+                    return js({"invites": acc.invites()}) or True
+                if path == "/api/auth/export.zip":
+                    mod = _tracker_module()
+                    data = mod.backup_zip() if mod else b""
+                    return self._send_full(200, "application/zip", data, {
+                        "Content-Disposition": 'attachment; filename="northchart-journal.zip"'}) or True
+            else:
+                if path == "/api/auth/signout":
+                    acc.logout(tok)
+                    return js({"ok": True}, 200, {"Set-Cookie": self._session_cookie("", 0)}) or True
+                if path == "/api/auth/profile":
+                    acc.update_profile(uid, b("name"))
+                    return js({"ok": True}) or True
+                if path == "/api/auth/google/unlink":
+                    acc.unlink_google(uid)
+                    return js({"ok": True}) or True
+                if path == "/api/auth/password":
+                    acc.change_password(uid, b("old"), b("new"), keep_token=tok)
+                    return js({"ok": True}) or True
+                if path == "/api/auth/verify/resend":
+                    acc.send_verify(u, base)
+                    return js({"ok": True, "emailed": acc.smtp_ready()}) or True
+                if path == "/api/auth/sessions/revoke":
+                    acc.revoke_sessions(uid, sid=None if body.get("others") else b("sid"), keep_token=tok)
+                    return js({"ok": True}) or True
+                if path == "/api/auth/tokens":
+                    return js({"ok": True, "token": acc.new_ingest_token(uid, b("label"))}) or True
+                if path == "/api/auth/tokens/revoke":
+                    acc.revoke_ingest(uid, b("id"))
+                    return js({"ok": True}) or True
+                if path in ("/api/auth/invites", "/api/auth/invites/revoke"):
+                    if u.get("role") != "owner":
+                        return js({"ok": False, "error": "only the desk owner can invite"}, 403) or True
+                    if path.endswith("revoke"):
+                        acc.revoke_invite(b("id"))
+                        return js({"ok": True}) or True
+                    return js({"ok": True, "code": acc.new_invite(uid, b("email"))}) or True
+                if path == "/api/auth/delete":
+                    acc.delete(uid, b("password"))
+                    return js({"ok": True}, 200, {"Set-Cookie": self._session_cookie("", 0)}) or True
+        except na.AuthError as e:
+            return js({"ok": False, "error": str(e)}, 400) or True
+        return js({"ok": False, "error": "not found"}, 404) or True
 
     def _send(self, body, ctype):
         self.send_response(200)
@@ -2025,10 +2516,258 @@ class Handler(BaseHTTPRequestHandler):
                                                  latest_signal=latest_signal)
         self._send_full(status, ctype, out, headers)
 
+    # ------------------------------------------------ Northchart Connect (MCP)
+    def _base_url(self):
+        fixed = os.environ.get("NORTHCHART_PUBLIC_URL")
+        if fixed:
+            return fixed.rstrip("/")
+        proto = (self.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip() or "http"
+        host = (self.headers.get("X-Forwarded-Host") or self.headers.get("Host")
+                or f"localhost:{PORT}").split(",")[0].strip()
+        return f"{proto}://{host}"
+
+    def _connect_http(self, method):
+        parsed = urllib.parse.urlparse(self.path)
+        body = b""
+        if method == "POST":
+            ln = int(self.headers.get("Content-Length", 0) or 0)
+            if ln > TRACKER_MAX_BODY:
+                return self._send_full(413, "application/json", b'{"error": "body too large"}')
+            body = self.rfile.read(ln) if ln else b""
+        ip = (self.headers.get("CF-Connecting-IP") or self.headers.get("X-Forwarded-For")
+              or self.client_address[0]).split(",")[0].strip()
+        status, headers, out = connect_service().handle(
+            method, parsed.path, parsed.query, self.headers, body, self._base_url(), ip)
+        self.send_response(status)
+        for k, v in headers.items():
+            self.send_header(k, v)
+        if "Content-Length" not in headers:
+            self.send_header("Content-Length", str(len(out)))
+        self.end_headers()
+        if method != "HEAD" and out:
+            self.wfile.write(out)
+
+    def _is_connect(self):
+        import northchart_connect as nc
+        return nc.is_public_path(urllib.parse.urlparse(self.path).path)
+
+    def do_OPTIONS(self):
+        if self._is_connect():
+            return self._connect_http("OPTIONS")
+        self.send_response(204)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def do_HEAD(self):
+        if self._is_connect():
+            return self._connect_http("HEAD")
+        if not self._authorized():
+            return self._deny()
+        self.send_response(200)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def do_DELETE(self):
+        if self._is_connect():
+            return self._connect_http("DELETE")
+        self.send_response(405)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _agent_stream(self, svc, body):
+        """Stream an agent answer as Server-Sent Events (tool steps, charts, text)."""
+        import northchart_agent as na
+        agent = na.DeskAgent(svc, lambda: SYMBOLS)
+        q = str(body.get("question") or "")
+        sym = str(body.get("symbol") or "XAUUSD").upper()
+        hist = body.get("history") if isinstance(body.get("history"), list) else []
+        self.close_connection = True
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Accel-Buffering", "no")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        try:
+            for ev in agent.stream(q, sym, hist):
+                self.wfile.write(b"data: " + json.dumps(ev, default=str).encode() + b"\n\n")
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # the user pressed Stop or closed the panel
+
+    def _agent_post(self, parsed):
+        ln = int(self.headers.get("Content-Length", 0) or 0)
+        if ln > TRACKER_MAX_BODY:
+            return self._send_full(413, "application/json", b'{"ok": false, "error": "body too large"}')
+        try:
+            body = json.loads(self.rfile.read(ln) or b"{}")
+        except Exception:
+            body = None
+        if not isinstance(body, dict):
+            return self._send_full(400, "application/json", b'{"ok": false, "error": "invalid JSON"}')
+        svc = connect_service()
+        if parsed.path == "/api/agent/stream":
+            return self._agent_stream(svc, body)
+        if parsed.path == "/api/agent/run":
+            ok, result = svc.run_tool(str(body.get("tool") or ""), body.get("args") or {},
+                                      client="Northchart UI")
+            return self._send(json.dumps({"ok": ok, "result": result}, default=str).encode(),
+                              "application/json")
+        if parsed.path == "/api/agent/revoke":
+            svc.revoke_all()
+            return self._send(b'{"ok": true}', "application/json")
+        return self._send_full(404, "application/json", b'{"ok": false, "error": "not found"}')
+
+    # ------------------------------------------------------------ brokers
+    def _brokers_http(self, method, parsed):
+        path = parsed.path
+        if not (path.startswith("/api/brokers") or path.startswith("/api/ingest/") or path.startswith("/bridge/")):
+            return False
+        import northchart_brokers as nb
+        js = lambda obj, status=200: self._send_full(status, "application/json", json.dumps(obj, default=str).encode())
+        u = self.user
+        conns = broker_connections(u)
+        if method == "GET":
+            if path == "/api/brokers":
+                cat = nb.catalogue(metaapi_client() is not None)
+                return js({**cat, "connections": conns.list(), "desk_url": self._base_url(),
+                           "secret_from_env": bool(os.environ.get("NORTHCHART_SECRET_KEY"))}) or True
+            if path in ("/bridge/NorthchartBridge.mq5", "/bridge/NorthchartBridge.mq4"):
+                fn = os.path.join(BASE_DIR, "tools", "northchart_bridge", os.path.basename(path))
+                try:
+                    with open(fn, "rb") as f:
+                        data = f.read().replace(b'"https://desktrading-today.precifarm.com"; // Northchart address',
+                                                ('"' + self._base_url() + '"; // Northchart address').encode())
+                except OSError:
+                    return js({"ok": False, "error": "bridge file missing"}, 404) or True
+                return self._send_full(200, "application/octet-stream", data, {
+                    "Content-Disposition": f'attachment; filename="{os.path.basename(path)}"'}) or True
+            return js({"ok": False, "error": "not found"}, 404) or True
+        ln = int(self.headers.get("Content-Length", 0) or 0)
+        limit = 12_000_000 if path == "/api/brokers/import" else 4_000_000
+        if ln > limit:
+            return js({"ok": False, "error": "file too large (12 MB at most)"}, 413) or True
+        try:
+            body = json.loads(self.rfile.read(ln) or b"{}")
+            body = body if isinstance(body, dict) else {}
+        except Exception:
+            return js({"ok": False, "error": "invalid JSON"}, 400) or True
+        b = lambda k, d="": str(body.get(k) if body.get(k) is not None else d).strip()
+        acct_type = lambda v: {"REAL": "PERSONAL", "LIVE": "PERSONAL", "PERSONAL": "PERSONAL", "DEMO": "DEMO",
+                               "PROP": "PROP"}.get(str(v or "").upper(), "PERSONAL")
+        label_of = lambda broker, login: re.sub(r"[^A-Z0-9]+", "-", f"{broker}-{login}".upper()).strip("-")[:40]
+        try:
+            if path == "/api/ingest/bridge":
+                login, server = b("login"), b("server")
+                if not login or not server:
+                    return js({"ok": False, "error": "login and server are required"}, 400) or True
+                broker = b("broker", "MetaTrader")[:60]
+                fills = nb.bridge_fills(body)
+                res = conns.ingest({"kind": "bridge", "login": login, "server": server}, "bridge", broker,
+                                   label_of(broker, login), acct_type(body.get("account_mode")), fills,
+                                   broker=broker, platform=b("platform", "mt5"),
+                                   currency=b("currency"), label=f"{broker} {login}")
+                return js({"ok": True, **res}) or True
+            if path == "/api/brokers/import":
+                raw = base64.b64decode(b("content_b64") or "")
+                offset = float(body.get("offset_hours") or 0)
+                kind, fills, info = nb.parse_statement(b("filename"), raw, offset, body.get("mapping") or None)
+                if info.get("error") or info.get("missing"):
+                    return js({"ok": False, "kind": kind, "error": info.get("error") or
+                               "Some columns could not be matched. Pick them below.", **info}, 400) or True
+                if not fills:
+                    return js({"ok": False, "kind": kind, "error": "No closed trades found in this file."}, 400) or True
+                broker = b("broker", "Statement")[:60]
+                label = b("account_label") or label_of(broker, "IMPORT")
+                res = conns.ingest({"kind": "statement", "account_label": label}, "statement", broker, label,
+                                   acct_type(body.get("account_type")), fills, broker=broker,
+                                   label=f"{broker} statement", last_file=b("filename")[:80])
+                return js({"ok": True, "kind": kind, "found": len(fills), **res, **({"mapping": info.get("mapping")}
+                                                                                    if info.get("mapping") else {})}) or True
+            if path == "/api/brokers/metaapi":
+                api = metaapi_client()
+                if api is None:
+                    return js({"ok": False, "error": "MetaApi is not switched on for this desk. Use the free "
+                                                     "Northchart Bridge instead."}, 400) or True
+                login, server, pw = b("login"), b("server"), str(body.get("password") or "")
+                platform = b("platform", "mt5").lower()
+                if not (login and server and pw) or platform not in ("mt4", "mt5"):
+                    return js({"ok": False, "error": "Enter the account number, server and investor password."}, 400) or True
+                broker = b("broker", "MetaTrader")[:60]
+                acc_id, region = api.create(login, pw, server, platform, f"northchart {label_of(broker, login)}")
+                del pw, body["password"]
+                st, info = api.info(acc_id, region)
+                if st == 200 and info.get("investorMode") is False:
+                    api.remove(acc_id)
+                    return js({"ok": False, "error": "That is the master (trading) password. Northchart only "
+                                                     "accepts the investor (read-only) password."}, 400) or True
+                c = conns.upsert({"kind": "metaapi", "login": login, "server": server}, broker=broker,
+                                 platform=platform, account_label=label_of(broker, login),
+                                 account_type=acct_type(body.get("account_type")), label=f"{broker} {login}",
+                                 state="connecting", secret=_vault.seal({"account_id": acc_id, "region": region}),
+                                 investor_checked=(st == 200 and info.get("investorMode") is True))
+                threading.Thread(target=self._metaapi_first_sync, args=(u, c["id"]), daemon=True).start()
+                return js({"ok": True, "connection": c}) or True
+            if path == "/api/brokers/sync":
+                api = metaapi_client()
+                if api is None:
+                    return js({"ok": False, "error": "MetaApi is not switched on for this desk"}, 400) or True
+                return js({"ok": True, **conns.sync_metaapi(b("id"), api)}) or True
+            if path == "/api/brokers/remove":
+                c = conns.get(b("id"))
+                if not c:
+                    return js({"ok": False, "error": "unknown connection"}, 404) or True
+                if c.get("kind") == "metaapi" and metaapi_client():
+                    try:
+                        metaapi_client().remove(_vault.open(c["secret"])["account_id"])
+                    except Exception:
+                        pass
+                conns.remove(c["id"])
+                return js({"ok": True}) or True
+        except (ValueError, KeyError) as e:
+            return js({"ok": False, "error": str(e)}, 400) or True
+        return js({"ok": False, "error": "not found"}, 404) or True
+
+    def _metaapi_first_sync(self, u, cid):
+        enter_user(u)
+        try:
+            time.sleep(5)
+            broker_connections(u).sync_metaapi(cid, metaapi_client())
+        except Exception as e:
+            print(f"brokers: first sync {cid}: {e}", file=sys.stderr)
+
     def do_POST(self):
+        if self._is_connect():
+            return self._connect_http("POST")
+        if self._auth_http("POST", urllib.parse.urlparse(self.path)):
+            return
         if not self._authorized():
             return self._deny()
         parsed = urllib.parse.urlparse(self.path)
+        if self._brokers_http("POST", parsed):
+            return
+        if parsed.path.startswith("/api/agent/"):
+            return self._agent_post(parsed)
+        if parsed.path in ("/api/journal/update", "/api/journal/sync", "/api/journal/review", "/api/journal/draft"):
+            ln = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                body = json.loads(self.rfile.read(ln) or b"{}") if ln <= TRACKER_MAX_BODY else {}
+            except Exception:
+                body = {}
+            jn = journal_service()
+            try:
+                if parsed.path == "/api/journal/sync":
+                    out = {"ok": True, **jn.auto_pass(force=True)}
+                elif parsed.path == "/api/journal/review":
+                    out = jn.review(str(body.get("id") or ""), body)
+                elif parsed.path == "/api/journal/draft":
+                    out = jn.draft_with_claude(str(body.get("id") or ""))
+                else:
+                    out = jn.update(str(body.get("id") or ""), str(body.get("field") or ""), body.get("value"))
+                return self._send(json.dumps(out).encode(), "application/json")
+            except Exception as e:
+                return self._send_full(400, "application/json",
+                                       json.dumps({"ok": False, "error": str(e)}).encode())
         if parsed.path.startswith("/api/router/"):
             ln = int(self.headers.get("Content-Length", 0) or 0)
             if ln > TRACKER_MAX_BODY:
@@ -2097,6 +2836,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
+        if self._is_connect():
+            return self._connect_http("GET")
+        # Desktop app (PWA) assets are public: browsers fetch the manifest without credentials.
+        import northchart_pwa
+        if parsed.path in northchart_pwa.PUBLIC_PATHS:
+            ctype, body = northchart_pwa.serve(parsed.path)
+            return self._send_full(200, ctype, body, {"Service-Worker-Allowed": "/"}
+                                   if parsed.path == "/sw.js" else None)
         # Render/platform health probes must not require HTTP Basic auth.
         if parsed.path == "/api/health":
             with state_lock:
@@ -2109,8 +2856,12 @@ class Handler(BaseHTTPRequestHandler):
                 "port": PORT,
             }).encode(), "application/json")
             return
+        if self._auth_http("GET", parsed):
+            return
         if not self._authorized():
             return self._deny()
+        if self._brokers_http("GET", parsed):
+            return
         qs = urllib.parse.parse_qs(parsed.query)
         sym = (qs.get("sym") or ["XAUUSD"])[0]
         if sym not in SYMBOLS:
@@ -2139,42 +2890,43 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self._send(text.encode("utf-8"), "text/plain; charset=utf-8")
         elif parsed.path == "/api/roster":
-            with state_lock:
-                rows = []
-                for s, c in SYMBOLS.items():
-                    st = latest.get(s) or {}
-                    rows.append({
-                        "sym": s, "grp": c.get("grp"), "name": c.get("name"),
-                        "status": st.get("status", "starting"),
-                        "direction": st.get("direction"),
-                        "price": st.get("price"),
-                        "grade": st.get("grade"),
-                        "confidence": st.get("confidence"),
-                        "tradeable": st.get("tradeable"),
-                        "mode": (st.get("desk_action") or {}).get("mode"),
-                    })
-                gov = dict(governor_state)
-            self._send(json.dumps({"ts": time.strftime("%H:%M:%S"),
-                                   "symbols": rows, "governor": gov}).encode(),
+            self._send(json.dumps(roster_payload()).encode(), "application/json")
+        elif parsed.path == "/api/agent/status":
+            self._send(json.dumps(connect_service().status(self._base_url())).encode(),
+                       "application/json")
+        elif parsed.path == "/api/agent/activity":
+            try:
+                n = int((qs.get("limit") or ["50"])[0] or 50)
+            except ValueError:
+                n = 50
+            self._send(json.dumps({"activity": connect_service().activity_feed(min(n, 300))}).encode(),
                        "application/json")
         elif parsed.path.startswith("/api/tracker/"):
             self._tracker("GET", parsed)
         elif parsed.path.startswith("/api/router/"):
             self._router("GET", parsed)
-        elif parsed.path in ("/router", "/router/"):
+        elif parsed.path in ("/router", "/router/", "/tracker", "/tracker/"):
+            # Tracker and Router pages were replaced by the automatic journal.
+            self.send_response(302)
+            self.send_header("Location", "/journal")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+        elif parsed.path in ("/journal", "/journal/"):
             try:
-                with open(ROUTER_FILE, "rb") as f:
+                with open(JOURNAL_FILE, "rb") as f:
                     body = f.read()
+                import northchart_ui
+                body = northchart_ui.inject(body, "journal")
             except Exception:
-                body = b"<h3>router.html missing</h3>"
+                body = b"<h3>journal.html missing</h3>"
             self._send(body, "text/html; charset=utf-8")
-        elif parsed.path in ("/tracker", "/tracker/"):
-            try:
-                with open(TRACKER_FILE, "rb") as f:
-                    body = f.read()
-            except Exception:
-                body = b"<h3>tracker.html missing</h3>"
-            self._send(body, "text/html; charset=utf-8")
+        elif parsed.path == "/api/journal/queue":
+            q = journal_service().queue()
+            self._send(json.dumps({"count": q["count"]}).encode(), "application/json")
+        elif parsed.path == "/api/journal/sheet":
+            paper = (qs.get("paper") or ["0"])[0] in ("1", "true")
+            self._send(json.dumps(journal_service().sheet(include_paper=paper), default=str).encode(),
+                       "application/json")
         elif parsed.path == "/" or parsed.path.startswith("/index"):
             try:
                 with open(DASH_FILE, "rb") as f:
@@ -2197,7 +2949,7 @@ def main():
         sys.exit(1)
     load_auth()
     threading.Thread(target=poller, daemon=True).start()
-    print(f"Signal Desk v{ENGINE_V} -> http://localhost:{PORT} (and Tailscale devices)")
+    print(f"Northchart (engine v{ENGINE_V}) -> http://localhost:{PORT} (and Tailscale devices)")
     srv.serve_forever()
 
 

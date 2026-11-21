@@ -17,7 +17,8 @@
  *
  * Settings (environment variables):
  *   DESK_URL           default http://localhost:8899
- *   DESK_USER, DESK_PASS  only if the desk asks for a password (live site)
+ *   DESK_TOKEN         a sync token from Account > Sync tokens (preferred once accounts are on)
+ *   DESK_USER, DESK_PASS  your account email and password, or the old desk password
  *   TV_ACCOUNT_LABEL   e.g. PEPPERSTONE-TV-01 (default: broker name + "-TV")
  *   TV_ACCOUNT_TYPE    PERSONAL | DEMO | PROP (default PERSONAL)
  *   TV_BROKER          override the detected broker name (e.g. "Paper Trading")
@@ -248,7 +249,9 @@ export function mapClosedTrades(panel) {
 // --------------------------------------------------------------- desk
 async function postFills(broker, fills) {
   const headers = { "Content-Type": "application/json" };
-  if (process.env.DESK_USER) {
+  if (process.env.DESK_TOKEN) {
+    headers.Authorization = "Bearer " + process.env.DESK_TOKEN;
+  } else if (process.env.DESK_USER) {
     headers.Authorization = "Basic " + Buffer.from(`${process.env.DESK_USER}:${process.env.DESK_PASS || ""}`).toString("base64");
   }
   const body = {
