@@ -217,7 +217,49 @@ table{width:100%;border-collapse:collapse}
 .sc .v{width:36px;text-align:right;font-size:11px;font-weight:700}
 
 /* ---------- center ---------- */
-#tvchart{height:460px;width:100%}
+#tvchart,#ncchart{height:480px;width:100%}
+.ncp{display:flex;flex-direction:column;container-type:inline-size}
+@container (max-width:1000px){.ctool .lbl{display:none}.ctool .cbtn{padding:5px 6px}}
+.ctool{display:flex;align-items:center;gap:6px;padding:7px 10px;border-bottom:1px solid var(--bd);background:var(--p1);flex-wrap:wrap}
+.csym{font:700 12.5px var(--font);margin-right:4px;white-space:nowrap}
+.cseg{display:inline-flex;border:1px solid var(--bd2);border-radius:7px;overflow:hidden}
+.cseg button{border:0;background:transparent;color:var(--dim);font:600 11.5px var(--mono);padding:5px 8px;cursor:pointer}
+.cseg button+button{border-left:1px solid var(--bd)}
+.cseg button:hover{color:var(--tx);background:var(--p2)}.cseg button.on{background:var(--tx);color:var(--bg)}
+.cseg.small button{font:600 11px var(--font);padding:5px 9px}
+.csep{width:1px;height:20px;background:var(--bd)}
+.cbtn{display:inline-flex;align-items:center;gap:6px;border:1px solid transparent;background:transparent;color:var(--dim);font:600 11.5px var(--font);
+padding:5px 8px;border-radius:7px;cursor:pointer;white-space:nowrap}
+.cbtn:hover{background:var(--p2);color:var(--tx)}.cbtn.on{color:var(--b);background:var(--bt)}
+.cbtn svg,.crail svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.cbtn.icon{padding:5px 6px}
+.cnum{font:700 10px var(--mono);background:var(--b);color:#fff;border-radius:8px;padding:0 5px;line-height:15px}
+.cstat{font:11px var(--mono);margin-right:4px;white-space:nowrap}
+.cpop-wrap{position:relative}
+.cpop{position:absolute;top:calc(100% + 6px);left:0;z-index:30;min-width:170px;background:var(--p1);border:1px solid var(--bd2);border-radius:10px;
+box-shadow:var(--shadow-lg,0 8px 32px rgba(0,0,0,.18));padding:5px;max-height:420px;overflow:auto}
+.cpop.wide{min-width:280px}
+.cpop button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;background:transparent;color:var(--tx);font:12.5px var(--font);
+padding:7px 9px;border-radius:6px;cursor:pointer}
+.cpop button:hover{background:var(--p2)}.cpop button.on{font-weight:600}
+.cpop .ck{width:14px;color:var(--b);font-weight:700}.cpop-sub{margin-left:auto;font:10.5px var(--mono);color:var(--dim2)}
+.cpop-h{font:600 9.5px var(--font);letter-spacing:.8px;text-transform:uppercase;color:var(--dim);padding:8px 9px 4px}
+.cpop-sep{height:1px;background:var(--bd);margin:4px 0}
+.cfind{width:100%;font:12.5px var(--font);padding:7px 9px;border:1px solid var(--bd2);border-radius:7px;background:var(--p2);color:var(--tx);margin-bottom:4px}
+.cbody{display:flex;min-height:0}
+.crail{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px;border-right:1px solid var(--bd);background:var(--p1)}
+.crail button{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--dim);
+border-radius:7px;cursor:pointer}
+.crail button:hover{background:var(--p2);color:var(--tx)}.crail button.on{background:var(--bt);color:var(--b)}
+.crail button.sepb{margin-top:6px}
+.rsep{width:20px;height:1px;background:var(--bd);margin:6px 0}
+.cmain{flex:1;position:relative;min-width:0}
+.chint{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:var(--tx);color:var(--bg);font:600 11.5px var(--font);
+padding:5px 11px;border-radius:999px;pointer-events:none;opacity:.92}
+.cfoot{display:flex;gap:14px;flex-wrap:wrap;justify-content:space-between;padding:6px 12px;border-top:1px solid var(--bd);font-size:11px;color:var(--dim);background:var(--p1)}
+.clegend{display:inline-flex;align-items:center;gap:4px}.clegend i{width:10px;height:3px;border-radius:2px;display:inline-block}
+.ncp.fs{position:fixed;inset:0;z-index:80;border-radius:0}
+.ncp.fs #ncchart,.ncp.fs #tvchart{height:calc(100vh - 92px)}
 .qrow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
 .qbtn{background:var(--p2);border:1px solid var(--bd2);color:var(--dim);font-size:10.5px;padding:5px 10px;cursor:pointer;
 border-radius:var(--radius-sm);transition:all .15s;font-weight:500}
@@ -351,7 +393,9 @@ color:var(--r);font-size:12px;text-align:center}
   .factors{padding:6px 10px}
   .main{grid-template-columns:1fr;padding:8px;gap:8px}
   .colR{grid-column:auto;display:flex!important}
-  #tvchart{height:280px}
+  #tvchart,#ncchart{height:340px}
+  .crail{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--bd)}
+  .cbody{flex-direction:column}
   .bigpx{font-size:26px}
   .recdir{font-size:22px}
   .duo{grid-template-columns:1fr}
@@ -691,9 +735,65 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
 
     <!-- ============ CENTER ============ -->
     <div class="col">
-      <div class="panel-chart">
-        <div class="ph">Price chart · 15m · {{ d.sym_name||sym }} <span class="mono mut">{{ d.tv_chart }}</span></div>
-        <div id="tvchart"></div>
+      <div class="panel-chart ncp" ref="chartPanel" :class="{fs:chartFs}">
+        <div class="ctool" role="toolbar" aria-label="Chart tools">
+          <span class="csym">{{ d.sym_name||sym }}</span>
+          <div class="cseg" role="group" aria-label="Timeframe" v-show="engine==='nc'">
+            <button v-for="t in chartTfs" :key="t" type="button" :class="{on:chartTf===t}" @click="setTf(t)">{{ t }}</button>
+          </div>
+          <span class="csep" v-show="engine==='nc'"></span>
+          <div class="cpop-wrap" v-show="engine==='nc'">
+            <button type="button" class="cbtn" @click.stop="chartMenu=chartMenu==='type'?'':'type'" title="Chart type">
+              <svg viewBox="0 0 24 24"><path d="M6 4v16M6 8h-2v6h2M12 6v14M12 9h-2v7h2M18 3v12M18 6h-2v5h2"/></svg><span class="lbl">{{ chartTypes.find(x=>x[0]===chartType)[1] }}</span></button>
+            <div class="cpop" v-if="chartMenu==='type'" @click.stop>
+              <button v-for="t in chartTypes" :key="t[0]" type="button" :class="{on:chartType===t[0]}" @click="setChartType(t[0])">{{ t[1] }}</button>
+              <div class="cpop-sep"></div>
+              <button type="button" :class="{on:chartLog}" @click="toggleLog()">Log scale</button>
+            </div>
+          </div>
+          <div class="cpop-wrap" v-show="engine==='nc'">
+            <button type="button" class="cbtn" @click.stop="chartMenu=chartMenu==='ind'?'':'ind'" title="Indicators">
+              <svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 4 8-9"/><path d="M3 21h18"/></svg><span class="lbl">Indicators</span><b v-if="chartInds.length" class="cnum">{{ chartInds.length }}</b></button>
+            <div class="cpop wide" v-if="chartMenu==='ind'" @click.stop>
+              <input class="cfind" v-model="indQ" placeholder="Search indicators" aria-label="Search indicators">
+              <div class="cpop-h">On the price</div>
+              <button v-for="i in indList.filter(x=>x.main&&indMatch(x))" :key="i.id" type="button" :class="{on:chartInds.includes(i.id)}" @click="toggleInd(i.id)">
+                <span class="ck">{{ chartInds.includes(i.id)?'✓':'' }}</span>{{ i.label }}<span class="cpop-sub">{{ i.id }}</span></button>
+              <div class="cpop-h">Below the chart</div>
+              <button v-for="i in indList.filter(x=>!x.main&&indMatch(x))" :key="i.id" type="button" :class="{on:chartInds.includes(i.id)}" @click="toggleInd(i.id)">
+                <span class="ck">{{ chartInds.includes(i.id)?'✓':'' }}</span>{{ i.label }}<span class="cpop-sub">{{ i.id }}</span></button>
+            </div>
+          </div>
+          <button type="button" class="cbtn" :class="{on:showLevels}" v-show="engine==='nc'" @click="toggleLevels()" title="Show the desk's entry, stop and targets">
+            <svg viewBox="0 0 24 24"><path d="M3 7h18M3 12h18M3 17h18" stroke-dasharray="3 3"/></svg><span class="lbl">Desk levels</span></button>
+          <span style="flex:1"></span>
+          <span class="cstat mut" v-show="engine==='nc'">{{ chartStatus }}</span>
+          <button type="button" class="cbtn icon" v-show="engine==='nc'" @click="chartShot()" title="Save a picture of the chart" aria-label="Save chart picture">
+            <svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+          <button type="button" class="cbtn icon" @click="chartFull()" :title="chartFs?'Exit full screen':'Full screen'" aria-label="Full screen">
+            <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+          <button type="button" class="cbtn" @click="setEngine(engine==='nc'?'tv':'nc')" :title="engine==='nc'?'Switch to TradingView\'s own chart':'Back to the Northchart chart with drawing tools and desk levels'">
+            <svg viewBox="0 0 24 24"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg><span class="lbl">{{ engine==='nc'?'TradingView view':'Northchart view' }}</span></button>
+        </div>
+        <div class="cbody">
+          <div class="crail" v-show="engine==='nc'" role="toolbar" aria-label="Drawing tools" aria-orientation="vertical">
+            <button v-for="t in drawTools" :key="t.id" type="button" :class="{on:drawTool===t.id,sepb:t.sep}" @click="pickTool(t.id)" :title="t.label" :aria-label="t.label" v-html="t.icon"></button>
+            <span class="rsep"></span>
+            <button type="button" :class="{on:chartMagnet}" @click="chartMagnet=!chartMagnet; savePrefs()" :title="chartMagnet?'Magnet on: points snap to candle prices':'Magnet off'" aria-label="Magnet"><svg viewBox="0 0 24 24"><path d="M6 3v8a6 6 0 0 0 12 0V3h-4v8a2 2 0 0 1-4 0V3z"/><path d="M6 7h4M14 7h4"/></svg></button>
+            <button type="button" :class="{on:drawLocked}" @click="lockDrawings()" :title="drawLocked?'Unlock drawings':'Lock drawings'" aria-label="Lock drawings"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path :d="drawLocked?'M8 11V7a4 4 0 0 1 8 0v4':'M8 11V7a4 4 0 0 1 7.5-2'"/></svg></button>
+            <button type="button" :class="{on:drawHidden}" @click="hideDrawings()" :title="drawHidden?'Show drawings':'Hide drawings'" aria-label="Hide drawings"><svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path v-if="drawHidden" d="M4 4l16 16"/></svg></button>
+            <button type="button" @click="clearDrawings()" title="Remove all drawings on this instrument" aria-label="Remove all drawings"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
+          </div>
+          <div class="cmain">
+            <div id="ncchart" v-show="engine==='nc'"></div>
+            <div id="tvchart" v-show="engine==='tv'"></div>
+            <div class="chint" v-if="engine==='nc'&&drawTool&&drawTool!=='cursor'">{{ drawHint }} · Esc cancels</div>
+          </div>
+        </div>
+        <div class="cfoot" v-show="engine==='nc'">
+          <span>{{ chartSource }}</span>
+          <span v-if="showLevels&&chartLevels.length" class="clegend"><i v-for="l in chartLevels" :key="l.key" :style="{background:levelColor(l.key)}"></i>Entry, stop and targets from the desk's {{ d.direction||'' }} call</span>
+        </div>
       </div>
 
       <div class="duo">
@@ -1095,6 +1195,31 @@ const app=createApp({
     cpQ:'', cpLog:[], quickQs:['Why this bias?','Should I wait?','How strong is this trend?','Is this a fake breakout?','Where are institutions positioned?','Safest entry?',"Summarize today's market"],
     tvu:'',tvp:'',tvsid:'',tvsign:'',tverrMsg:'',authOpen:false,authStep:'signin',authLoading:false,
     tvWidgetSym:null, curvePts:[], macroHelp:false,
+    engine:'nc', chartTfs:['1m','5m','15m','30m','1h','4h','1D','1W'], chartTf:'15m', chartType:'candle_solid', chartLog:false,
+    chartTypes:[['candle_solid','Candles'],['candle_stroke','Hollow candles'],['ohlc','Bars'],['area','Area']],
+    chartMenu:'', indQ:'', chartInds:['VOL'], showLevels:true, chartStatus:'', chartSource:'', chartLevels:[], chartFs:false,
+    indList:[{id:'MA',label:'Moving average',main:true},{id:'EMA',label:'Exponential moving average',main:true},
+      {id:'SMA',label:'Smoothed moving average',main:true},{id:'BOLL',label:'Bollinger Bands',main:true},
+      {id:'SAR',label:'Parabolic SAR',main:true},{id:'BBI',label:'Bull and bear index',main:true},
+      {id:'VOL',label:'Volume'},{id:'RSI',label:'Relative strength index'},{id:'MACD',label:'MACD'},
+      {id:'KDJ',label:'Stochastic (KDJ)'},{id:'CCI',label:'Commodity channel index'},{id:'DMI',label:'Directional movement'},
+      {id:'WR',label:'Williams %R'},{id:'OBV',label:'On-balance volume'},{id:'MTM',label:'Momentum'},{id:'ROC',label:'Rate of change'},
+      {id:'TRIX',label:'TRIX'},{id:'AO',label:'Awesome oscillator'}],
+    drawTool:'cursor', chartMagnet:true, drawLocked:false, drawHidden:false,
+    drawTools:[
+      {id:'cursor',label:'Cursor',icon:'<svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/></svg>'},
+      {id:'segment',label:'Trend line',sep:true,icon:'<svg viewBox="0 0 24 24"><path d="M5 19L19 5"/><circle cx="5" cy="19" r="1.8"/><circle cx="19" cy="5" r="1.8"/></svg>'},
+      {id:'rayLine',label:'Ray',icon:'<svg viewBox="0 0 24 24"><path d="M5 19L22 2"/><circle cx="5" cy="19" r="1.8"/><circle cx="12" cy="12" r="1.8"/></svg>'},
+      {id:'straightLine',label:'Extended line',icon:'<svg viewBox="0 0 24 24"><path d="M2 22L22 2"/><circle cx="8" cy="16" r="1.8"/><circle cx="16" cy="8" r="1.8"/></svg>'},
+      {id:'horizontalStraightLine',label:'Horizontal line',icon:'<svg viewBox="0 0 24 24"><path d="M2 12h20"/><circle cx="12" cy="12" r="1.8"/></svg>'},
+      {id:'horizontalRayLine',label:'Horizontal ray',icon:'<svg viewBox="0 0 24 24"><path d="M6 12h16"/><circle cx="6" cy="12" r="1.8"/></svg>'},
+      {id:'verticalStraightLine',label:'Vertical line',icon:'<svg viewBox="0 0 24 24"><path d="M12 2v20"/><circle cx="12" cy="12" r="1.8"/></svg>'},
+      {id:'parallelStraightLine',label:'Parallel channel',sep:true,icon:'<svg viewBox="0 0 24 24"><path d="M3 15L15 3M9 21L21 9"/></svg>'},
+      {id:'priceChannelLine',label:'Price channel',icon:'<svg viewBox="0 0 24 24"><path d="M3 17L17 3M7 21L21 7M3 11L11 3"/></svg>'},
+      {id:'fibonacciLine',label:'Fibonacci retracement',icon:'<svg viewBox="0 0 24 24"><path d="M3 4h18M3 9h18M3 13h18M3 20h18"/><path d="M6 20L18 4" stroke-dasharray="2 2"/></svg>'},
+      {id:'ncMeasure',label:'Measure: price change, % and bars',sep:true,icon:'<svg viewBox="0 0 24 24"><path d="M4 20V8M4 20h12"/><path d="M8 16l10-10M14 6h4v4"/></svg>'},
+      {id:'priceLine',label:'Price label',icon:'<svg viewBox="0 0 24 24"><path d="M3 12h11"/><path d="M14 8h6l2 4-2 4h-6z"/></svg>'},
+      {id:'simpleAnnotation',label:'Note',icon:'<svg viewBox="0 0 24 24"><path d="M5 4h14v11H10l-5 5z"/></svg>'}],
     darkMode:false, roster:[], refreshing:false,
     agentOpen:false, agentTab:'run', agentQ:'', agentFeed:[], agentStatus:{}, agentUnread:0, agentSeenTs:0, agentId:0,
     chat:[], streaming:false, abortCtl:null, agentWide:false, agentMode:'desk', stick:true, menuOpen:false, installPrompt:null, isStandalone:false, installHelp:false, installHint:'other',
@@ -1104,6 +1229,9 @@ const app=createApp({
       ['Chart USDJPY','15-minute candles with desk levels'],['Route XAUUSD','Sized for every account, preview only']],
   }},
   computed:{
+    drawHint(){ const t=this.drawTools.find(x=>x.id===this.drawTool); if(!t) return '';
+      const two=['segment','rayLine','straightLine','ncMeasure','fibonacciLine'].includes(t.id), three=['parallelStraightLine','priceChannelLine'].includes(t.id);
+      return t.label+': '+(three?'click three points':two?'click two points':'click once') },
     initials(){ const m=this.me||{}; const src=(m.name||m.email||'?').trim();
       const p=src.split(/[\s@.]+/).filter(Boolean); return ((p[0]||'?')[0]+((m.name&&p[1])?p[1][0]:'')).toUpperCase() },
     perf(){ return this.d.perf||{} },
@@ -1209,6 +1337,7 @@ const app=createApp({
       if(meta) meta.content=this.darkMode?'#0b0d10':'#ffffff';
       try{ localStorage.setItem('sd-theme-v2', this.darkMode?'dark':'light') }catch(e){}
       this.tvWidgetSym=null;
+      if(this._nc){ this._nc.setStyles(this.darkMode?'dark':'light'); this.$nextTick(()=>{ this._nc.setStyles(this.chartStyles()); this.drawLevels() }) }
       this.$nextTick(()=>this.mountChart());
     },
     toggleTheme(){ this.darkMode=!this.darkMode; this.applyTheme();
@@ -1237,6 +1366,149 @@ const app=createApp({
       }catch(e){ this.d={status:'error', error:'network'} }
     },
     mountChart(){
+      if(this.engine==='tv') return this.mountTv();
+      this.ncEnsure();
+    },
+
+    // ---------------- Northchart chart (KLineChart engine) ----------------
+    savePrefs(){ try{ localStorage.setItem('nc-chart', JSON.stringify({engine:this.engine,tf:this.chartTf,type:this.chartType,
+      log:this.chartLog,inds:this.chartInds,levels:this.showLevels,magnet:this.chartMagnet})) }catch(e){} },
+    loadPrefs(){ try{ const p=JSON.parse(localStorage.getItem('nc-chart')||'{}');
+      if(p.engine) this.engine=p.engine; if(this.chartTfs.includes(p.tf)) this.chartTf=p.tf; if(p.type) this.chartType=p.type;
+      this.chartLog=!!p.log; if(Array.isArray(p.inds)) this.chartInds=p.inds; if(p.levels===false) this.showLevels=false;
+      if(p.magnet===false) this.chartMagnet=false }catch(e){} },
+    indMatch(x){ const q=this.indQ.trim().toLowerCase(); return !q||x.label.toLowerCase().includes(q)||x.id.toLowerCase().includes(q) },
+    levelColor(k){ return {entry:this.cssVar('--b')||'#2563eb',sl:this.cssVar('--r')||'#d04438',tp1:this.cssVar('--g')||'#0d9b6e',tp2:this.cssVar('--g')||'#0d9b6e'}[k] },
+    chartStyles(){
+      const g=this.cssVar('--g')||'#0d9b6e', r=this.cssVar('--r')||'#d04438', tx=this.cssVar('--dim')||'#6B7280', bd=this.cssVar('--bd')||'#E5E7EB';
+      return {grid:{horizontal:{color:bd},vertical:{color:bd}},
+        candle:{type:this.chartType,bar:{upColor:g,downColor:r,noChangeColor:tx,upBorderColor:g,downBorderColor:r,upWickColor:g,downWickColor:r},
+          area:{lineColor:this.cssVar('--b')||'#2563eb'},priceMark:{last:{upColor:g,downColor:r}},
+          tooltip:{text:{color:tx}}},
+        xAxis:{axisLine:{color:bd},tickText:{color:tx}},yAxis:{axisLine:{color:bd},tickText:{color:tx}},
+        separator:{color:bd},crosshair:{horizontal:{line:{color:tx}},vertical:{line:{color:tx}}}};
+    },
+    ncRegister(){
+      if(this._ncReg||typeof klinecharts==='undefined') return; this._ncReg=true;
+      const vm=this;
+      klinecharts.registerOverlay({name:'ncLevel',totalStep:2,needDefaultPointFigure:false,needDefaultXAxisFigure:false,needDefaultYAxisFigure:true,
+        createPointFigures:({coordinates,bounding,overlay})=>{ const y=coordinates[0].y, e=overlay.extendData||{};
+          return [{type:'line',attrs:{coordinates:[{x:0,y},{x:bounding.width,y}]},styles:{style:'dashed',dashedValue:[5,4],color:e.color,size:1}},
+            {type:'text',ignoreEvent:true,attrs:{x:bounding.width-8,y:y-3,text:e.label,align:'right',baseline:'bottom'},styles:{color:e.color,size:11,weight:600,backgroundColor:'transparent',paddingLeft:0,paddingRight:0}}] }});
+      klinecharts.registerOverlay({name:'ncMeasure',totalStep:3,needDefaultPointFigure:true,needDefaultXAxisFigure:true,needDefaultYAxisFigure:true,
+        createPointFigures:({coordinates,overlay})=>{
+          if(coordinates.length<2) return [];
+          const [a,b]=coordinates, [pa,pb]=overlay.points;
+          const up=(pb.value??0)>=(pa.value??0), col=up?(vm.cssVar('--g')||'#0d9b6e'):(vm.cssVar('--r')||'#d04438');
+          const diff=(pb.value-pa.value), pct=pa.value?diff/pa.value*100:0, bars=Math.abs((pb.dataIndex??0)-(pa.dataIndex??0));
+          const dp=Number.isInteger(vm.d.dp)?vm.d.dp:2;
+          const txt=(diff>=0?'+':'')+diff.toFixed(dp)+'  ('+(pct>=0?'+':'')+pct.toFixed(2)+'%)  '+bars+' bars';
+          return [{type:'rect',attrs:{x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),width:Math.abs(b.x-a.x),height:Math.abs(b.y-a.y)},
+              styles:{style:'fill',color:col+'22',borderColor:col}},
+            {type:'line',attrs:{coordinates:[{x:a.x,y:(a.y+b.y)/2},{x:b.x,y:(a.y+b.y)/2}]},styles:{color:col,style:'dashed',dashedValue:[3,3]}},
+            {type:'text',attrs:{x:(a.x+b.x)/2,y:Math.min(a.y,b.y)-6,text:txt,align:'center',baseline:'bottom'},
+              styles:{color:'#fff',backgroundColor:col,size:11,weight:600,paddingLeft:6,paddingRight:6,paddingTop:3,paddingBottom:3,borderRadius:4}}] }});
+    },
+    ncEnsure(){
+      if(this.d.status!=='ok'||typeof klinecharts==='undefined') return;
+      const el=document.getElementById('ncchart'); if(!el) return;
+      this.ncRegister();
+      if(!this._nc){
+        this._nc=klinecharts.init(el,{timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||'Etc/UTC'}); window.ncChart=this._nc;
+        this._nc.setStyles(this.darkMode?'dark':'light'); this._nc.setStyles(this.chartStyles());
+        const vm=this;
+        this._nc.setDataLoader({
+          getBars:async({type,symbol,period,callback})=>{
+            if(type!=='init'){ callback([],false); return }
+            vm.chartStatus='Loading…';
+            try{ const r=await fetch('/api/chart/bars?sym='+encodeURIComponent(symbol.ticker)+'&tf='+encodeURIComponent(vm.chartTf));
+              const j=await r.json(); if(!r.ok) throw new Error(j.error||'no data');
+              vm.chartSource=j.source+(j.bars.length?' · '+j.bars.length+' bars':''); vm.chartLevels=j.levels||[];
+              vm._ncLast=j.bars[j.bars.length-1]||null;
+              callback(j.bars,false); vm.chartStatus='';
+              vm.$nextTick(()=>{ vm.drawLevels(); vm.restoreDrawings() });
+            }catch(e){ vm.chartStatus='No price history: '+e.message; callback([],false) } },
+          subscribeBar:({callback})=>{ vm._ncPush=callback },
+          unsubscribeBar:()=>{ vm._ncPush=null }});
+        for(const id of this.chartInds) this.addInd(id);
+        if(this.chartLog) this._nc.overrideYAxis({paneId:'candle_pane',name:'logarithm'});
+        this._ncTimer=setInterval(()=>this.ncTick(),20000);
+        window.addEventListener('resize',()=>this._nc&&this._nc.resize());
+        document.addEventListener('fullscreenchange',()=>{ this.chartFs=!!document.fullscreenElement; this.$nextTick(()=>this._nc&&this._nc.resize()) });
+        document.addEventListener('click',()=>{ this.chartMenu='' });
+        document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&this.drawTool!=='cursor'){ this.pickTool('cursor') } });
+      }
+      const key=this.sym+'|'+this.chartTf;
+      if(this._ncKey!==key){
+        this._ncKey=key; this.saveDrawingsFor(this._ncSym);
+        this._ncSym=this.sym;
+        this._nc.removeOverlay({groupId:'user'}); this._nc.removeOverlay({groupId:'desk'});
+        const p={'1m':['minute',1],'5m':['minute',5],'15m':['minute',15],'30m':['minute',30],'1h':['hour',1],'4h':['hour',4],'1D':['day',1],'1W':['week',1]}[this.chartTf];
+        this._nc.setSymbol({ticker:this.sym,pricePrecision:Number.isInteger(this.d.dp)?this.d.dp:2,volumePrecision:0});
+        this._nc.setPeriod({type:p[0],span:p[1]});
+      } else this.drawLevels();
+    },
+    async ncTick(){
+      if(!this._nc||this.engine!=='nc'||!this._ncPush||document.hidden) return;
+      try{ const r=await fetch('/api/chart/bars?sym='+this.sym+'&tf='+this.chartTf); if(!r.ok) return; const j=await r.json();
+        const tail=j.bars.slice(-2); for(const b of tail){ if(!this._ncLast||b.timestamp>=this._ncLast.timestamp) this._ncPush&&this._ncPush(b) }
+        this._ncLast=j.bars[j.bars.length-1]; this.chartLevels=j.levels||[]; this.drawLevels() }catch(e){}
+    },
+    setTf(t){ this.chartTf=t; this.savePrefs(); this.ncEnsure() },
+    setChartType(t){ this.chartType=t; this.chartMenu=''; this.savePrefs(); this._nc&&this._nc.setStyles({candle:{type:t}}) },
+    toggleLog(){ this.chartLog=!this.chartLog; this.savePrefs(); this._nc&&this._nc.overrideYAxis({paneId:'candle_pane',name:this.chartLog?'logarithm':'normal'}) },
+    setEngine(e){ this.engine=e; this.savePrefs(); if(e==='tv'){ this.tvWidgetSym=null; this.$nextTick(()=>this.mountTv()) } else this.$nextTick(()=>{ this.ncEnsure(); this._nc&&this._nc.resize() }) },
+    addInd(id){ const i=this.indList.find(x=>x.id===id); if(!i||!this._nc) return;
+      if(i.main) this._nc.createIndicator({name:id,paneId:'candle_pane'},true); else this._nc.createIndicator({name:id}) },
+    toggleInd(id){ if(!this._nc) return;
+      if(this.chartInds.includes(id)){ this.chartInds=this.chartInds.filter(x=>x!==id); this._nc.removeIndicator({name:id}) }
+      else { this.chartInds=[...this.chartInds,id]; this.addInd(id) }
+      this.savePrefs() },
+    toggleLevels(){ this.showLevels=!this.showLevels; this.savePrefs(); this.drawLevels() },
+    drawLevels(){
+      if(!this._nc) return; this._nc.removeOverlay({groupId:'desk'});
+      if(!this.showLevels||!this._ncLast) return;
+      const dp=Number.isInteger(this.d.dp)?this.d.dp:2;
+      for(const l of this.chartLevels) this._nc.createOverlay({name:'ncLevel',groupId:'desk',lock:true,
+        points:[{timestamp:this._ncLast.timestamp,value:l.value}],
+        extendData:{label:l.label+'  '+Number(l.value).toLocaleString('en-GB',{minimumFractionDigits:dp,maximumFractionDigits:dp}),color:this.levelColor(l.key)}});
+    },
+    pickTool(id){
+      this.drawTool=id; if(!this._nc) return;
+      if(id==='cursor'){ if(this._ncDrawing){ this._nc.removeOverlay({id:this._ncDrawing}); this._ncDrawing=null } return }
+      const vm=this, save=()=>vm.saveDrawingsFor(vm.sym);
+      const o={name:id,groupId:'user',lock:this.drawLocked,mode:this.chartMagnet?'weak_magnet':'normal',
+        onDrawEnd:()=>{ vm._ncDrawing=null; vm.drawTool='cursor'; save(); return false },
+        onPressedMoveEnd:()=>{ save(); return false }, onRemoved:()=>{ save(); return false }};
+      if(id==='simpleAnnotation'){ const t=prompt('Note text'); if(!t){ this.drawTool='cursor'; return } o.extendData=t }
+      this._ncDrawing=this._nc.createOverlay(o);
+    },
+    saveDrawingsFor(sym){
+      if(!this._nc||!sym) return;
+      const list=this._nc.getOverlays({groupId:'user'}).filter(o=>o.points&&o.points.length&&o.id!==this._ncDrawing)
+        .map(o=>({name:o.name,points:o.points.map(p=>({timestamp:p.timestamp,value:p.value})),extendData:o.extendData??null}))
+        .filter(o=>o.points.every(p=>p.timestamp!=null&&p.value!=null));
+      try{ localStorage.setItem('nc-draw-'+sym, JSON.stringify(list)) }catch(e){}
+    },
+    restoreDrawings(){
+      if(!this._nc) return; this._nc.removeOverlay({groupId:'user'});
+      let list=[]; try{ list=JSON.parse(localStorage.getItem('nc-draw-'+this.sym)||'[]') }catch(e){}
+      const vm=this, save=()=>vm.saveDrawingsFor(vm.sym);
+      for(const o of list) this._nc.createOverlay({...o,groupId:'user',lock:this.drawLocked,visible:!this.drawHidden,
+        onPressedMoveEnd:()=>{ save(); return false },onRemoved:()=>{ save(); return false }});
+    },
+    lockDrawings(){ this.drawLocked=!this.drawLocked; if(!this._nc) return;
+      for(const o of this._nc.getOverlays({groupId:'user'})) this._nc.overrideOverlay({id:o.id,lock:this.drawLocked}) },
+    hideDrawings(){ this.drawHidden=!this.drawHidden; if(!this._nc) return;
+      for(const o of this._nc.getOverlays({groupId:'user'})) this._nc.overrideOverlay({id:o.id,visible:!this.drawHidden}) },
+    clearDrawings(){ if(!this._nc) return; if(!confirm('Remove all drawings on '+this.sym+'?')) return;
+      this._nc.removeOverlay({groupId:'user'}); try{ localStorage.removeItem('nc-draw-'+this.sym) }catch(e){} },
+    chartShot(){ if(!this._nc) return;
+      const url=this._nc.getConvertPictureUrl(true,'png',this.cssVar('--p1')||'#ffffff');
+      const a=document.createElement('a'); a.href=url; a.download='northchart-'+this.sym+'-'+this.chartTf+'.png'; a.click() },
+    chartFull(){ const el=this.$refs.chartPanel; if(!el) return;
+      if(document.fullscreenElement) document.exitFullscreen(); else if(el.requestFullscreen) el.requestFullscreen(); else { this.chartFs=!this.chartFs; this.$nextTick(()=>this._nc&&this._nc.resize()) } },
+    mountTv(){
       if(this.d.status!=='ok'||typeof TradingView==='undefined') return;
       const theme=this.darkMode?'dark':'light';
       const symKey=this.d.tv_chart+'|'+theme;
@@ -1488,6 +1760,7 @@ const app=createApp({
       this.toast('TV disconnected'); this.tick() },
   },
   mounted(){
+    this.loadPrefs();
     try{
       // White is the default. Dark only when chosen with the toggle (saved under a new key,
       // so an older dark preference or the system setting no longer applies).
@@ -1524,7 +1797,9 @@ const app=createApp({
       if(e.key==='Escape')this.closeAuth();
     });
     const s=document.createElement('script'); s.src='https://s3.tradingview.com/tv.js';
-    s.onload=()=>this.mountChart(); document.head.appendChild(s);
+    s.onload=()=>{ if(this.engine==='tv') this.mountTv() }; document.head.appendChild(s);
+    const k=document.createElement('script'); k.src='/static/klinecharts.min.js';
+    k.onload=()=>this.mountChart(); document.head.appendChild(k);
   },
 });
 

@@ -431,6 +431,20 @@ def accounts_service():
 
 
 _vault = None
+_bars = None
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+STATIC_TYPES = {".js": "application/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
+                ".png": "image/png", ".svg": "image/svg+xml", ".txt": "text/plain; charset=utf-8",
+                ".LICENSE": "text/plain; charset=utf-8"}
+
+
+def bars_service():
+    global _bars
+    with _connect_lock:
+        if _bars is None:
+            import northchart_chart as nch
+            _bars = nch.Bars(lambda: SYMBOLS, lambda s: latest.get(s))
+        return _bars
 
 
 def broker_connections(u=None):
@@ -2862,6 +2876,24 @@ class Handler(BaseHTTPRequestHandler):
             return self._deny()
         if self._brokers_http("GET", parsed):
             return
+        if parsed.path.startswith("/static/"):
+            name = os.path.basename(parsed.path)
+            ext = next((e for e in STATIC_TYPES if name.endswith(e)), None)
+            fn = os.path.join(STATIC_DIR, name)
+            if not ext or not os.path.isfile(fn):
+                return self._send_full(404, "text/plain", b"not found")
+            with open(fn, "rb") as f:
+                return self._send_full(200, STATIC_TYPES[ext], f.read(), {"Cache-Control": "public, max-age=86400"})
+        if parsed.path == "/api/chart/bars":
+            q = urllib.parse.parse_qs(parsed.query)
+            try:
+                out = bars_service().get((q.get("sym") or ["XAUUSD"])[0], (q.get("tf") or ["15m"])[0])
+                return self._send(json.dumps(out).encode(), "application/json")
+            except ValueError as e:
+                return self._send_full(400, "application/json", json.dumps({"ok": False, "error": str(e)}).encode())
+            except Exception as e:
+                return self._send_full(502, "application/json",
+                                       json.dumps({"ok": False, "error": f"price history unavailable: {e}"}).encode())
         qs = urllib.parse.parse_qs(parsed.query)
         sym = (qs.get("sym") or ["XAUUSD"])[0]
         if sym not in SYMBOLS:
