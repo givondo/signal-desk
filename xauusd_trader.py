@@ -2305,8 +2305,9 @@ class Handler(BaseHTTPRequestHandler):
     def _google(self, path, q, acc, pages, u, via, base):
         import northchart_accounts as na
         import northchart_google as ng
-        bad = lambda msg, st=400: self._send_full(st, "text/html; charset=utf-8", pages.message(
-            "Google sign-in", msg, "/signin", "Back to sign in"))
+        def bad(msg, st=400, to="/signin"):
+            # back to the page the person came from, with the reason shown in place
+            return self._send_full(302, "text/plain", b"", {"Location": to + "?gerr=" + urllib.parse.quote(msg[:200])})
         if not ng.enabled():
             return bad("Google sign-in is not switched on for this desk yet. Sign in with email and password.")
         nxt = q("next") if q("next").startswith("/") and not q("next").startswith("//") else "/"
@@ -2320,11 +2321,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_full(302, "text/plain", b"", {"Location": url, "Set-Cookie": cookie})
         if q("error"):
             return bad("Google sign-in was cancelled.")
+        p = {}
         try:
             claims, p = _google_service().finish(base, q("code"), q("state"), self._cookie("nc_g"))
             user, created = acc.google_user(claims, p.get("invite") or "", self._client_ip(), p["mode"], p.get("uid"))
         except (ValueError, na.AuthError) as e:
-            return bad(str(e))
+            dest = "/account" if p.get("mode") == "link" else ("/signup" if "invite" in str(e).lower() else "/signin")
+            return bad(str(e), to=dest)
         if p["mode"] == "link":
             dest = "/account?google=linked"
             tok = self._cookie("nc_s")

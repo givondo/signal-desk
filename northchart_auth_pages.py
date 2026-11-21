@@ -25,9 +25,21 @@ body{min-height:100vh;display:flex;flex-direction:column}
 .cta[disabled]{opacity:.5;cursor:default}
 .btn2{font:600 12.5px var(--nc-font);padding:7px 12px;border:1px solid var(--bd2);border-radius:7px;background:var(--p2);color:var(--tx);cursor:pointer}
 .btn2:hover{background:var(--p3)}.btn2.danger{color:var(--r);border-color:var(--r)}
-.gbtn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;font:600 14px var(--nc-font);padding:10px;
-border:1px solid var(--bd2);border-radius:8px;background:var(--p1);color:var(--tx);cursor:pointer;text-decoration:none}
-.gbtn:hover{background:var(--p2)}
+.box a.gbtn{color:var(--tx)}
+.gbtn{position:relative;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:46px;font:600 14.5px var(--nc-font);
+border:1px solid var(--bd2);border-radius:10px;background:var(--p1);color:var(--tx);cursor:pointer;text-decoration:none;
+box-shadow:0 1px 2px rgba(16,24,40,.06);transition:background .15s,box-shadow .15s,border-color .15s}
+.gbtn:hover{background:var(--p2);border-color:var(--dim2);box-shadow:0 2px 6px rgba(16,24,40,.08)}
+.gbtn:focus-visible{outline:none;box-shadow:0 0 0 3px var(--bt);border-color:var(--b)}
+.gbtn .gmark{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--bd2);display:inline-flex;align-items:center;justify-content:center;
+font:700 12px var(--nc-font);color:var(--dim)}
+.gbtn.busy{pointer-events:none;color:var(--dim)}
+.gbtn.busy .gmark{border-color:var(--b);border-right-color:transparent;animation:gspin .8s linear infinite;color:transparent}
+@keyframes gspin{to{transform:rotate(360deg)}}
+.gbtn .last{position:absolute;right:10px;font:700 9.5px var(--nc-font);letter-spacing:.5px;text-transform:uppercase;color:var(--g);background:var(--gt);
+padding:2px 7px;border-radius:999px}
+.gnote{font-size:11.5px;color:var(--dim);text-align:center;margin:8px 0 0}
+.box h1 + .lead{margin-bottom:20px}
 .or{display:flex;align-items:center;gap:10px;color:var(--dim2);font-size:11.5px;margin:14px 0}
 .or:before,.or:after{content:"";flex:1;height:1px;background:var(--bd)}
 .alt{text-align:center;font-size:12.5px;color:var(--dim);margin-top:16px}
@@ -107,9 +119,24 @@ def _field(name, label, typ="text", auto="", help_="", extra=""):
             + (f'<div class="help">{help_}</div>' if help_ else "") + "</div>")
 
 
-def _google_block(href, label):
-    return (f'<a class="gbtn" id="gbtn" href="{html.escape(href)}">{html.escape(label)}</a>'
-            '<div class="or">or with email</div>')
+def _google_block(href, label, note="Google confirms your email. Northchart never sees your Google password."):
+    return (f'<a class="gbtn" id="gbtn" href="{html.escape(href)}" data-label="{html.escape(label)}">'
+            f'<span class="gmark" aria-hidden="true">G</span><span class="gl">{html.escape(label)}</span>'
+            '<span class="last" id="glast" hidden>Last used</span></a>'
+            f'<p class="gnote">{html.escape(note)}</p><div class="or">or use your email</div>')
+
+
+GOOGLE_JS = """<script>
+(function(){ const g=document.getElementById("gbtn"); if(!g) return;
+  try{ if(localStorage.getItem("nc-last-login")==="google") document.getElementById("glast").hidden=false }catch(e){}
+  const err=new URLSearchParams(location.search).get("gerr"); if(err) show($("msg"),err);
+  g.addEventListener("click",e=>{ if(e.defaultPrevented) return;
+    try{ localStorage.setItem("nc-last-login","google") }catch(_){}
+    g.classList.add("busy"); g.querySelector(".gl").textContent="Opening Google…" });
+  window.addEventListener("pageshow",()=>{ g.classList.remove("busy"); g.querySelector(".gl").textContent=g.dataset.label });
+})();
+const f0=document.getElementById("f"); if(f0) f0.addEventListener("submit",()=>{ try{ localStorage.setItem("nc-last-login","email") }catch(_){} });
+</script>"""
 
 
 def signin(mode, has_users, smtp, google=False):
@@ -118,7 +145,7 @@ def signin(mode, has_users, smtp, google=False):
     signup_link = ('<div class="alt">New here? <a href="/signup">Create an account</a></div>'
                    if mode != "closed" else "")
     inner = f"""<main class="auth"><div class="box">
-<h1>Sign in</h1><p class="lead">Your desk, journal and broker connections.</p>
+<h1>Welcome back</h1><p class="lead">Sign in to your desk, journal and broker connections.</p>
 <div id="msg" class="msg" role="alert"></div>
 {_google_block("/auth/google/start", "Continue with Google") if google else ""}
 <form id="f" novalidate>
@@ -127,7 +154,7 @@ def signin(mode, has_users, smtp, google=False):
 <button class="cta" type="submit">Sign in</button></form>
 <div class="alt"><a href="/forgot">Forgot your password?</a></div>{signup_link}{FOOT}</div></main>"""
     script = """<script>wire("f",async d=>{ await post("/api/auth/signin",d); location.href=nextUrl() });
-const g=document.getElementById("gbtn"); if(g) g.href="/auth/google/start?next="+encodeURIComponent(nextUrl());</script>"""
+const g=document.getElementById("gbtn"); if(g) g.href="/auth/google/start?next="+encodeURIComponent(nextUrl());</script>""" + GOOGLE_JS
     return page("Sign in", inner, script)
 
 
@@ -137,18 +164,18 @@ def signup(mode, invite="", google=False):
                  'taking new accounts. <a href="/signin">Sign in</a> if you already have one.</p></div></main>')
         return page("Sign up", inner)
     inv = (_field("invite", "Invite code", "text", "one-time-code",
-                  "Ask the desk owner for one. It looks like 1A2B-3C4D-5E6F.",
-                  f'required value="{html.escape(invite)}"') if mode == "invite" else "")
+                  "From the desk owner. It looks like 1A2B-3C4D-5E6F.",
+                  f'required form="f" value="{html.escape(invite)}"') if mode == "invite" else "")
     inner = f"""<main class="auth"><div class="box">
 <h1>Create your account</h1><p class="lead">Connect your broker and every trade you take is journalled for you,
 matched to the desk's view at entry. Read-only: Northchart never places trades.</p>
 <div id="msg" class="msg" role="alert"></div>
+{inv}
 {_google_block("/auth/google/start", "Sign up with Google") if google else ""}
 <form id="f" novalidate>
-{_field("name", "Your name", "text", "name", extra='required autofocus')}
+{_field("name", "Your name", "text", "name", extra='required' + ('' if inv else ' autofocus'))}
 {_field("email", "Email", "email", "email", extra='required')}
 {_field("password", "Password", "password", "new-password", "At least 10 characters.", 'required minlength="10"')}
-{inv}
 <button class="cta" type="submit">Create account</button></form>
 <div class="alt">Already have an account? <a href="/signin">Sign in</a></div>
 <p class="fine">By creating an account you accept the <a href="/legal/terms">terms</a> and the
@@ -158,7 +185,7 @@ matched to the desk's view at entry. Read-only: Northchart never places trades.<
 const g=document.getElementById("gbtn");
 if(g) g.addEventListener("click",e=>{ const i=document.getElementById("invite");
   if(i&&!i.value.trim()){ e.preventDefault(); show($("msg"),"Enter your invite code first, then choose Sign up with Google."); i.focus(); return }
-  g.href="/auth/google/start"+(i?"?invite="+encodeURIComponent(i.value.trim()):"") });</script>"""
+  g.href="/auth/google/start"+(i?"?invite="+encodeURIComponent(i.value.trim()):"") });</script>""" + GOOGLE_JS
     return page("Create account", inner, script)
 
 
@@ -296,6 +323,7 @@ act("saveName",async()=>{ await post("/api/auth/profile",{name:$("name").value})
 act("resend",async()=>{ await post("/api/auth/verify/resend"); flash("Confirmation email sent",true) });
 act("gUnlink",async()=>{ await post("/api/auth/google/unlink"); flash("Google disconnected",true); load() });
 if(new URLSearchParams(location.search).get("google")==="linked") show($("welcome"),"Google connected. You can now sign in with it.",true);
+{ const ge=new URLSearchParams(location.search).get("gerr"); if(ge) show($("welcome"),ge) }
 act("signout",async()=>{ await post("/api/auth/signout"); location.href="/signin" });
 act("savePw",async()=>{ await post("/api/auth/password",{old:$("oldpw").value,new:$("newpw").value}); $("oldpw").value=$("newpw").value=""; flash("Password changed. Other devices were signed out.",true); load() });
 act("others",async()=>{ await post("/api/auth/sessions/revoke",{others:true}); flash("Signed out everywhere else",true); load() });
