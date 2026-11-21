@@ -10,7 +10,7 @@
     3. Saves them as your Windows user variables and restarts the laptop desk.
     4. Writes them into /etc/signaldesk.env on the server and restarts it. It also adds
        NORTHCHART_SECRET_KEY and NORTHCHART_PUBLIC_URL there if they are missing.
-       The values travel over stdin, never on a command line.
+       The values travel in a short-lived file, never on a command line.
 
   Run:  powershell -ExecutionPolicy Bypass -File tools\set-google-login.ps1
 #>
@@ -89,8 +89,20 @@ sleep 2
 echo "service: `$(systemctl is-active signaldesk)"
 echo "settings present: `$(grep -o '^[A-Z_]*=' "`$F" | tr -d = | tr '\n' ' ')"
 "@
-  $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(($remote -replace "`r", "")))
-  $b64 | gcloud compute ssh $Instance --zone=$Zone --project=$Project --command="base64 -d | sudo bash"
+  # gcloud on Windows answers plink's prompts through stdin, so the settings go over as a
+  # short-lived file in your home folder on the VM, run once and deleted on both sides.
+  $gc = (Get-Command gcloud.cmd -ErrorAction Stop).Source
+  $tmp = Join-Path $env:TEMP ("nc-google-" + [guid]::NewGuid().ToString("N").Substring(0, 8) + ".sh")
+  [IO.File]::WriteAllText($tmp, ($remote -replace "`r", ""), (New-Object Text.UTF8Encoding($false)))
+  icacls $tmp /inheritance:r /grant:r "${env:USERNAME}:F" | Out-Null
+  $name = Split-Path $tmp -Leaf
+  try {
+    & $gc compute scp $tmp "${Instance}:$name" --zone=$Zone --project=$Project
+    if ($LASTEXITCODE -ne 0) { throw "Could not copy the settings to the VM." }
+    & $gc compute ssh $Instance --zone=$Zone --project=$Project --command="sudo bash ~/$name; rm -f ~/$name"
+  } finally {
+    Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+  }
   if ($LASTEXITCODE -ne 0) { throw "The server step failed. Run again with -SkipConsole once gcloud can reach the VM." }
 }
 
