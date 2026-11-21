@@ -103,7 +103,7 @@ The server exposes a remote MCP endpoint at `/mcp` (Streamable HTTP, protocol ve
 
 `/mcp`, `/.well-known/oauth-*` and `/oauth/*` bypass HTTP Basic auth because they handle their own; every other route still needs the desk login.
 
-**Agent desk.** The Agents button in the header (or Ctrl+K, or `/`) opens a panel with three tabs: Run (plain-language commands such as `snapshot`, `brief EURUSD`, `route` or any question, answered as cards), Activity (every tool call by the UI, ChatGPT or Claude, with timing and errors) and Connect (the MCP URL, setup steps, connected agents and a sign-out-all button). UI calls go through `/api/agent/run`, `/api/agent/activity`, `/api/agent/status` and `/api/agent/revoke`, which stay behind the desk login.
+**Agent desk.** The Agents button in the header (or Ctrl+K, or `/`) opens a panel with three tabs: Run, a streaming chat (`northchart_agent.py`, served at `POST /api/agent/stream` as Server-Sent Events): each answer shows the tools it ran as they run, draws interactive 15-minute candle charts with the desk's entry, stop and target lines (or a conviction chart for market scans), then streams the written answer. It runs on the built-in desk engine, which writes only from tool output. Set `ANTHROPIC_API_KEY` on the server to have Claude run the conversation with the same read-only tools instead (`NORTHCHART_AGENT_MODEL` picks the model, default `claude-sonnet-5-5`; any API failure falls back to the desk engine for that answer); Activity (every tool call by the UI, ChatGPT or Claude, with timing and errors) and Connect (the MCP URL, setup steps, connected agents and a sign-out-all button). UI calls go through `/api/agent/run`, `/api/agent/activity`, `/api/agent/status` and `/api/agent/revoke`, which stay behind the desk login.
 
 Tests: `python -m unittest tests.test_connect` runs the full OAuth flow and MCP calls against a real local server.
 
@@ -117,7 +117,7 @@ Tests: `python -m unittest tests.test_connect` runs the full OAuth flow and MCP 
 | `/api/ask?sym=..&q=..` | rule-based copilot from live state |
 | `/api/health` | unauthenticated health probe |
 | `/mcp` | Northchart Connect MCP endpoint (OAuth or bearer token) |
-| `/api/agent/*` | agent desk: run a tool, activity feed, status, sign out agents |
+| `/api/agent/*` | agent desk: streaming chat (`/stream`), run a tool, activity feed, status, sign out agents |
 | `/tracker` | trading tracker page |
 | `/api/tracker/summary` | journal metrics, prop status, prop economics, capital (syncs paper tickets) |
 | `/api/tracker/records?kind=` / `export?kind=` / `backup` | read rows, CSV export, zip backup |

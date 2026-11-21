@@ -351,10 +351,11 @@ color:var(--r);font-size:12px;text-align:center}
 .adot{width:7px;height:7px;border-radius:50%;background:var(--dim2)}
 .adot.hot{background:var(--b);box-shadow:0 0 0 3px var(--bt);animation:bl 1.6s infinite}
 .agentbtn.on{color:var(--b);border-color:rgba(37,99,235,.4);background:var(--bt)}
-.adrawer{position:fixed;top:0;right:0;bottom:0;width:min(460px,100vw);z-index:65;background:var(--p1);
+.adrawer{position:fixed;top:0;right:0;bottom:0;width:min(640px,100vw);z-index:65;background:var(--p1);
 border-left:1px solid var(--bd2);box-shadow:var(--shadow-lg);display:flex;flex-direction:column;transform:translateX(102%);
 transition:transform .22s ease}
 .adrawer.open{transform:none}
+.adrawer.wide{width:min(1120px,100vw)}
 .ahead{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--bd)}
 .ahead h2{font-size:14px;font-weight:800;letter-spacing:.3px;flex:1}
 .ahead h2 small{display:block;font-size:10px;color:var(--dim);font-weight:500;letter-spacing:.2px}
@@ -400,6 +401,67 @@ font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:var(--dim);fon
 .asteps{font-size:12.5px;line-height:1.6;padding-left:18px;color:var(--tx)}
 .asteps li{margin-bottom:3px}
 .anote{font-size:11.5px;color:var(--dim);line-height:1.55}
+/* agent chat: streaming answers, tool trail, inline charts */
+.chat{display:flex;flex-direction:column;gap:18px;max-width:860px;width:100%;margin:0 auto}
+.turn-u{align-self:flex-end;max-width:85%;background:var(--p3);color:var(--tx);padding:9px 13px;border-radius:16px 16px 4px 16px;
+font-size:13.5px;white-space:pre-wrap}
+.turn-a{display:flex;gap:10px;align-items:flex-start}
+.turn-a .av{width:26px;height:26px;border-radius:8px;background:#0b0d10;color:var(--gold);font:800 11px var(--mono);
+display:grid;place-items:center;flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(201,162,39,.35);margin-top:1px}
+.turn-a .col{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.modebadge{font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;font-weight:700;color:var(--dim)}
+.modebadge b{color:var(--b)}
+.trail{border:1px solid var(--bd);border-radius:10px;background:var(--p2);font-size:12px;overflow:hidden}
+.trail summary{list-style:none;cursor:pointer;padding:7px 10px;color:var(--dim);display:flex;align-items:center;gap:8px}
+.trail summary::-webkit-details-marker{display:none}
+.trail summary .chev{margin-left:auto;transition:transform .15s}
+.trail[open] summary .chev{transform:rotate(90deg)}
+.trail .step{display:grid;grid-template-columns:16px 1fr auto;gap:8px;align-items:center;padding:6px 10px;border-top:1px solid var(--bd)}
+.trail .step .nm{font-weight:600}
+.trail .step .sm{color:var(--dim);font-family:var(--mono);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trail .step .ms{color:var(--dim2);font-size:10.5px;font-family:var(--mono)}
+.spin-s{width:12px;height:12px;border:2px solid var(--bd2);border-top-color:var(--b);border-radius:50%;animation:sp .7s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+.md{font-size:13.5px;line-height:1.62;color:var(--tx);word-wrap:break-word}
+.md p{margin:0 0 8px}.md p:last-child{margin-bottom:0}
+.md ul,.md ol{margin:2px 0 8px;padding-left:20px}.md li{margin:2px 0}
+.md h4{font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim);margin:12px 0 4px}
+.md code{font-family:var(--mono);font-size:12px;background:var(--p3);padding:1px 5px;border-radius:5px}
+.md pre{font-family:var(--mono);font-size:11.5px;background:var(--p2);border:1px solid var(--bd);border-radius:9px;padding:10px;white-space:pre-wrap;margin:0 0 8px}
+.md em{color:var(--dim)}
+.caret{display:inline-block;width:7px;height:15px;background:var(--b);vertical-align:-2px;margin-left:2px;border-radius:1px;animation:bl 1s steps(2) infinite}
+.ncchart{border:1px solid var(--bd);border-radius:12px;background:var(--chart-bg);overflow:hidden;position:relative}
+.ncchart .hd{display:flex;align-items:baseline;gap:10px;padding:9px 12px 0}
+.ncchart .hd b{font-size:13px}.ncchart .hd .sub{font-size:11px;color:var(--dim)}
+.ncchart .hd .px{margin-left:auto;font-family:var(--mono);font-weight:700;font-size:13px}
+.ncchart svg{display:block;width:100%;height:auto;touch-action:none;user-select:none}
+.ncchart .ft{font-size:10px;color:var(--dim2);padding:0 12px 8px;display:flex;gap:12px;flex-wrap:wrap}
+.ncchart .tip{position:absolute;pointer-events:none;background:var(--p1);border:1px solid var(--bd2);border-radius:8px;
+padding:6px 8px;font:11px/1.45 var(--mono);box-shadow:var(--shadow);white-space:nowrap;z-index:2}
+.dirbadge{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:999px;letter-spacing:.6px}
+.dirbadge.LONG{color:var(--g);background:var(--gt)}.dirbadge.SHORT{color:var(--r);background:var(--rt)}.dirbadge.NEUTRAL{color:var(--a);background:var(--at)}
+.sugg{display:flex;flex-wrap:wrap;gap:6px}
+.sugg button{background:none;border:1px solid var(--bd2);color:var(--tx);font-size:11.5px;border-radius:999px;padding:5px 11px;cursor:pointer}
+.sugg button:hover{border-color:var(--b);color:var(--b)}
+.hero{margin:auto 0;text-align:center;padding:26px 6px}
+.hero .big{width:46px;height:46px;border-radius:13px;background:#0b0d10;color:var(--gold);font:800 18px var(--mono);display:grid;place-items:center;
+margin:0 auto 12px;box-shadow:inset 0 0 0 1px rgba(201,162,39,.35)}
+.hero h3{font-size:19px;font-weight:800;margin-bottom:4px}
+.hero p{color:var(--dim);font-size:12.5px;margin-bottom:16px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:left}
+.tiles button{background:var(--p2);border:1px solid var(--bd);border-radius:11px;padding:10px 12px;cursor:pointer;color:var(--tx);font-size:12.5px;line-height:1.4}
+.tiles button small{display:block;color:var(--dim);font-size:11px;margin-top:2px}
+.tiles button:hover{border-color:var(--b)}
+.composer{padding:10px 14px 14px;border-top:1px solid var(--bd);background:var(--p1)}
+.composer .box{display:flex;gap:8px;align-items:flex-end;border:1px solid var(--bd2);border-radius:16px;background:var(--p2);padding:8px 8px 8px 14px;
+max-width:860px;margin:0 auto;transition:border-color .15s,box-shadow .15s}
+.composer .box:focus-within{border-color:var(--b);box-shadow:0 0 0 3px var(--bt)}
+.composer textarea{flex:1;border:none;background:none;resize:none;color:var(--tx);font:13.5px/1.5 var(--font);max-height:160px;outline:none;padding:4px 0}
+.composer .send{width:34px;height:34px;border-radius:50%;border:none;background:var(--b);color:#fff;cursor:pointer;font-size:15px;display:grid;place-items:center;flex-shrink:0}
+.composer .send:disabled{opacity:.35;cursor:default}
+.composer .send.stop{background:var(--tx);color:var(--p1)}
+.composer .hint{max-width:860px;margin:6px auto 0;font-size:10.5px;color:var(--dim2);display:flex;gap:10px;justify-content:space-between}
+.noticebar{font-size:11.5px;color:var(--a);background:var(--at);border-radius:8px;padding:6px 9px}
 .aempty{color:var(--dim);font-size:12px;text-align:center;padding:24px 10px}
 .ascrim{position:fixed;inset:0;z-index:64;background:rgba(16,24,40,.25)}
 @media(min-width:1500px){.ascrim{display:none}}
@@ -836,10 +898,12 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
 
   <!-- agent desk: the human view of Northchart Connect -->
   <div class="ascrim" v-if="agentOpen" @click="toggleAgent(false)"></div>
-  <aside class="adrawer" :class="{open:agentOpen}" aria-label="Agent desk" :aria-hidden="!agentOpen">
+  <aside class="adrawer" :class="{open:agentOpen,wide:agentWide}" aria-label="Agent desk" :aria-hidden="!agentOpen">
     <div class="ahead">
       <div class="brand-mark" style="width:30px;height:30px;font-size:12px" aria-hidden="true">N</div>
       <h2>Agent desk<small>Same read-only tools for you, ChatGPT and Claude. Nothing here places orders.</small></h2>
+      <button class="iconbtn" @click="newChat" title="New chat" aria-label="New chat">＋</button>
+      <button class="iconbtn" @click="agentWide=!agentWide" :title="agentWide?'Narrow panel':'Widen panel'" :aria-label="agentWide?'Narrow panel':'Widen panel'">{{ agentWide?'⇥':'⇤' }}</button>
       <button class="iconbtn" @click="toggleAgent(false)" aria-label="Close agent desk">✕</button>
     </div>
     <div class="atabs" role="tablist">
@@ -847,48 +911,55 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
         :class="{on:agentTab===t[0]}" @click="setAgentTab(t[0])">{{ t[1] }}<span v-if="t[0]==='activity'&&agentUnread" class="inboxbadge">{{ agentUnread }}</span></button>
     </div>
 
-    <div class="abody" v-if="agentTab==='run'" ref="arun">
-      <div v-if="!agentLog.length" class="anote">Ask about <b>{{ sym }}</b> in plain words, or pick a tool. Try <code>snapshot</code>, <code>brief</code>,
-        <code>route</code>, <code>overview</code>, <code>history</code> or a question such as <i>why no trade?</i> Add a symbol to switch, for example <code>brief EURUSD</code>.</div>
-      <div class="achips">
-        <button v-for="c in agentChips" :key="c[0]" @click="agentSend(c[0])">{{ c[1] }}</button>
-      </div>
-      <template v-for="m in agentLog" :key="m.id">
-        <div v-if="m.me" class="amsg me">{{ m.text }}</div>
-        <div v-else class="acard">
-          <div class="top"><span>{{ m.title }}</span><span :class="m.ok?'ok':'bad'">{{ m.pending?'running…':(m.ok?m.ms+' ms':'error') }}</span></div>
-          <div class="in">
-            <div v-if="m.pending" class="anote"><span class="spin"></span> Running {{ m.tool }}…</div>
-            <div v-else-if="!m.ok" style="color:var(--r)">{{ m.res && m.res.error }}</div>
-            <template v-else-if="m.tool==='get_market_snapshot'">
-              <div class="akv">
-                <div><span>Price</span><b>{{ m.res.price }}</b></div>
-                <div><span>Bias</span><b :class="m.res.direction==='LONG'?'dirL':m.res.direction==='SHORT'?'dirS':'dirN'">{{ m.res.direction }}</b></div>
-                <div><span>Grade</span><b>{{ m.res.grade }}</b></div>
-                <div><span>Confidence</span><b>{{ m.res.confidence }}%</b></div>
-                <div><span>Quality</span><b>{{ m.res.signal_quality }}</b></div>
-                <div><span>MTF</span><b>{{ m.res.mtf_agreement }}%</b></div>
-              </div>
-              <p v-if="m.res.desk_action" style="margin-top:8px"><b>{{ m.res.desk_action.mode }}</b> · {{ m.res.desk_action.title }}<br><span class="anote">{{ m.res.desk_action.detail }}</span></p>
-            </template>
-            <table v-else-if="m.tool==='get_market_overview'" class="atbl">
-              <tr><th>Symbol</th><th>Price</th><th>Bias</th><th>Grade</th><th>Mode</th></tr>
-              <tr v-for="r in m.res.symbols" :key="r.sym" style="cursor:pointer" @click="switchSym(r.sym)">
-                <td><b>{{ r.sym }}</b></td><td class="num">{{ r.price ?? '—' }}</td>
-                <td :class="r.direction==='LONG'?'dirL':r.direction==='SHORT'?'dirS':'dirN'">{{ r.direction||'—' }}</td>
-                <td>{{ r.grade||'—' }}</td><td>{{ r.mode||r.status }}</td></tr>
-            </table>
-            <table v-else-if="m.tool==='preview_signal_routing'" class="atbl">
-              <tr><th>Account</th><th>Answer</th><th>Size</th></tr>
-              <tr v-for="a in (m.res.accounts||[])" :key="a.account"><td><b>{{ a.account }}</b><div class="anote" v-if="a.reasons&&a.reasons.length">{{ a.reasons.join(' · ') }}</div></td>
-                <td><span class="dec" :class="a.decision">{{ a.decision }}</span></td><td class="num">{{ a.lots }} lots</td></tr>
-            </table>
-            <pre v-else-if="m.tool==='get_desk_brief'">{{ m.res.brief }}</pre>
-            <p v-else-if="m.tool==='ask_desk'" style="white-space:pre-wrap">{{ m.res.answer }}</p>
-            <pre v-else>{{ JSON.stringify(m.res,null,2) }}</pre>
-          </div>
+    <div class="abody" v-if="agentTab==='run'" ref="arun" @scroll.passive="onChatScroll">
+      <div v-if="!chat.length" class="hero">
+        <div class="big">N</div>
+        <h3>What should we look at?</h3>
+        <p>Answers stream from the desk's live tools, with charts. Read-only: nothing here places an order.</p>
+        <div class="tiles">
+          <button v-for="t in heroTiles" :key="t[0]" @click="ask(t[0])">{{ t[0] }}<small>{{ t[1] }}</small></button>
         </div>
-      </template>
+      </div>
+      <div class="chat" v-else>
+        <template v-for="t in chat" :key="t.id">
+          <div v-if="t.role==='user'" class="turn-u">{{ t.text }}</div>
+          <div v-else class="turn-a">
+            <div class="av">N</div>
+            <div class="col">
+              <div class="modebadge" v-if="t.mode">{{ t.mode==='claude'?'Claude agent':'Desk engine' }} · <b>{{ t.symbol }}</b></div>
+              <div v-if="t.notice" class="noticebar">{{ t.notice }}</div>
+              <details v-if="t.steps.length" class="trail" :open="t.streaming">
+                <summary><span v-if="t.streaming&&t.steps.some(x=>x.status==='running')" class="spin-s"></span><span v-else>✓</span>
+                  {{ t.streaming?'Working':'Used' }} {{ t.steps.length }} tool{{ t.steps.length>1?'s':'' }}<template v-if="!t.streaming"> · {{ t.steps.reduce((a,x)=>a+(x.ms||0),0) }} ms</template>
+                  <span class="chev">›</span></summary>
+                <div class="step" v-for="st in t.steps" :key="st.id">
+                  <span><span v-if="st.status==='running'" class="spin-s"></span><span v-else :class="st.ok?'dirL':'dirS'">{{ st.ok?'✓':'✕' }}</span></span>
+                  <span style="min-width:0"><span class="nm">{{ toolTitle(st.name) }}</span> <span class="sm">{{ st.summary || argText(st.args) }}</span></span>
+                  <span class="ms">{{ st.ms!=null?st.ms+' ms':'' }}</span>
+                </div>
+              </details>
+              <template v-for="(bk,bi) in t.blocks" :key="bi">
+                <div v-if="bk.type==='text'" class="md" v-html="md(bk.text)+(t.streaming&&bi===t.blocks.length-1?'<span class=&quot;caret&quot;></span>':'')"></div>
+                <nc-chart v-else-if="bk.type==='chart'" :chart="bk.chart" :dark="darkMode"></nc-chart>
+                <div v-else-if="bk.type==='card'&&bk.card.kind==='route'" class="acard">
+                  <div class="top"><span>Route preview · {{ bk.card.symbol }}</span><span>preview only</span></div>
+                  <div class="in"><table class="atbl"><tr><th>Account</th><th>Answer</th><th>Size</th><th>Risk</th></tr>
+                    <tr v-for="ac in bk.card.accounts" :key="ac.account"><td><b>{{ ac.account }}</b> <span class="anote">{{ ac.type }}</span>
+                      <div class="anote" v-if="ac.reasons.length">{{ ac.reasons.join(' · ') }}</div></td>
+                      <td><span class="dec" :class="ac.decision">{{ ac.decision }}</span></td><td class="num">{{ ac.lots }} lots</td><td class="num">{{ ac.risk ?? '—' }}</td></tr>
+                  </table></div></div>
+                <details v-else-if="bk.type==='card'" class="trail"><summary>{{ bk.card.title||'Data' }} <span class="chev">›</span></summary>
+                  <pre style="padding:10px;margin:0;font:11px var(--mono);white-space:pre-wrap;max-height:320px;overflow:auto">{{ JSON.stringify(bk.card.data,null,2) }}</pre></details>
+              </template>
+              <div v-if="t.streaming&&!t.blocks.length&&!t.steps.length" class="anote"><span class="spin-s"></span> Thinking…</div>
+              <div v-if="t.error" class="noticebar" style="color:var(--r);background:var(--rt)">{{ t.error }}</div>
+              <div class="sugg" v-if="!t.streaming&&t.suggestions.length&&t===chat[chat.length-1]">
+                <button v-for="sg in t.suggestions" :key="sg" @click="ask(sg)">{{ sg }}</button>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
     </div>
 
     <div class="abody" v-else-if="agentTab==='activity'">
@@ -928,10 +999,15 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
       <div v-if="agentStatus.owner_password_set===false" class="anote" style="color:var(--r)">No desk password is set on this server. Set SIGNALDESK_PASS before connecting agents.</div>
     </div>
 
-    <form class="acmd" @submit.prevent="agentSend()" v-if="agentTab==='run'">
-      <input ref="ainput" v-model="agentQ" :placeholder="'Ask or run a tool for '+sym+'…'" aria-label="Agent command">
-      <button type="submit">Run</button>
-    </form>
+    <div class="composer" v-if="agentTab==='run'">
+      <div class="box">
+        <textarea ref="ainput" v-model="agentQ" rows="1" :placeholder="'Ask about '+sym+', or any market…'" aria-label="Agent command"
+          @keydown.enter.exact.prevent="ask()" @input="autoGrow"></textarea>
+        <button v-if="streaming" class="send stop" @click="stopStream" title="Stop" aria-label="Stop">■</button>
+        <button v-else class="send" :disabled="!agentQ.trim()" @click="ask()" title="Send (Enter)" aria-label="Send">↑</button>
+      </div>
+      <div class="hint"><span>Enter to send · Shift+Enter for a new line · Ctrl+K anywhere</span><span>{{ agentMode==='claude'?'Claude agent':'Desk engine' }}</span></div>
+    </div>
   </aside>
   <div class="toastwrap"><transition-group name="toast">
     <div class="toast" v-for="t in toasts" :key="t.id">{{ t.msg }}</div>
@@ -940,7 +1016,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
 
 <script>
 const {createApp} = Vue;
-createApp({
+const app=createApp({
   data(){return{
     sym:'XAUUSD', inboxN:0,
     symGroups:[
@@ -957,8 +1033,10 @@ createApp({
     tvu:'',tvp:'',tvsid:'',tvsign:'',tverrMsg:'',authOpen:false,authStep:'signin',authLoading:false,
     tvWidgetSym:null, curvePts:[], macroHelp:false,
     darkMode:false, roster:[], refreshing:false,
-    agentOpen:false, agentTab:'run', agentQ:'', agentLog:[], agentFeed:[], agentStatus:{}, agentUnread:0, agentSeenTs:0, agentId:0,
-    agentChips:[['snapshot','Snapshot'],['brief','Desk brief'],['why no trade?','Why no trade?'],['route','Route preview'],['overview','All markets'],['detail','Full detail']],
+    agentOpen:false, agentTab:'run', agentQ:'', agentFeed:[], agentStatus:{}, agentUnread:0, agentSeenTs:0, agentId:0,
+    chat:[], streaming:false, abortCtl:null, agentWide:false, agentMode:'desk', stick:true,
+    heroTiles:[['Why no trade on gold?','Levels, evidence and what would change the view'],['Scan all markets','Conviction across all 15 instruments'],
+      ['Chart USDJPY','15-minute candles with desk levels'],['Route XAUUSD','Sized for every account, preview only']],
   }},
   computed:{
     perf(){ return this.d.perf||{} },
@@ -1200,37 +1278,77 @@ createApp({
         this.agentUnread=this.agentFeed.filter(a=>a.client!=='Northchart UI'&&a.ts>this.agentSeenTs).length;
         if(this.agentOpen&&this.agentTab==='activity') this.markAgentSeen();
       }catch(e){} },
-    parseAgent(text){
-      const raw=(text||'').trim(); const words=raw.split(/\s+/);
-      const symWord=words.map(w=>w.toUpperCase().replace('/','')).find(w=>this.flatSyms.some(f=>f[0]===w));
-      const sym=symWord||this.sym; const first=(words[0]||'').toLowerCase();
-      const map={snapshot:'get_market_snapshot',snap:'get_market_snapshot',price:'get_market_snapshot',
-        brief:'get_desk_brief',detail:'get_signal_detail',levels:'get_signal_detail',history:'get_price_history',
-        route:'preview_signal_routing',size:'preview_signal_routing',overview:'get_market_overview',markets:'get_market_overview',
-        all:'get_market_overview',instruments:'list_instruments',portfolio:'get_portfolio_summary',accounts:'get_portfolio_summary'};
-      const noSym=['get_market_overview','list_instruments','get_portfolio_summary'];
-      if(map[first]) return {tool:map[first],args:noSym.includes(map[first])?{}:{symbol:sym}};
-      return {tool:'ask_desk',args:{symbol:sym,question:raw}};
+    toolTitle(n){ return ({get_market_snapshot:'Snapshot',get_signal_detail:'Signal detail',get_candles:'Candles',
+      ask_desk:'Desk copilot',get_market_overview:'Market overview',preview_signal_routing:'Route preview',
+      get_desk_brief:'Desk brief',get_portfolio_summary:'Portfolio',get_price_history:'Price history',list_instruments:'Instruments'})[n]||n },
+    argText(a){ return a?Object.values(a).join(' · '):'' },
+    md(src){
+      const esc=x=>x.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const inline=x=>esc(x).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>')
+        .replace(/(^|[\s(])_([^_]+)_(?=[\s).,]|$)/g,'$1<em>$2</em>');
+      const lines=(src||'').split('\n'); let html='', list=null, para=[], pre=null;
+      const flushP=()=>{ if(para.length){ html+='<p>'+para.map(inline).join('<br>')+'</p>'; para=[] } };
+      const flushL=()=>{ if(list){ html+='<'+list.t+'>'+list.items.map(i=>'<li>'+inline(i)+'</li>').join('')+'</'+list.t+'>'; list=null } };
+      for(const ln of lines){
+        if(/^```/.test(ln)){ if(pre===null){flushP();flushL();pre=[]} else {html+='<pre>'+esc(pre.join('\n'))+'</pre>';pre=null} continue }
+        if(pre!==null){ pre.push(ln); continue }
+        let m;
+        if((m=ln.match(/^\s*[-*]\s+(.*)/))){ flushP(); if(!list||list.t!=='ul'){flushL();list={t:'ul',items:[]}} list.items.push(m[1]); continue }
+        if((m=ln.match(/^#{1,4}\s+(.*)/))){ flushP(); flushL(); html+='<h4>'+inline(m[1])+'</h4>'; continue }
+        if(!ln.trim()){ flushP(); flushL(); continue }
+        flushL(); para.push(ln);
+      }
+      if(pre!==null) html+='<pre>'+esc(pre.join('\n'))+'</pre>';
+      flushP(); flushL(); return html;
     },
-    async agentSend(text){
-      const q=(text??this.agentQ).trim(); if(!q) return; this.agentQ='';
-      const {tool,args}=this.parseAgent(q);
-      const titles={get_market_snapshot:'Snapshot',get_desk_brief:'Desk brief',get_signal_detail:'Signal detail',
-        get_price_history:'Price history',preview_signal_routing:'Route preview',get_market_overview:'All markets',
-        list_instruments:'Instruments',get_portfolio_summary:'Portfolio',ask_desk:'Desk answer'};
-      this.agentLog.push({id:++this.agentId,me:true,text:q});
-      const card={id:++this.agentId,tool,title:(titles[tool]||tool)+(args.symbol&&tool!=='get_market_overview'?' · '+args.symbol:''),pending:true,ok:true,res:null,ms:0};
-      this.agentLog.push(card); this.scrollAgent();
-      const t0=performance.now();
-      try{ const r=await fetch('/api/agent/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool,args})});
-        const j=await r.json(); card.ok=!!j.ok; card.res=j.result;
-      }catch(e){ card.ok=false; card.res={error:String(e)} }
-      card.ms=Math.round(performance.now()-t0); card.pending=false;
-      const i=this.agentLog.findIndex(x=>x.id===card.id); if(i>=0) this.agentLog.splice(i,1,{...card});
-      if(this.agentLog.length>60) this.agentLog.splice(0,this.agentLog.length-60);
+    autoGrow(e){ const el=e?e.target:this.$refs.ainput; if(!el) return; el.style.height='auto'; el.style.height=Math.min(160,el.scrollHeight)+'px' },
+    newChat(){ this.stopStream(); this.chat=[]; this.agentTab='run'; this.$nextTick(()=>this.$refs.ainput&&this.$refs.ainput.focus()) },
+    stopStream(){ if(this.abortCtl){ try{this.abortCtl.abort()}catch(e){} } },
+    async ask(text){
+      const q=(text??this.agentQ).trim(); if(!q||this.streaming) return;
+      this.agentQ=''; this.$nextTick(()=>this.autoGrow());
+      const history=this.chat.filter(t=>!t.streaming).map(t=>t.role==='user'?{role:'user',content:t.text}
+        :{role:'assistant',content:t.blocks.filter(b=>b.type==='text').map(b=>b.text).join('\n')}).slice(-10);
+      this.chat.push({id:++this.agentId,role:'user',text:q});
+      this.chat.push({id:++this.agentId,role:'assistant',mode:null,symbol:this.sym,steps:[],blocks:[],suggestions:[],streaming:true,error:null,notice:null});
+      const t=this.chat[this.chat.length-1];
+      this.streaming=true; this.abortCtl=new AbortController(); this.scrollAgent(true);
+      try{
+        const r=await fetch('/api/agent/stream',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({question:q,symbol:this.sym,history}),signal:this.abortCtl.signal});
+        if(!r.ok||!r.body) throw new Error('HTTP '+r.status);
+        const rd=r.body.getReader(), dec=new TextDecoder(); let buf='';
+        while(true){
+          const {value,done}=await rd.read(); if(done) break;
+          buf+=dec.decode(value,{stream:true});
+          let i; while((i=buf.indexOf('\n\n'))>=0){
+            const chunk=buf.slice(0,i); buf=buf.slice(i+2);
+            const data=chunk.split('\n').filter(l=>l.startsWith('data:')).map(l=>l.slice(5).trim()).join('\n');
+            if(data){ try{ this.onAgentEvent(t,JSON.parse(data)) }catch(e){} }
+          }
+        }
+      }catch(e){ if(e.name!=='AbortError') t.error='Stream failed: '+e.message; else t.notice='Stopped.' }
+      t.streaming=false; this.streaming=false; this.abortCtl=null;
+      t.steps.forEach(x=>{ if(x.status==='running'){x.status='done';x.ok=false;x.summary='stopped'} });
       this.scrollAgent(); this.fetchAgentFeed();
     },
-    scrollAgent(){ this.$nextTick(()=>{const el=this.$refs.arun; if(el) el.scrollTop=el.scrollHeight}) },
+    onAgentEvent(t,ev){
+      if(ev.type==='start'){ t.mode=ev.mode; t.symbol=ev.symbol; this.agentMode=ev.mode }
+      else if(ev.type==='tool'){ const st=t.steps.find(x=>x.id===ev.id);
+        if(st) Object.assign(st,ev); else t.steps.push({...ev}) }
+      else if(ev.type==='text'){ const last=t.blocks[t.blocks.length-1];
+        if(last&&last.type==='text') last.text+=ev.delta; else t.blocks.push({type:'text',text:ev.delta}) }
+      else if(ev.type==='chart') t.blocks.push({type:'chart',chart:ev.chart});
+      else if(ev.type==='card') t.blocks.push({type:'card',card:ev.card});
+      else if(ev.type==='suggestions') t.suggestions=ev.items||[];
+      else if(ev.type==='notice') t.notice=ev.message;
+      else if(ev.type==='error') t.error=ev.message;
+      this.scrollAgent();
+    },
+    onChatScroll(){ const el=this.$refs.arun; if(!el||this._autoScrolling) return;
+      this.stick=(el.scrollHeight-el.scrollTop-el.clientHeight)<80 },
+    scrollAgent(force){ if(force) this.stick=true; this.$nextTick(()=>{ const el=this.$refs.arun; if(!el||!this.stick) return;
+      this._autoScrolling=true; el.scrollTop=el.scrollHeight; requestAnimationFrame(()=>{this._autoScrolling=false}) }) },
     async copyMcp(){ try{ await navigator.clipboard.writeText(this.agentStatus.mcp_url); this.toast('MCP URL copied') }catch(e){ this.toast(this.agentStatus.mcp_url) } },
     async revokeAgents(){ if(!confirm('Sign out every connected agent? They will need your desk password to reconnect.')) return;
       await fetch('/api/agent/revoke',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
@@ -1280,5 +1398,105 @@ createApp({
     const s=document.createElement('script'); s.src='https://s3.tradingview.com/tv.js';
     s.onload=()=>this.mountChart(); document.head.appendChild(s);
   },
-}).mount('#app');
+});
+
+// ---------------- nc-chart: inline charts for agent answers ----------------
+app.component('nc-chart',{
+  props:{chart:Object,dark:Boolean},
+  data(){return{hover:null,W:640,H:290}},
+  computed:{
+    c(){return this.chart||{}},
+    dp(){ const p=this.c.price??(this.c.bars&&this.c.bars.length?this.c.bars[this.c.bars.length-1].c:1);
+      return Math.abs(p)>=1000?2:Math.abs(p)>=10?(Math.abs(p)>=100?2:3):4 },
+    pad(){return{l:8,r:100,t:10,b:24}},
+    bars(){return this.c.bars||[]},
+    yr(){ if(this.c.kind!=='candles'||!this.bars.length) return [0,1];
+      let lo=Math.min(...this.bars.map(b=>b.l)), hi=Math.max(...this.bars.map(b=>b.h));
+      const span=hi-lo||Math.abs(hi)*0.001||1;
+      for(const lv of (this.c.levels||[])){ if(lv.value>lo-span*1.5&&lv.value<hi+span*1.5){ lo=Math.min(lo,lv.value); hi=Math.max(hi,lv.value) } }
+      const m=(hi-lo)*0.08||span*0.08; return [lo-m,hi+m] },
+    pw(){return this.W-this.pad.l-this.pad.r}, ph(){return this.H-this.pad.t-this.pad.b},
+    step(){return this.pw/Math.max(1,this.bars.length)},
+    candles(){ const y=this.y, w=Math.max(1,this.step*0.64);
+      return this.bars.map((b,i)=>{ const x=this.pad.l+this.step*(i+0.5), up=b.c>=b.o;
+        return {x,w,up,yh:y(b.h),yl:y(b.l),yo:y(b.o),yc:y(b.c),top:Math.min(y(b.o),y(b.c)),hgt:Math.max(1,Math.abs(y(b.o)-y(b.c)))} }) },
+    grid(){ const [lo,hi]=this.yr, n=5, out=[]; for(let i=0;i<=n;i++){ const v=lo+(hi-lo)*i/n; out.push({v,y:this.y(v)}) } return out },
+    times(){ const n=this.bars.length; if(!n) return []; const k=Math.max(1,Math.floor(n/5)), out=[];
+      for(let i=k>>1;i<n;i+=k){ const d=new Date(this.bars[i].t*1000);
+        out.push({x:this.pad.l+this.step*(i+0.5),t:d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}) } return out },
+    levels(){ const [lo,hi]=this.yr; return (this.c.levels||[]).filter(l=>l.value>=lo&&l.value<=hi).map(l=>({...l,y:this.y(l.value)})) },
+    tags(){ // right-axis labels for levels and last price, pushed apart so they never overlap
+      const t=this.levels.map(l=>({key:l.label,text:l.label+' '+this.f(l.value),y:l.y,fill:this.tone(l.tone)}));
+      if(this.last) t.push({key:'last',text:this.f(this.last.v),y:this.last.y,fill:this.last.up?'var(--g)':'var(--r)'});
+      t.sort((a,b)=>a.y-b.y); const gap=17, top=this.pad.t+8, bot=this.H-this.pad.b-8;
+      for(let i=1;i<t.length;i++) if(t[i].y-t[i-1].y<gap) t[i].y=t[i-1].y+gap;
+      for(let i=t.length-1;i>=0;i--){ const lim=i===t.length-1?bot:t[i+1].y-gap; if(t[i].y>lim) t[i].y=lim }
+      t.forEach(x=>{x.y=Math.max(top,x.y)}); return t },
+    hidden(){ const [lo,hi]=this.yr; return (this.c.levels||[]).filter(l=>l.value<lo||l.value>hi) },
+    last(){ const b=this.bars[this.bars.length-1]; return b?{v:b.c,y:this.y(b.c),up:b.c>=b.o}:null },
+    hb(){ return this.hover!=null?this.bars[this.hover]:null },
+    // bar chart
+    brows(){ return (this.c.bars||[]) },
+    bH(){ return 26+this.brows.length*22 },
+  },
+  methods:{
+    y(v){ const [lo,hi]=this.yr; return this.pad.t+this.ph*(1-(v-lo)/((hi-lo)||1)) },
+    f(v){ return v==null?'—':Number(v).toLocaleString(undefined,{minimumFractionDigits:this.dp,maximumFractionDigits:this.dp}) },
+    tone(t){ return t==='stop'?'var(--r)':t==='target'?'var(--g)':'var(--b)' },
+    move(e){ if(this.c.kind!=='candles'||!this.bars.length) return;
+      const r=this.$refs.svg.getBoundingClientRect(), x=(e.clientX-r.left)*this.W/r.width;
+      const i=Math.floor((x-this.pad.l)/this.step); this.hover=(i>=0&&i<this.bars.length)?i:null;
+      this.hy=(e.clientY-r.top)*this.H/r.height; this.tipX=(e.clientX-r.left); this.tipW=r.width },
+    tipStyle(){ const left=this.tipX>this.tipW*0.6?this.tipX-170:this.tipX+14; return {left:left+'px',top:'38px'} },
+    when(t){ const d=new Date(t*1000); return d.toLocaleDateString([], {weekday:'short'})+' '+d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) },
+  },
+  template:`
+  <div class="ncchart">
+    <div class="hd"><b>{{ c.title }}</b>
+      <span v-if="c.direction" class="dirbadge" :class="c.direction">{{ c.direction }}</span>
+      <span class="sub" v-if="c.subtitle">{{ c.subtitle }}</span>
+      <span class="px" v-if="c.kind==='candles'&&last">{{ f(c.price??last.v) }}</span></div>
+    <template v-if="c.kind==='candles'">
+      <svg ref="svg" :viewBox="'0 0 '+W+' '+H" @pointermove="move" @pointerleave="hover=null" role="img" :aria-label="c.title+' candlestick chart'">
+        <g v-for="g in grid" :key="'g'+g.y">
+          <line :x1="pad.l" :x2="W-pad.r" :y1="g.y" :y2="g.y" stroke="var(--bd)" stroke-width="1"/>
+          <text v-if="!tags.some(t=>Math.abs(t.y-g.y)<12)" :x="W-pad.r+6" :y="g.y+3.5" font-size="10" fill="var(--dim2)" font-family="var(--mono)">{{ f(g.v) }}</text>
+        </g>
+        <text v-for="tm in times" :key="'t'+tm.x" :x="tm.x" :y="H-7" font-size="10" fill="var(--dim2)" text-anchor="middle">{{ tm.t }}</text>
+        <g v-for="(k,i) in candles" :key="i" :opacity="hover==null||hover===i?1:.55">
+          <line :x1="k.x" :x2="k.x" :y1="k.yh" :y2="k.yl" :stroke="k.up?'var(--g)':'var(--r)'" stroke-width="1"/>
+          <rect :x="k.x-k.w/2" :y="k.top" :width="k.w" :height="k.hgt" :fill="k.up?'var(--g)':'var(--r)'" rx="0.5"/>
+        </g>
+        <line v-for="lv in levels" :key="'l'+lv.label" :x1="pad.l" :x2="W-pad.r" :y1="lv.y" :y2="lv.y" :stroke="tone(lv.tone)" stroke-width="1.2" stroke-dasharray="5 4"/>
+        <line v-if="last" :x1="pad.l" :x2="W-pad.r" :y1="last.y" :y2="last.y" stroke="var(--dim)" stroke-width=".8" stroke-dasharray="1 3"/>
+        <g v-for="tg in tags" :key="'tg'+tg.key">
+          <rect :x="W-pad.r+2" :y="tg.y-8" :width="pad.r-4" height="16" rx="3" :fill="tg.fill"/>
+          <text :x="W-pad.r+6" :y="tg.y+3.6" font-size="9.5" fill="#fff" font-family="var(--mono)" font-weight="700">{{ tg.text }}</text>
+        </g>
+        <g v-if="hb">
+          <line :x1="candles[hover].x" :x2="candles[hover].x" :y1="pad.t" :y2="H-pad.b" stroke="var(--dim)" stroke-width=".8" stroke-dasharray="3 3"/>
+          <line v-if="hy>pad.t&&hy<H-pad.b" :x1="pad.l" :x2="W-pad.r" :y1="hy" :y2="hy" stroke="var(--dim)" stroke-width=".8" stroke-dasharray="3 3"/>
+        </g>
+      </svg>
+      <div v-if="hb" class="tip" :style="tipStyle()">{{ when(hb.t) }}<br>O {{ f(hb.o) }} H {{ f(hb.h) }}<br>L {{ f(hb.l) }} C <b :class="hb.c>=hb.o?'dirL':'dirS'">{{ f(hb.c) }}</b></div>
+      <div class="ft"><span>{{ bars.length }} × 15m</span><span v-if="c.source">{{ c.source }}</span>
+        <span v-for="h in hidden" :key="h.label">{{ h.label }} {{ f(h.value) }} off chart</span></div>
+    </template>
+    <template v-else-if="c.kind==='bars'">
+      <svg :viewBox="'0 0 '+W+' '+bH" role="img" :aria-label="c.title" style="max-width:760px;margin:0 auto">
+        <line :x1="W/2" :x2="W/2" y1="6" :y2="bH-16" stroke="var(--bd2)"/>
+        <text :x="W*0.27" :y="bH-4" font-size="10" fill="var(--dim2)" text-anchor="middle">◀ short</text>
+        <text :x="W*0.73" :y="bH-4" font-size="10" fill="var(--dim2)" text-anchor="middle">long ▶</text>
+        <g v-for="(r,i) in brows" :key="r.label">
+          <text x="8" :y="18+i*22" font-size="11" fill="var(--tx)" font-family="var(--mono)" font-weight="700">{{ r.label }}</text>
+          <rect :x="r.value>=0?W/2:W/2+(W/2-84)*r.value/100" :y="8+i*22" :width="Math.max(2,Math.abs((W/2-84)*r.value/100))" height="14" rx="3"
+            :fill="r.value>0?'var(--g)':r.value<0?'var(--r)':'var(--a)'" opacity=".85"/>
+          <text :x="r.value>=0?W/2+Math.abs((W/2-84)*r.value/100)+6:W/2-Math.abs((W/2-84)*r.value/100)-6" :y="19+i*22" font-size="10"
+            :text-anchor="r.value>=0?'start':'end'" fill="var(--dim)" font-family="var(--mono)">{{ Math.abs(r.value) }}% {{ r.note }}</text>
+        </g>
+      </svg>
+    </template>
+  </div>`
+});
+app.mount('#app');
 </script></body></html>

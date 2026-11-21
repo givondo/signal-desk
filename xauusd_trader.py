@@ -387,6 +387,33 @@ def _portfolio_summary():
     return json.loads(out)
 
 
+def _candles(sym, limit=96):
+    """15m OHLC bars for charts. Futures proxies (GC=F, SI=F, CL=F) are shifted
+    by the spot-futures basis so they line up with the desk's spot levels, and
+    the response says so."""
+    with state_lock:
+        cc = dict(candle_cache.get(sym) or {})
+        st = latest.get(sym) or {}
+    bars = [list(b) for b in (cc.get("ohlc") or [])][-max(10, min(160, int(limit))):]
+    src = cc.get("source") or SYMBOLS[sym].get("candles")
+    out = {"symbol": sym, "interval": "15m", "source": f"Yahoo Finance {src}", "basis": 0.0,
+           "bars": [], "price": st.get("price"), "updated": cc.get("ts")}
+    if not bars:
+        return out
+    dp = SYMBOLS[sym].get("dp", 2)
+    px = st.get("price")
+    if src and src.endswith("=F") and isinstance(px, (int, float)) and bars[-1][4]:
+        basis = px - bars[-1][4]
+        if abs(basis) / px < 0.03:
+            out["basis"] = round(basis, dp)
+            out["source"] += (f" futures, shifted {basis:+.{dp}f} to spot" if round(basis, dp)
+                              else " futures")
+            bars = [[b[0]] + [v + basis for v in b[1:]] for b in bars]
+    out["bars"] = [{"t": int(b[0]), "o": round(b[1], dp), "h": round(b[2], dp), "l": round(b[3], dp),
+                    "c": round(b[4], dp)} for b in bars]
+    return out
+
+
 def connect_service():
     global _connect
     with _connect_lock:
@@ -400,6 +427,7 @@ def connect_service():
                 "ask": copilot_answer,
                 "route_preview": _route_preview,
                 "portfolio": _portfolio_summary,
+                "candles": _candles,
                 "owner_password": _owner_password,
             }, DATA_DIR)
         return _connect
@@ -607,13 +635,22 @@ def refresh_candles(sym):
     data = http_json("https://query1.finance.yahoo.com/v8/finance/chart/"
                      f"{urllib.parse.quote(SYMBOLS[sym]['candles'])}"
                      "?interval=15m&range=2d")
-    q = data["chart"]["result"][0]["indicators"]["quote"][0]
+    res0 = data["chart"]["result"][0]
+    q = res0["indicators"]["quote"][0]
+    stamps = res0.get("timestamp") or []
     hs, ls, cs = [], [], []
-    for h, l, c in zip(q["high"], q["low"], q["close"]):
+    ohlc = []
+    for i, (h, l, c) in enumerate(zip(q["high"], q["low"], q["close"])):
         if h is not None and l is not None and c is not None:
             hs.append(h)
             ls.append(l)
             cs.append(c)
+            o = (q.get("open") or [None] * len(q["close"]))[i]
+            if i < len(stamps):
+                ohlc.append([stamps[i], o if o is not None else c, h, l, c])
+    # Keep the bars for charts (agent desk and the get_candles tool).
+    candle_cache[sym]["ohlc"] = ohlc[-160:]
+    candle_cache[sym]["source"] = SYMBOLS[sym]["candles"]
     if len(cs) < 10:
         return
     ref = cs[-1]
@@ -2154,6 +2191,27 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    def _agent_stream(self, svc, body):
+        """Stream an agent answer as Server-Sent Events (tool steps, charts, text)."""
+        import northchart_agent as na
+        agent = na.DeskAgent(svc, lambda: SYMBOLS)
+        q = str(body.get("question") or "")
+        sym = str(body.get("symbol") or "XAUUSD").upper()
+        hist = body.get("history") if isinstance(body.get("history"), list) else []
+        self.close_connection = True
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Accel-Buffering", "no")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        try:
+            for ev in agent.stream(q, sym, hist):
+                self.wfile.write(b"data: " + json.dumps(ev, default=str).encode() + b"\n\n")
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # the user pressed Stop or closed the panel
+
     def _agent_post(self, parsed):
         ln = int(self.headers.get("Content-Length", 0) or 0)
         if ln > TRACKER_MAX_BODY:
@@ -2165,6 +2223,8 @@ class Handler(BaseHTTPRequestHandler):
         if not isinstance(body, dict):
             return self._send_full(400, "application/json", b'{"ok": false, "error": "invalid JSON"}')
         svc = connect_service()
+        if parsed.path == "/api/agent/stream":
+            return self._agent_stream(svc, body)
         if parsed.path == "/api/agent/run":
             ok, result = svc.run_tool(str(body.get("tool") or ""), body.get("args") or {},
                                       client="Northchart UI")

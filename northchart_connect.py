@@ -213,7 +213,7 @@ def _sym_schema(extra=None, required=("symbol",)):
     return {"type": "object", "properties": props, "required": list(required), "additionalProperties": False}
 
 
-SNAPSHOT_KEYS = ("sym", "sym_name", "grp", "ts", "price", "change_pct", "day_high", "day_low",
+SNAPSHOT_KEYS = ("sym", "sym_name", "grp", "dp", "ts", "price", "change_pct", "day_high", "day_low",
                  "direction", "confidence", "grade", "signal_quality", "mtf_agreement", "aligned",
                  "tradeable", "regime", "session", "spread_est", "atr_1h", "atr_d")
 
@@ -290,6 +290,18 @@ def build_tools(ctx) -> dict:
             raise ToolError("question is required")
         return {"symbol": s, "question": q, "answer": ctx["ask"](s, q[:500])}
 
+    def candles(args):
+        s = sym_of(args)
+        lim = args.get("limit", 96)
+        try:
+            lim = max(10, min(160, int(lim)))
+        except (TypeError, ValueError):
+            lim = 96
+        out = ctx["candles"](s, lim) if "candles" in ctx else {"bars": []}
+        if not out.get("bars"):
+            raise ToolError(f"no candles for {s} yet; the engine refreshes them every minute")
+        return out
+
     def route(args):
         s = sym_of(args)
         return ctx["route_preview"](s)
@@ -317,6 +329,11 @@ def build_tools(ctx) -> dict:
              "Recent intraday prices recorded by the engine for one instrument (one point per poll, up to 480).",
              _sym_schema({"limit": {"type": "integer", "minimum": 1, "maximum": 480,
                                     "description": "Number of most recent points, default 120."}}), history),
+        Tool("get_candles", "15-minute candles",
+             "Recent 15-minute OHLC candles for one instrument (up to 160 bars, about 40 hours), for charting. "
+             "Metals and oil come from futures and are shifted to spot; the source field says so.",
+             _sym_schema({"limit": {"type": "integer", "minimum": 10, "maximum": 160,
+                                    "description": "Number of most recent bars, default 96."}}), candles),
         Tool("get_desk_brief", "Desk brief",
              "The plain-text desk brief for one instrument: desk status, session clock, market brief, "
              "signals, watchlist and no-trade notes, following the desk's risk-first protocol.",
