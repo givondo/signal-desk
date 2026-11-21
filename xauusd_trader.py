@@ -2313,6 +2313,12 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         if self._is_connect():
             return self._connect_http("GET")
+        # Desktop app (PWA) assets are public: browsers fetch the manifest without credentials.
+        import northchart_pwa
+        if parsed.path in northchart_pwa.PUBLIC_PATHS:
+            ctype, body = northchart_pwa.serve(parsed.path)
+            return self._send_full(200, ctype, body, {"Service-Worker-Allowed": "/"}
+                                   if parsed.path == "/sw.js" else None)
         # Render/platform health probes must not require HTTP Basic auth.
         if parsed.path == "/api/health":
             with state_lock:

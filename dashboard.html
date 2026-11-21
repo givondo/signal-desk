@@ -8,6 +8,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Northchart</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230b0d10'/%3E%3Ctext x='32' y='44' font-size='30' font-weight='bold' text-anchor='middle' fill='%23c9a227' font-family='Consolas'%3ESD%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -362,6 +364,12 @@ transition:transform .22s ease}
 display:grid;place-items:center;font-size:20px;line-height:1}
 .hbtn:hover{background:var(--p3);color:var(--tx)}
 .hdot{position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--b);box-shadow:0 0 0 2px var(--p1)}
+.dlbtn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--bd2);background:var(--p2);color:var(--tx);
+font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:9px;cursor:pointer}
+.dlbtn:hover{border-color:var(--b);color:var(--b)}
+.dlhelp{right:10px;top:46px;min-width:280px;max-width:320px;padding:12px 14px;gap:6px;font-size:12.5px;line-height:1.55}
+.dlhelp p{margin:0}
+.ahead{position:relative}
 .hmenu{position:relative}
 .hpop{position:absolute;right:0;top:38px;z-index:5;min-width:220px;background:var(--p1);border:1px solid var(--bd2);border-radius:10px;
 box-shadow:var(--shadow-lg);padding:5px;display:flex;flex-direction:column}
@@ -908,20 +916,17 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
       <button v-if="agentTab!=='run'" class="hbtn" @click="setAgentTab('run')" title="Back to chat" aria-label="Back to chat">‹</button>
       <div v-else class="brand-mark" style="width:26px;height:26px;font-size:11px" aria-hidden="true">N</div>
       <h2>{{ agentTab==='run'?'Agent desk':agentTab==='activity'?'Activity':'Connect agents' }}</h2>
-      <button v-if="agentTab==='run'" class="hbtn" @click="newChat" title="New chat" aria-label="New chat">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
-      <div class="hmenu">
-        <button class="hbtn" @click.stop="menuOpen=!menuOpen" title="More" aria-label="More options" :aria-expanded="menuOpen">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
-          <span v-if="agentUnread" class="hdot"></span></button>
-        <div v-if="menuOpen" class="hpop" @click="menuOpen=false">
-          <button @click="setAgentTab('activity')">Activity<span v-if="agentUnread" class="inboxbadge">{{ agentUnread }}</span></button>
-          <button @click="setAgentTab('connect')">Connect ChatGPT or Claude</button>
-          <button @click="agentWide=!agentWide">{{ agentWide?'Narrow panel':'Widen panel' }}</button>
-        </div>
+      <button v-if="!isStandalone" class="dlbtn" @click.stop="installDesktop" title="Install Northchart as a desktop app">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        Download desktop</button>
+      <div v-if="installHelp" class="hpop dlhelp" @click.stop>
+        <b>Install Northchart</b>
+        <p v-if="installHint==='chromium'">In Chrome or Edge, open the browser menu (⋮), choose <b>Cast, save and share</b>, then <b>Install page as app</b>. You can also use the install icon at the right of the address bar.</p>
+        <p v-else-if="installHint==='safari'">In Safari on a Mac, choose <b>File</b>, then <b>Add to Dock</b>.</p>
+        <p v-else-if="installHint==='ios'">Tap <b>Share</b>, then <b>Add to Home Screen</b>.</p>
+        <p v-else>Open this page in Chrome or Edge and choose <b>Install page as app</b> from the browser menu.</p>
+        <p class="anote">It opens in its own window from your Start menu, dock or taskbar and updates itself.</p>
       </div>
-      <button class="hbtn" @click="toggleAgent(false)" title="Close (Esc)" aria-label="Close agent desk">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>
 
     <div class="abody" v-if="agentTab==='run'" ref="arun" @scroll.passive="onChatScroll">
@@ -1047,7 +1052,7 @@ const app=createApp({
     tvWidgetSym:null, curvePts:[], macroHelp:false,
     darkMode:false, roster:[], refreshing:false,
     agentOpen:false, agentTab:'run', agentQ:'', agentFeed:[], agentStatus:{}, agentUnread:0, agentSeenTs:0, agentId:0,
-    chat:[], streaming:false, abortCtl:null, agentWide:false, agentMode:'desk', stick:true, menuOpen:false,
+    chat:[], streaming:false, abortCtl:null, agentWide:false, agentMode:'desk', stick:true, menuOpen:false, installPrompt:null, isStandalone:false, installHelp:false, installHint:'other',
     heroTiles:[['Why no trade on gold?','Levels, evidence and what would change the view'],['Scan all markets','Conviction across all 15 instruments'],
       ['Chart USDJPY','15-minute candles with desk levels'],['Route XAUUSD','Sized for every account, preview only']],
   }},
@@ -1316,6 +1321,12 @@ const app=createApp({
     },
     autoGrow(e){ const el=e?e.target:this.$refs.ainput; if(!el) return; el.style.height='auto'; el.style.height=Math.min(160,el.scrollHeight)+'px' },
     newChat(){ this.stopStream(); this.chat=[]; this.agentTab='run'; this.$nextTick(()=>this.$refs.ainput&&this.$refs.ainput.focus()) },
+    async installDesktop(){
+      if(this.installPrompt){ const p=this.installPrompt; this.installPrompt=null; p.prompt();
+        try{ const r=await p.userChoice; if(r&&r.outcome==='accepted') this.toast('Installing Northchart') }catch(e){} return }
+      const ua=navigator.userAgent;
+      this.installHint=/iPhone|iPad/.test(ua)?'ios':/Edg\/|Chrome\//.test(ua)?'chromium':/Safari\//.test(ua)?'safari':'other';
+      this.installHelp=!this.installHelp },
     stopStream(){ if(this.abortCtl){ try{this.abortCtl.abort()}catch(e){} }
       const t=this.chat[this.chat.length-1]; if(t&&t.revealing){ t.blocks.forEach(b=>{ if(b.type==='text') b.text=b.full }); t.revealing=false } },
     async ask(text){
@@ -1414,15 +1425,21 @@ const app=createApp({
     this.tick(); this.fetchRoster(); this.fetchInbox(); this.fetchAgentFeed();
     setInterval(()=>this.fetchAgentFeed(),10000);
     if(location.hash==='#agents') this.toggleAgent(true);
-    document.addEventListener('click',()=>{this.menuOpen=false});
+    document.addEventListener('click',()=>{this.menuOpen=false;this.installHelp=false});
+    this.isStandalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+    window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); this.installPrompt=e });
+    window.addEventListener('appinstalled',()=>{ this.isStandalone=true; this.installPrompt=null; this.installHelp=false; this.toast('Northchart installed') });
+    if('serviceWorker' in navigator){ navigator.serviceWorker.register('/sw.js').catch(()=>{}) }
+    if(location.hash==='#agents-activity'||location.hash==='#agents-connect'){ this.toggleAgent(true); this.setAgentTab(location.hash.slice(8)) }
     setInterval(()=>this.fetchInbox(),60000);
     setInterval(()=>this.tick(),15000);
     setInterval(()=>this.fetchRoster(),15000);
     setInterval(()=>{this.now=Date.now()},1000);
     window.addEventListener('resize',()=>{this.drawSpark();this.drawEquity();this.drawDaily()});
     window.addEventListener('keydown',e=>{
+      if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key.toLowerCase()==='o'){ e.preventDefault(); this.toggleAgent(true); this.newChat(); return }
       if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){ e.preventDefault(); this.agentTab='run'; this.toggleAgent(true); return }
-      if(e.key==='Escape'&&this.menuOpen){ this.menuOpen=false; return }
+      if(e.key==='Escape'&&(this.menuOpen||this.installHelp)){ this.menuOpen=false; this.installHelp=false; return }
       if(e.key==='Escape'&&this.agentOpen){ this.toggleAgent(false); return }
       if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
       if(e.key==='/'){ e.preventDefault(); this.agentTab='run'; this.toggleAgent(true); return }

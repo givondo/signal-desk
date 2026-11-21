@@ -177,3 +177,25 @@ class AgentStreaming(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DesktopApp(unittest.TestCase):
+    def test_pwa_assets_are_public_and_valid(self):
+        with DeskServer() as s:
+            c = http.client.HTTPConnection("127.0.0.1", s.port, timeout=10)
+            c.request("GET", "/manifest.webmanifest")
+            r = c.getresponse()
+            self.assertEqual(r.status, 200)
+            m = json.loads(r.read())
+            self.assertEqual(m["display"], "standalone")
+            self.assertEqual({i["sizes"] for i in m["icons"]}, {"192x192", "512x512"})
+            for path in ("/sw.js", "/icons/icon-192.png", "/icons/maskable-512.png"):
+                c.request("GET", path)
+                r = c.getresponse()
+                body = r.read()
+                self.assertEqual(r.status, 200, path)
+                if path.endswith(".png"):
+                    self.assertTrue(body.startswith(b"\x89PNG"))
+            c.request("GET", "/")
+            self.assertEqual(c.getresponse().status, 401)   # the app itself still needs the desk login
+            c.close()
