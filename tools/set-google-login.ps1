@@ -13,6 +13,8 @@
        The values travel in a short-lived file, never on a command line.
 
   Run:  powershell -ExecutionPolicy Bypass -File tools\set-google-login.ps1
+  Or, with the client JSON downloaded from the console (no typing):
+        powershell -ExecutionPolicy Bypass -File tools\set-google-login.ps1 -JsonPath "$HOME\Downloads\client_secret_....json"
 #>
 param(
   [string]$Project = "skilled-orbit-460722-h9",
@@ -20,6 +22,7 @@ param(
   [string]$Zone = "us-central1-a",
   [string]$PublicUrl = "https://desktrading-today.precifarm.com",
   [string]$DeskDir = (Split-Path -Parent $PSScriptRoot),
+  [string]$JsonPath = "",
   [switch]$SkipConsole,
   [switch]$SkipServer
 )
@@ -27,6 +30,7 @@ $ErrorActionPreference = "Stop"
 
 function Step($n, $text) { Write-Host ""; Write-Host "[$n] $text" -ForegroundColor Cyan }
 
+if ($JsonPath) { $SkipConsole = $true }
 if (-not $SkipConsole) {
   Step 1 "Consent screen"
   Write-Host "  Opening Google Auth Platform > Branding for $Project."
@@ -46,13 +50,25 @@ if (-not $SkipConsole) {
   Start-Process "https://console.cloud.google.com/auth/clients/create?project=$Project"
 }
 
-Step 3 "Paste the values"
-do {
-  $id = (Read-Host "  Client ID (ends with .apps.googleusercontent.com)").Trim()
-} until ($id -match '^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$')
-$sec = Read-Host "  Client secret (hidden)" -AsSecureString
-$secret = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec))
-$secret = $secret.Trim()
+if ($JsonPath) {
+  Step 3 "Reading the client file"
+  $j = Get-Content -Raw $JsonPath | ConvertFrom-Json
+  $c = if ($j.web) { $j.web } else { $j.installed }
+  if (-not $c) { throw "That file is not a Google OAuth client file." }
+  $id, $secret = "$($c.client_id)".Trim(), "$($c.client_secret)".Trim()
+  if ($j.web -and $c.redirect_uris -notcontains "$PublicUrl/auth/google/callback") {
+    Write-Host "  Note: the client file does not list $PublicUrl/auth/google/callback as a redirect URI." -ForegroundColor Yellow
+  }
+  if ($id -notmatch '^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$') { throw "No valid client ID in that file." }
+} else {
+  Step 3 "Paste the values"
+  do {
+    $id = (Read-Host "  Client ID (ends with .apps.googleusercontent.com)").Trim()
+  } until ($id -match '^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$')
+  $sec = Read-Host "  Client secret (hidden)" -AsSecureString
+  $secret = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec))
+  $secret = $secret.Trim()
+}
 if ($secret -notmatch '^[A-Za-z0-9_\-]{20,}$') { throw "That does not look like a Google client secret (it usually starts with GOCSPX-)." }
 
 Step 4 "Laptop"
