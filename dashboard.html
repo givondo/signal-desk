@@ -477,6 +477,40 @@ font-size:13.5px;white-space:pre-wrap}
 .turn-a .av{width:26px;height:26px;border-radius:8px;background:#0b0d10;color:var(--gold);font:800 11px var(--mono);
 display:grid;place-items:center;flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(201,162,39,.35);margin-top:1px}
 .turn-a .col{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.astage{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);font-weight:600}
+.vcard{border:1px solid var(--bd);border-radius:14px;background:var(--p1);padding:14px 16px;box-shadow:0 1px 2px rgba(16,24,40,.05);border-left:4px solid var(--bd2)}
+.vcard.LONG{border-left-color:var(--g)}.vcard.SHORT{border-left-color:var(--r)}
+.vtop{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.vname{font-weight:700;font-size:13.5px}.vname small{color:var(--dim);font:600 11px var(--mono);margin-left:4px}
+.vpx{font:700 15px var(--mono)}.vpx small{font-size:11.5px;margin-left:6px}
+.vmain{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 12px}
+.vdir{font:800 24px var(--font);letter-spacing:-.3px}.vcard.LONG .vdir{color:var(--g)}.vcard.SHORT .vdir{color:var(--r)}.vcard.NEUTRAL .vdir{color:var(--dim);font-size:19px}
+.vchip{font-size:11.5px;color:var(--dim);background:var(--p2);border:1px solid var(--bd);padding:3px 8px;border-radius:999px}.vchip b{color:var(--tx)}
+.vact{font:700 10.5px var(--font);letter-spacing:.6px;text-transform:uppercase;padding:4px 9px;border-radius:999px;margin-left:auto}
+.vact.go{color:var(--g);background:var(--gt)}.vact.wait{color:var(--a);background:var(--at)}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px}
+.vgrid>div{background:var(--p2);border:1px solid var(--bd);border-radius:9px;padding:7px 10px}
+.vgrid label{display:block;font:600 9.5px var(--font);letter-spacing:.8px;text-transform:uppercase;color:var(--dim)}
+.vgrid b{font:700 14px var(--mono)}.vgrid small{display:block;font-size:10.5px;color:var(--dim)}
+.vgrid .st b{color:var(--r)}.vgrid .tp b{color:var(--g)}
+.vfoot{margin-top:10px;font-size:11px;color:var(--dim)}
+.team2{border:1px solid var(--bd);border-radius:12px;padding:10px 12px;background:var(--p2)}
+.t2h{display:flex;justify-content:space-between;align-items:baseline;font:700 11px var(--font);letter-spacing:.7px;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
+.t2h .anote{text-transform:none;letter-spacing:0;font-weight:600;color:var(--tx)}
+.t2row{display:flex;flex-wrap:wrap;gap:6px}
+.t2chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--bd2);background:var(--p1);color:var(--tx);font:600 12px var(--font);padding:5px 10px;border-radius:999px;cursor:pointer}
+.t2chip i{width:8px;height:8px;border-radius:50%;background:var(--dim2)}
+.t2chip em{font-style:normal;font-weight:500;color:var(--dim);font-size:11.5px}
+.t2chip.bullish i,.t2chip.clear i{background:var(--g)}.t2chip.bearish i,.t2chip.blocked i{background:var(--r)}.t2chip.caution i{background:var(--a)}
+.t2chip.open{border-color:var(--b)}
+.t2det{margin-top:8px;font-size:12.5px;line-height:1.5}.t2det ul{margin:4px 0 0 16px}
+.aacts{display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap}
+.aacts>button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--bd2);background:var(--p1);color:var(--dim);font:600 11.5px var(--font);padding:5px 10px;border-radius:8px;cursor:pointer}
+.aacts>button:hover{color:var(--tx);background:var(--p2)}
+.aacts svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.srcs{font-size:11.5px;color:var(--dim);margin-left:auto}.srcs summary{cursor:pointer;padding:5px 4px;list-style:none}
+.srcs[open]{flex-basis:100%;margin-left:0;border:1px solid var(--bd);border-radius:10px;background:var(--p2)}
+.srcs[open] summary{padding:7px 10px;border-bottom:1px solid var(--bd)}
 .modebadge{font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;font-weight:700;color:var(--dim)}
 .modebadge b{color:var(--b)}
 .trail{border:1px solid var(--bd);border-radius:10px;background:var(--p2);font-size:12px;overflow:hidden}
@@ -1066,8 +1100,8 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
     <div class="abody" v-if="agentTab==='run'" ref="arun" @scroll.passive="onChatScroll">
       <div v-if="!chat.length" class="hero">
         <div class="big">N</div>
-        <h3>What should we look at?</h3>
-        <p>Answers stream from the desk's live tools, with charts. Read-only: nothing here places an order.</p>
+        <h3>Ask the desk</h3>
+        <p>Every answer starts with the desk's plan, then the reasons, then a chart. Built from live data. It never places an order.</p>
         <div class="tiles">
           <button v-for="t in heroTiles" :key="t[0]" @click="ask(t[0])">{{ t[0] }}<small>{{ t[1] }}</small></button>
         </div>
@@ -1078,28 +1112,42 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
           <div v-else class="turn-a">
             <div class="av">N</div>
             <div class="col">
-              <div class="modebadge" v-if="t.mode">{{ t.mode==='claude'?'Claude team':'Desk team' }} · <b>{{ t.symbol }}</b></div>
+              <div v-if="t.streaming" class="astage"><span class="spin-s"></span>{{ agentStage(t) }}<span class="anote" v-if="t.symbol"> · {{ t.symbol }}</span></div>
               <div v-if="t.notice" class="noticebar">{{ t.notice }}</div>
-              <details v-if="t.steps.length" class="trail" :open="t.streaming">
-                <summary><span v-if="t.streaming&&t.steps.some(x=>x.status==='running')" class="spin-s"></span><span v-else>✓</span>
-                  {{ t.streaming?'Working':'Used' }} {{ t.steps.length }} tool{{ t.steps.length>1?'s':'' }}<template v-if="!t.streaming"> · {{ t.steps.reduce((a,x)=>a+(x.ms||0),0) }} ms</template>
-                  <span class="chev">›</span></summary>
-                <div class="step" v-for="st in t.steps" :key="st.id">
-                  <span><span v-if="st.status==='running'" class="spin-s"></span><span v-else :class="st.ok?'dirL':'dirS'">{{ st.ok?'✓':'✕' }}</span></span>
-                  <span style="min-width:0"><span class="nm">{{ toolTitle(st.name) }}</span> <span class="sm">{{ st.summary || argText(st.args) }}</span></span>
-                  <span class="ms">{{ st.ms!=null?st.ms+' ms':'' }}</span>
-                </div>
-              </details>
               <template v-for="(bk,bi) in visibleBlocks(t)" :key="bi">
-                <div v-if="bk.type==='text'" class="md" v-html="mdCaret(bk.text,(t.streaming||t.revealing)&&bk.text.length<bk.full.length||t.streaming&&bi===t.blocks.length-1)"></div>
+                <div v-if="bk.type==='verdict'" class="vcard" :class="bk.v.direction">
+                  <div class="vtop">
+                    <span class="vname">{{ bk.v.name }} <small>{{ bk.v.symbol }}</small></span>
+                    <span class="vpx">{{ vfmt(bk.v,bk.v.price) }}<small v-if="bk.v.change_pct!=null" :class="bk.v.change_pct>=0?'dirL':'dirS'">{{ bk.v.change_pct>=0?'+':'' }}{{ Number(bk.v.change_pct).toFixed(2) }}%</small></span>
+                  </div>
+                  <div class="vmain">
+                    <span class="vdir">{{ bk.v.direction==='NEUTRAL'?'No clear bias':bk.v.direction }}</span>
+                    <span class="vchip" v-if="bk.v.grade">Grade <b>{{ bk.v.grade }}</b></span>
+                    <span class="vchip" v-if="bk.v.confidence!=null"><b>{{ bk.v.confidence }}%</b> confidence</span>
+                    <span class="vact" :class="bk.v.tradeable?'go':'wait'" :title="bk.v.action_title||''">{{ bk.v.tradeable?'Tradeable now':(bk.v.action==='CLOSED'?'Market closed':'Wait') }}</span>
+                  </div>
+                  <div class="vgrid" v-if="bk.v.entry!=null">
+                    <div><label>Entry</label><b>{{ vfmt(bk.v,bk.v.entry) }}</b><small v-if="bk.v.model">{{ String(bk.v.model).toLowerCase() }}</small></div>
+                    <div class="st"><label>Stop</label><b>{{ vfmt(bk.v,bk.v.stop) }}</b></div>
+                    <div v-for="(tp,ti) in bk.v.targets" :key="ti" class="tp"><label>Target {{ ti+1 }}</label><b>{{ vfmt(bk.v,tp) }}</b></div>
+                    <div v-if="bk.v.rr"><label>Reward : risk</label><b>{{ bk.v.rr }} : 1</b></div>
+                  </div>
+                  <div class="vfoot">{{ [bk.v.session,bk.v.regime&&(String(bk.v.regime).toLowerCase()+' regime'),bk.v.time&&('data '+bk.v.time)].filter(Boolean).join(' · ') }} · Research, not advice</div>
+                </div>
+                <div v-else-if="bk.type==='text'" class="md" v-html="mdCaret(bk.text,(t.streaming||t.revealing)&&bk.text.length<bk.full.length||t.streaming&&bi===visibleBlocks(t).length-1)"></div>
                 <nc-chart v-else-if="bk.type==='chart'" :chart="bk.chart" :dark="darkMode"></nc-chart>
-                <div v-else-if="bk.type==='team'" class="team" role="list" aria-label="Desk team">
-                  <button v-for="ag in bk.agents" :key="ag.id" class="agentt" role="listitem" @click="ag.open=!ag.open" :aria-expanded="!!ag.open">
-                    <div class="r1"><span class="ic">{{ ag.name[0] }}</span><span class="nm">{{ ag.name }}</span>
-                      <span v-if="ag.status==='running'" class="spin-s"></span><span v-else class="vpill" :class="ag.verdict.replace(' ','')">{{ ag.verdict }}</span></div>
-                    <div class="sm">{{ ag.status==='running'?ag.role:ag.summary }}</div>
-                    <ul v-if="ag.open&&ag.points&&ag.points.length"><li v-for="(pt,pi) in ag.points" :key="pi">{{ pt }}</li></ul>
-                  </button>
+                <div v-else-if="bk.type==='team'" class="team2" role="group" aria-label="Specialists">
+                  <div class="t2h"><span>Specialists</span><span class="anote">{{ teamLine(bk) }}</span></div>
+                  <div class="t2row">
+                    <button v-for="ag in bk.agents" :key="ag.id" type="button" class="t2chip" :class="[ag.status==='running'?'run':ag.verdict.replace(' ',''),{open:ag.open}]"
+                      @click="ag.open=!ag.open" :aria-expanded="!!ag.open" :title="ag.summary||ag.role">
+                      <span v-if="ag.status==='running'" class="spin-s"></span><i v-else></i>{{ ag.name.replace(' analyst','').replace(' manager','') }}
+                      <em>{{ ag.status==='running'?'working':ag.verdict }}</em></button>
+                  </div>
+                  <template v-for="ag in bk.agents" :key="'d'+ag.id">
+                    <div v-if="ag.open" class="t2det"><b>{{ ag.name }}</b> <span class="anote">{{ ag.summary }}</span>
+                      <ul v-if="ag.points&&ag.points.length"><li v-for="(pt,pi) in ag.points" :key="pi">{{ pt }}</li></ul></div>
+                  </template>
                 </div>
                 <div v-else-if="bk.type==='card'&&bk.card.kind==='route'" class="acard">
                   <div class="top"><span>Route preview · {{ bk.card.symbol }}</span><span>preview only</span></div>
@@ -1108,10 +1156,29 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
                       <div class="anote" v-if="ac.reasons.length">{{ ac.reasons.join(' · ') }}</div></td>
                       <td><span class="dec" :class="ac.decision">{{ ac.decision }}</span></td><td class="num">{{ ac.lots }} lots</td><td class="num">{{ ac.risk ?? '—' }}</td></tr>
                   </table></div></div>
+                <div v-else-if="bk.type==='card'&&bk.card.kind==='journal'" class="vcard">
+                  <div class="vtop"><span class="vname">Your journal</span><a class="anote" href="/journal">Open the journal ›</a></div>
+                  <div class="vgrid">
+                    <div><label>Trades</label><b>{{ bk.card.stats.trades??0 }}</b></div>
+                    <div><label>Win rate</label><b>{{ bk.card.stats.win_rate==null?'—':bk.card.stats.win_rate+'%' }}</b></div>
+                    <div :class="(bk.card.stats.total_r||0)>=0?'tp':'st'"><label>Total R</label><b>{{ bk.card.stats.total_r==null?'—':(bk.card.stats.total_r>0?'+':'')+bk.card.stats.total_r }}</b></div>
+                    <div><label>To review</label><b>{{ bk.card.stats.to_review??0 }}</b></div>
+                    <div :class="bk.card.stats.breaches?'st':''"><label>Breaches</label><b>{{ bk.card.stats.breaches??0 }}</b></div>
+                  </div></div>
                 <details v-else-if="bk.type==='card'" class="trail"><summary>{{ bk.card.title||'Data' }} <span class="chev">›</span></summary>
                   <pre style="padding:10px;margin:0;font:11px var(--mono);white-space:pre-wrap;max-height:320px;overflow:auto">{{ JSON.stringify(bk.card.data,null,2) }}</pre></details>
               </template>
-              <div v-if="t.streaming&&!t.blocks.length&&!t.steps.length" class="anote"><span class="spin-s"></span> Thinking…</div>
+              <div class="aacts" v-if="!t.streaming&&!t.revealing&&t.blocks.length">
+                <button type="button" @click="copyAnswer(t)" title="Copy the plan and the answer"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>Copy</button>
+                <button type="button" v-if="t.blocks.some(b=>b.type==='verdict'&&b.v.entry!=null)" @click="showOnChart(t)" title="Open the main chart with these levels"><svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 4 8-9"/><path d="M3 21h18"/></svg>Show on chart</button>
+                <details v-if="t.steps.length" class="srcs"><summary>Sources · {{ t.steps.length }} desk tool{{ t.steps.length>1?'s':'' }}</summary>
+                  <div class="step" v-for="st in t.steps" :key="st.id">
+                    <span :class="st.ok?'dirL':'dirS'">{{ st.ok?'✓':'✕' }}</span>
+                    <span style="min-width:0"><span class="nm">{{ toolTitle(st.name) }}</span> <span class="sm">{{ st.summary || argText(st.args) }}</span></span>
+                    <span class="ms">{{ st.ms?st.ms+' ms':'' }}</span>
+                  </div></details>
+              </div>
+
               <div v-if="t.error" class="noticebar" style="color:var(--r);background:var(--rt)">{{ t.error }}</div>
               <div class="sugg" v-if="!t.streaming&&!t.revealing&&t.suggestions.length&&t===chat[chat.length-1]">
                 <button v-for="sg in t.suggestions" :key="sg" @click="ask(sg)">{{ sg }}</button>
@@ -1225,10 +1292,13 @@ const app=createApp({
     chat:[], streaming:false, abortCtl:null, agentWide:false, agentMode:'desk', stick:true, menuOpen:false, installPrompt:null, isStandalone:false, installHelp:false, installHint:'other',
     listening:false, speechOk:false, speed:'normal',
     speeds:{slow:{label:'Slow',cps:30,sentence:420,para:650},normal:{label:'Normal',cps:55,sentence:200,para:340},fast:{label:'Fast',cps:120,sentence:90,para:160}},
-    heroTiles:[['Why no trade on gold?','Levels, evidence and what would change the view'],['Scan all markets','Conviction across all 15 instruments'],
-      ['Chart USDJPY','15-minute candles with desk levels'],['Route XAUUSD','Sized for every account, preview only']],
   }},
   computed:{
+    heroTiles(){ const n=(this.d.sym_name||this.sym), s=this.sym;
+      return [['Analyse '+s,'The plan first: bias, entry, stop and targets, then the reasons'],
+        ['Scan all markets','Which of the 15 instruments has the strongest setup'],
+        ['Review my journal','Win rate, R, discipline flags and what to fix'],
+        ['What would change the view on '+s+'?','The levels and events that would flip it']] },
     drawHint(){ const t=this.drawTools.find(x=>x.id===this.drawTool); if(!t) return '';
       const two=['segment','rayLine','straightLine','ncMeasure','fibonacciLine'].includes(t.id), three=['parallelStraightLine','priceChannelLine'].includes(t.id);
       return t.label+': '+(three?'click three points':two?'click two points':'click once') },
@@ -1690,6 +1760,7 @@ const app=createApp({
         if(last&&last.type==='text') last.full+=ev.delta; else t.blocks.push({type:'text',full:ev.delta,text:''});
         this.pace(t) }
       else if(ev.type==='chart') t.blocks.push({type:'chart',chart:ev.chart});
+      else if(ev.type==='verdict') t.blocks.push({type:'verdict',v:ev});
       else if(ev.type==='team') t.blocks.push({type:'team',agents:ev.agents.map(a=>({...a,status:'running',verdict:'',summary:'',points:[],open:false}))});
       else if(ev.type==='agent'){ const tb=[...t.blocks].reverse().find(b=>b.type==='team'); const ag=tb&&tb.agents.find(a=>a.id===ev.id);
         if(ag) Object.assign(ag,ev) }
@@ -1733,7 +1804,33 @@ const app=createApp({
         else if(e.error!=='no-speech'&&e.error!=='aborted') this.toast('Voice input stopped: '+e.error) };
       r.onend=()=>{ this.listening=false; this._rec=null; if(fin.trim()&&!this.streaming) this.ask() };
       try{ r.start(); this.listening=true; this._rec=r }catch(e){ this.toast('Voice input is not available here') } },
-    visibleBlocks(t){ const out=[]; for(const b of t.blocks){ out.push(b); if(b.type==='text'&&b.text.length<b.full.length) break } return out },
+    // Reading order: the plan, the specialists, the explanation, then cards and the chart.
+    visibleBlocks(t){ const rank={verdict:0,team:1,text:2,card:3,chart:4};
+      const r=b=>b.type==='card'&&b.card.kind==='journal'?0:(rank[b.type]??5);
+      const ordered=t.blocks.map((b,i)=>[b,i]).sort((a,b)=>r(a[0])-r(b[0])||a[1]-b[1]).map(x=>x[0]);
+      const out=[]; for(const b of ordered){ out.push(b); if(b.type==='text'&&b.text.length<b.full.length) break } return out },
+    agentStage(t){ if(!t.streaming) return '';
+      const tb=t.blocks.find(b=>b.type==='team'), txt=t.blocks.some(b=>b.type==='text');
+      if(txt) return 'Writing the answer';
+      if(tb){ const d=tb.agents.filter(a=>a.status!=='running').length; return 'Specialists reporting ('+d+' of '+tb.agents.length+')' }
+      if(t.steps.some(x=>x.status==='running')) return 'Reading live desk data';
+      return 'Thinking' },
+    teamLine(tb){ const v=tb.agents.filter(a=>['market','macro','news'].includes(a.id)&&a.verdict&&a.verdict!=='no read');
+      const dir=(this.chat.find(c=>c.blocks&&c.blocks.includes(tb))||{}).blocks?.find(b=>b.type==='verdict')?.v?.direction;
+      const want=dir==='LONG'?'bullish':dir==='SHORT'?'bearish':null;
+      if(!want||!v.length) return tb.agents.every(a=>a.status!=='running')?'':'Working';
+      return v.filter(a=>a.verdict===want).length+' of '+v.length+' back the view' },
+    vfmt(v,x){ if(x==null||x==='') return '—'; const dp=Number.isInteger(v.dp)?v.dp:(Math.abs(x)<10?4:2);
+      return Number(x).toLocaleString('en-GB',{minimumFractionDigits:dp,maximumFractionDigits:dp}) },
+    answerText(t){ return t.blocks.filter(b=>b.type==='text').map(b=>b.full).join('\n').replace(/\*\*|####\s?|_/g,'') },
+    async copyAnswer(t){ const v=(t.blocks.find(b=>b.type==='verdict')||{}).v; let head='';
+      if(v) head=v.name+' ('+v.symbol+') '+this.vfmt(v,v.price)+': '+v.direction+(v.grade?' grade '+v.grade:'')+(v.confidence!=null?', '+v.confidence+'% confidence':'')
+        +(v.entry!=null?'. Entry '+this.vfmt(v,v.entry)+', stop '+this.vfmt(v,v.stop)+(v.targets.length?', targets '+v.targets.map(x=>this.vfmt(v,x)).join(', '):''):'')+'.\n\n';
+      try{ await navigator.clipboard.writeText(head+this.answerText(t)); this.toast('Answer copied') }catch(e){ this.toast('Could not copy') } },
+    showOnChart(t){ const v=(t.blocks.find(b=>b.type==='verdict')||{}).v; if(!v) return;
+      if(this.sym!==v.symbol) this.switchSym(v.symbol);
+      this.engine='nc'; this.showLevels=true; this.savePrefs(); this.toggleAgent(false);
+      this.$nextTick(()=>{ const el=this.$refs.chartPanel; if(el) el.scrollIntoView({behavior:'smooth',block:'center'}); this.ncEnsure(); this.drawLevels() }) },
     onChatScroll(){ const el=this.$refs.arun; if(!el||this._autoScrolling) return;
       this.stick=(el.scrollHeight-el.scrollTop-el.clientHeight)<80 },
     scrollAgent(force){ if(force) this.stick=true; this.$nextTick(()=>{ const el=this.$refs.arun; if(!el||!this.stick) return;
