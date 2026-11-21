@@ -37,9 +37,30 @@ A desk-wide risk governor sits above every instrument: a daily stop in R, a cap 
 - works out money at risk from the trade's own profit per point, so R multiples are exact without contract-size guesses;
 - writes the trade into the sealed, append-only journal. A trade with no stop it can trust stays in the sheet as **Needs stop** until you type one in. Notes, emotion and later stop changes are stored as corrections, never overwrites.
 
+Every stop, emotion and note carries its source: **Broker**, **Desk**, **Draft** (written for you, not yet confirmed) or **You**. Your entry always wins and nothing automatic overwrites it. Emotion is never set automatically: behaviour flags (Revenge, FOMO, Overtrading, Against desk, Moved stop, Early exit, No stop) suggest one for a one-click confirm. Notes start as a draft paragraph built from what the desk recorded (setup, desk call, time held, best and worst R on the desk's 5-minute prices, whether the target was reached, one lesson); Claude rewrites it when `ANTHROPIC_API_KEY` is set. A trade with no stop can be marked **No stop used**, which keeps it out of R statistics and counts it as a discipline breach. **Review** walks through unreviewed trades one at a time (keys 1 to 8 pick an emotion, Enter saves); the header badge shows how many wait.
+
 The strip above the sheet shows trades, win rate, total and average R, net P/L, the longest losing streak, how often you traded with or against the desk, and how many trades still need a stop. CSV and Excel exports are one click. Agents read it through the `get_journal` tool.
 
 The Tracker and Router pages were removed in favour of the journal; `/tracker` and `/router` redirect here. Their APIs stay: TradingView sync posts fills to `/api/tracker/*`, and the agent's `preview_signal_routing` tool uses the router.
+
+## Accounts
+
+Sign in at `/signin`. The first account is the owner, created at `/setup` with the current desk password (`SIGNALDESK_PASS`), or from the computer running the desk when none is set. The owner keeps the existing journal and invites other traders from **Account**; sign-up is invite-only unless `NORTHCHART_SIGNUP=open` (or `closed`). Every member gets an empty journal of their own under `DATA_DIR/users/<id>/`; market data and desk signals are shared.
+
+Passwords are stored as scrypt hashes; sessions are HttpOnly, SameSite=Lax cookies (Secure over HTTPS) and the server keeps only their SHA-256; every cookie-authenticated write must come from the same origin; five failed sign-ins lock an email or address for 15 minutes. Verification and reset emails go out over SMTP when `SMTP_HOST` is set, otherwise they are written to `DATA_DIR/accounts/outbox.log`. The account page covers profile, password, active sessions, sync tokens, invites, data export (zip of CSVs) and deleting the account. ChatGPT and Claude now sign in with a Northchart email and password when connecting, and see only that user's journal; routing and portfolio tools stay owner-only.
+
+Scripts use a **sync token** (`Bearer nci_...`, made on the account page) that can only send trades, or the account email and password as HTTP Basic. The old desk password keeps working as the owner for one release; `NORTHCHART_LEGACY_BASIC=0` turns it off.
+
+## Broker connections
+
+**Account > Brokers and data**: search for your broker (CMA-licensed brokers are marked) and pick a route. All of them are read-only and feed the same journal pipeline.
+
+- **Northchart Bridge** (MetaTrader 4 and 5, free): `tools/northchart_bridge/NorthchartBridge.mq5` and `.mq4`, downloadable from the account page with the desk address filled in. It reads closed trades from the terminal's history and posts them to `/api/ingest/bridge` with a sync token. It contains no trading calls and the password never leaves the terminal. MT5 sends the stop at entry and the stop at the close, so a widened stop is flagged.
+- **Investor password via MetaApi** (paid, owner's choice): set `NORTHCHART_METAAPI_TOKEN`. The trader enters account number, server and the investor password once; the desk creates the MetaApi account, refuses a master password using MetaApi's `investorMode` flag, keeps only the sealed MetaApi account id and pulls new trades every ten minutes.
+- **Statement import**: MT5 and MT4 HTML reports, cTrader and prop-firm CSVs, and any CSV whose columns are detected by name or picked by hand. Duplicates are skipped.
+- **TradingView trade sync**: `tools/start_tradingview_sync.ps1` with `DESK_TOKEN` set to a sync token.
+
+Planned: cTrader Open API, Interactive Brokers Flex, Binance read-only keys; OANDA and the Deriv API wait for a read-only option. Secrets are sealed with an HMAC-SHA256 stream cipher plus tag, keyed by `NORTHCHART_SECRET_KEY` (set it in production) or a generated `DATA_DIR/accounts/secret.key`.
 
 ## Trading tracker and Trading OS
 
@@ -149,7 +170,12 @@ Tests: `python -m unittest tests.test_connect` runs the full OAuth flow and MCP 
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `SIGNALDESK_PASS` / `SIGNALDESK_USER` | unset / `trader` | HTTP Basic auth on every route except health |
+| `SIGNALDESK_PASS` / `SIGNALDESK_USER` | unset / `trader` | the old desk password: proves ownership at `/setup`, and works for scripts this release |
+| `NORTHCHART_SIGNUP` | `invite` | `invite`, `open` or `closed` |
+| `NORTHCHART_LEGACY_BASIC` | `1` | `0` stops accepting the old desk password |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | unset | email for verification and password reset |
+| `NORTHCHART_SECRET_KEY` | generated file | key that seals broker secrets (24+ characters) |
+| `NORTHCHART_METAAPI_TOKEN` | unset | switches on the investor-password route via MetaApi |
 | `DATA_DIR` | app dir | where journals and state persist |
 | `DESK_DAILY_STOP_R` | `4` | desk halts at this daily loss in R |
 | `DESK_MAX_OPEN` | `4` | maximum open or working tickets across the desk |

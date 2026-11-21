@@ -39,6 +39,17 @@ table.t td,table.t th{padding:7px 6px;border-bottom:1px solid var(--bd);text-ali
 table.t th{font:600 9.5px var(--nc-font);letter-spacing:.9px;text-transform:uppercase;color:var(--dim)}
 .badge{font:700 9px var(--nc-font);letter-spacing:.6px;text-transform:uppercase;padding:2px 7px;border-radius:999px}
 .badge.ok{color:var(--g);background:var(--gt)}.badge.warn{color:var(--a);background:var(--at)}.badge.mut{color:var(--dim);background:var(--p3)}
+.chips2{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.chip2{font:500 12.5px var(--nc-font);padding:7px 11px;border-radius:999px;border:1px solid var(--bd2);background:var(--p2);color:var(--tx);cursor:pointer}
+.chip2:hover{background:var(--p3)}.chip2 .cma{font-size:10px;color:var(--g);margin-left:5px;font-weight:700}
+.conn{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bd)}
+.conn b{font-size:13.5px}.conn .lead{margin:0;font-size:12px}
+.route{border:1px solid var(--bd);border-radius:10px;padding:14px 16px;margin-top:12px;background:var(--p2)}
+.route h3{font:700 14px var(--nc-font);margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.route ol{margin:8px 0 10px 18px;font-size:12.5px;line-height:1.7;color:var(--tx)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid2 .f{margin:0}.f select{width:100%;font:14px var(--nc-font);padding:9px 10px;border:1px solid var(--bd2);border-radius:8px;background:var(--p1);color:var(--tx)}
+@media(max-width:640px){.grid2{grid-template-columns:1fr}}
 code.k{font:12.5px var(--nc-mono);background:var(--p3);padding:6px 9px;border-radius:6px;display:block;word-break:break-all;margin-top:8px}
 .legal{max-width:760px;margin:0 auto;padding:26px 18px 60px;line-height:1.7;font-size:14px}
 .legal h1{font:700 24px var(--nc-font);margin-bottom:6px}.legal h2{font:700 16px var(--nc-font);margin:20px 0 6px}
@@ -52,7 +63,7 @@ const $=id=>document.getElementById(id);
 async function post(path,body){
   const r=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify(body||{})});
   let j={}; try{ j=await r.json() }catch(e){}
-  if(!r.ok||j.ok===false) throw new Error(j.error||"Something went wrong. Try again.");
+  if(!r.ok||j.ok===false){ const e=new Error(j.error||"Something went wrong. Try again."); e.data=j; throw e }
   return j;
 }
 function show(el,text,ok){ el.textContent=text; el.className="msg "+(ok?"ok":"err") }
@@ -197,9 +208,13 @@ def account():
 <section class="sec" id="brokers"><h2>Brokers and data</h2>
   <p class="lead">Connect the accounts you trade from and every closed trade lands in your journal by itself.
   Northchart only ever reads: it cannot place, change or cancel orders.</p>
-  <div id="brokerList" class="lead">Broker connections arrive in the next update. Until then, trades come in through
-  TradingView trade sync or a sync script using the token below.</div>
-  <div id="tvRow" hidden><button class="btn2" onclick="location.href='/#tradingview'">TradingView data login (desk owner)</button></div>
+  <div id="conns"></div>
+  <div class="f" style="margin-top:12px"><label for="bq">Add a broker</label>
+    <input id="bq" placeholder="Find your broker: Exness, HFM, FXPesa, Pepperstone, prop firm…" autocomplete="off"></div>
+  <div id="bres" class="chips2"></div>
+  <div id="bpanel"></div>
+  <details style="margin-top:12px"><summary class="lead" style="cursor:pointer;margin:0">Coming next</summary><div id="planned"></div></details>
+  <div id="tvRow" hidden style="margin-top:12px"><button class="btn2" onclick="location.href='/#tradingview'">TradingView data login (desk owner)</button></div>
 </section>
 
 <section class="sec"><h2>Sync tokens</h2>
@@ -269,6 +284,78 @@ document.addEventListener("click",async e=>{ const b=e.target.closest("button[da
   try{ if(b.dataset.tok) await post("/api/auth/tokens/revoke",{id:b.dataset.tok});
     if(b.dataset.sid) await post("/api/auth/sessions/revoke",{sid:b.dataset.sid});
     if(b.dataset.inv) await post("/api/auth/invites/revoke",{id:b.dataset.inv}); load() }catch(err){ flash(err.message) } });
+
+let BK=null;
+const kindName={bridge:"Northchart Bridge",metaapi:"MetaApi",statement:"Statement",tradingview:"TradingView sync"};
+async function loadBrokers(){
+  BK=await (await fetch("/api/brokers")).json();
+  $("conns").innerHTML=(BK.connections||[]).length?BK.connections.map(c=>`<div class="conn"><div style="flex:1"><b>${escH(c.label||c.broker)}</b>
+    <span class="badge ${c.state==="error"?"warn":"ok"}">${escH(kindName[c.kind]||c.kind)}</span> <span class="badge mut">Read-only</span>
+    <p class="lead">${c.trades||0} trade(s) pulled · last sync ${when(c.last_sync)}${c.last_error?' · <span style="color:var(--r)">'+escH(c.last_error)+'</span>':""}</p></div>
+    ${c.kind==="metaapi"?`<button class="btn2" data-sync="${c.id}">Sync now</button>`:""}<button class="btn2 danger" data-rm="${c.id}">Disconnect</button></div>`).join("")
+    :'<p class="lead" style="margin:0">No brokers connected yet.</p>';
+  $("planned").innerHTML=(BK.planned||[]).map(p=>`<p class="lead" style="margin:6px 0 0"><b>${escH(p.name)}</b>: ${escH(p.why)}</p>`).join("");
+  showBrokers("");
+}
+function showBrokers(q){
+  q=q.trim().toLowerCase();
+  const list=(BK.brokers||[]).filter(b=>!q||b.name.toLowerCase().includes(q)||b.platform_names.join(" ").toLowerCase().includes(q));
+  $("bres").innerHTML=list.slice(0,q?12:8).map(b=>`<button class="chip2" data-b="${b.id}">${escH(b.name)}${b.cma?'<span class="cma">CMA</span>':""}</button>`).join("")
+    +(q&&!list.length?'<p class="lead">Not listed? Pick "Any other MetaTrader broker", or upload a statement as CSV.</p>':"");
+}
+function brokerPanel(id){
+  const b=BK.brokers.find(x=>x.id===id); const mt=b.platforms.some(p=>p==="mt5"||p==="mt4");
+  let h=`<div class="route" style="background:var(--p1)"><h3>${escH(b.name)}</h3><p class="lead" style="margin:0">${escH(b.platform_names.join(", "))}${b.note?" · "+escH(b.note):""}</p></div>`;
+  if(mt) h+=`<div class="route"><h3>Northchart Bridge <span class="badge ok">Free · recommended</span></h3>
+    <p class="lead" style="margin:0">A small add-on for your own MetaTrader. It reads closed trades and sends them here. It has no trading code, and your password never leaves your computer.</p>
+    <ol><li>Download the add-on: <a href="/bridge/NorthchartBridge.mq5">MetaTrader 5</a> or <a href="/bridge/NorthchartBridge.mq4">MetaTrader 4</a>.</li>
+    <li>In MetaTrader: File &gt; Open Data Folder &gt; MQL5 (or MQL4) &gt; Experts. Put the file there and refresh the Navigator.</li>
+    <li>Tools &gt; Options &gt; Expert Advisors: tick <i>Allow WebRequest for listed URL</i> and add <code>${escH(BK.desk_url)}</code>.</li>
+    <li>Drag Northchart Bridge onto any chart and paste the token below. Algo trading does not need to be on.</li></ol>
+    <button class="btn2" id="brTok">Create a token for ${escH(b.name)}</button><div id="brTokOut"></div></div>`;
+  if(mt) h+=`<div class="route"><h3>Investor password <span class="badge mut">MetaApi</span></h3>`+(BK.routes.metaapi?`
+    <p class="lead" style="margin:0">No install. Use the <b>investor</b> (read-only) password from your broker, never the master password; the desk checks and refuses a master password. The password goes to MetaApi once and is not stored here.</p>
+    <div class="grid2" style="margin-top:10px"><div class="f"><label>Platform</label><select id="maPlat">${b.platforms.filter(p=>p==="mt5"||p==="mt4").map(p=>`<option value="${p}">${p==="mt5"?"MetaTrader 5":"MetaTrader 4"}</option>`).join("")}</select></div>
+    <div class="f"><label>Account type</label><select id="maType"><option value="REAL">Live</option><option value="DEMO">Demo</option><option value="PROP">Prop firm</option></select></div>
+    <div class="f"><label>Account number</label><input id="maLogin" inputmode="numeric"></div>
+    <div class="f"><label>Server</label><input id="maServer" placeholder="e.g. Exness-MT5Real8"></div>
+    <div class="f" style="grid-column:1/-1"><label>Investor password</label><input id="maPw" type="password" autocomplete="off"></div></div>
+    <button class="btn2" id="maGo" style="margin-top:10px">Connect read-only</button>`:`<p class="lead" style="margin:0">Not switched on for this desk. The Bridge above does the same job for free.</p>`)+`</div>`;
+  if(b.platforms.includes("tradingview")) h+=`<div class="route"><h3>TradingView trade sync</h3><p class="lead" style="margin:0">If you trade ${escH(b.name)} through TradingView, run <code>tools/start_tradingview_sync.ps1</code> with <code>DESK_TOKEN</code> set to a sync token from this page.</p></div>`;
+  h+=`<div class="route"><h3>Upload a statement</h3><p class="lead" style="margin:0">MetaTrader: History tab, right-click &gt; Report &gt; HTML. cTrader and prop firms: export history as CSV. Trades already in your journal are skipped.</p>
+    <div class="grid2" style="margin-top:10px"><div class="f"><label>File</label><input id="stFile" type="file" accept=".htm,.html,.csv,.txt"></div>
+    <div class="f"><label>Times in the file are</label><select id="stOff">${[0,1,2,3,-4,-5].map(o=>`<option value="${o}">UTC${o>0?"+"+o:o<0?o:""}${o===0?" (Exness, cTrader)":o===2||o===3?" (most MetaTrader servers)":""}</option>`).join("")}</select></div>
+    <div class="f"><label>Account type</label><select id="stType"><option value="REAL">Live</option><option value="DEMO">Demo</option><option value="PROP">Prop firm</option></select></div>
+    <div class="f"><label>Account name</label><input id="stLabel" placeholder="${escH(b.name.toUpperCase().replace(/[^A-Z0-9]+/g,"-"))}-01"></div></div>
+    <div id="stMap"></div><button class="btn2" id="stGo" style="margin-top:10px">Import trades</button></div>`;
+  $("bpanel").innerHTML=h; $("bpanel").dataset.b=id;
+  const tok=$("brTok"); if(tok) tok.onclick=async()=>{ try{ const j=await post("/api/auth/tokens",{label:b.name+" Bridge"});
+    $("brTokOut").innerHTML=`<p class="lead" style="margin:10px 0 0">Paste this into the Bridge. Shown once.</p><code class="k">${escH(j.token)}</code>`; load() }catch(e){ flash(e.message) } };
+  const ma=$("maGo"); if(ma) ma.onclick=async()=>{ ma.disabled=true; try{ await post("/api/brokers/metaapi",{broker:b.name,platform:$("maPlat").value,account_type:$("maType").value,
+    login:$("maLogin").value,server:$("maServer").value,password:$("maPw").value}); $("maPw").value=""; flash("Connected. The first sync runs in the background.",true); loadBrokers() }
+    catch(e){ flash(e.message) } finally{ ma.disabled=false } };
+  $("stGo").onclick=()=>importStatement(b, null);
+}
+async function importStatement(b, mapping){
+  const f=$("stFile").files[0]; if(!f) return flash("Choose a file first");
+  const buf=new Uint8Array(await f.arrayBuffer()); let bin=""; for(let i=0;i<buf.length;i+=0x8000) bin+=String.fromCharCode.apply(null,buf.subarray(i,i+0x8000));
+  try{ const j=await post("/api/brokers/import",{filename:f.name,content_b64:btoa(bin),offset_hours:+$("stOff").value,account_type:$("stType").value,
+      account_label:$("stLabel").value,broker:b.name,mapping});
+    flash(`${j.kind}: ${j.found} trade(s) found, ${j.added} new, ${j.duplicates} already in your journal.`,true); $("stMap").innerHTML=""; loadBrokers() }
+  catch(e){ flash(e.message); if(e.data&&e.data.headers&&e.data.headers.length) mapUI(b,e.data) }
+}
+function mapUI(b,j){
+  const fields=[["instrument","Symbol"],["direction","Buy or sell"],["entry_price","Entry price"],["exit_price","Exit price"],["volume","Size"],
+    ["open_time_utc","Open time"],["close_time_utc","Close time"],["stop_loss","Stop loss"],["net_pl","Net profit"],["gross_pl","Profit"],["broker_trade_id","Trade ID"]];
+  $("stMap").innerHTML=`<p class="lead" style="margin:12px 0 6px">Match the columns in your file:</p><div class="grid2">`+fields.map(([k,l])=>`<div class="f"><label>${l}${["instrument","direction","entry_price","exit_price"].includes(k)?" (needed)":""}</label><select data-map="${k}"><option value="">Not in file</option>${j.headers.map(h=>`<option${(j.mapping||{})[k]===h?" selected":""}>${escH(h)}</option>`).join("")}</select></div>`).join("")+"</div>";
+  $("stGo").onclick=()=>{ const m={}; document.querySelectorAll("[data-map]").forEach(s=>{ if(s.value) m[s.dataset.map]=s.value }); importStatement(b,m) };
+}
+$("bq").addEventListener("input",e=>showBrokers(e.target.value));
+document.addEventListener("click",async e=>{ const c=e.target.closest("[data-b]"); if(c){ brokerPanel(c.dataset.b); return }
+  const rm=e.target.closest("[data-rm]"); if(rm){ if(!confirm("Disconnect this broker? Trades already journalled stay.")) return;
+    try{ await post("/api/brokers/remove",{id:rm.dataset.rm}); loadBrokers() }catch(err){ flash(err.message) } return }
+  const sy=e.target.closest("[data-sync]"); if(sy){ try{ const j=await post("/api/brokers/sync",{id:sy.dataset.sync}); flash(`${j.added} new trade(s)`,true); loadBrokers() }catch(err){ flash(err.message) } } });
+loadBrokers();
 load();
 </script>"""
     return page("Account", inner, script, nav="account")

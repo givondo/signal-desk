@@ -430,6 +430,47 @@ def accounts_service():
         return _accounts
 
 
+_vault = None
+
+
+def broker_connections(u=None):
+    """This request's user's broker connections."""
+    global _vault
+    import northchart_accounts as na
+    import northchart_brokers as nb
+    u = u or na.current_user.get()
+    with _connect_lock:
+        if _vault is None:
+            _vault = nb.Vault(DATA_DIR)
+    return nb.Connections(accounts_service().user_dir(u), _vault, _tracker_module)
+
+
+def metaapi_client():
+    tok = os.environ.get("NORTHCHART_METAAPI_TOKEN")
+    if not tok:
+        return None
+    import northchart_brokers as nb
+    return nb.MetaApi(tok)
+
+
+def sync_all_brokers(min_age=600):
+    """Pull MetaApi trades for every user (called by the poller)."""
+    api = metaapi_client()
+    if api is None:
+        return
+    users = [None] + [u for u in accounts_service().data["users"].values() if not _is_owner(u)]
+    for u in users:
+        enter_user(u)
+        conns = broker_connections(u)
+        for c in conns.list():
+            if c.get("kind") == "metaapi" and time.time() - (c.get("last_sync") or 0) >= min_age:
+                try:
+                    conns.sync_metaapi(c["id"], api)
+                except Exception as e:
+                    print(f"brokers: {c['id']}: {e}", file=sys.stderr)
+    enter_user(None)
+
+
 def _account_login(email, password):
     import northchart_accounts as na
     try:
@@ -2122,6 +2163,8 @@ def poller():
             jn.record_desk(snap)
             if n % 4 == 0:
                 jn.auto_pass()
+                if n % 40 == 0:
+                    sync_all_brokers()
                 for u in list(accounts_service().data["users"].values()):   # every member's journal too
                     if not _is_owner(u):
                         enter_user(u)
@@ -2517,6 +2560,124 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(b'{"ok": true}', "application/json")
         return self._send_full(404, "application/json", b'{"ok": false, "error": "not found"}')
 
+    # ------------------------------------------------------------ brokers
+    def _brokers_http(self, method, parsed):
+        path = parsed.path
+        if not (path.startswith("/api/brokers") or path.startswith("/api/ingest/") or path.startswith("/bridge/")):
+            return False
+        import northchart_brokers as nb
+        js = lambda obj, status=200: self._send_full(status, "application/json", json.dumps(obj, default=str).encode())
+        u = self.user
+        conns = broker_connections(u)
+        if method == "GET":
+            if path == "/api/brokers":
+                cat = nb.catalogue(metaapi_client() is not None)
+                return js({**cat, "connections": conns.list(), "desk_url": self._base_url(),
+                           "secret_from_env": bool(os.environ.get("NORTHCHART_SECRET_KEY"))}) or True
+            if path in ("/bridge/NorthchartBridge.mq5", "/bridge/NorthchartBridge.mq4"):
+                fn = os.path.join(BASE_DIR, "tools", "northchart_bridge", os.path.basename(path))
+                try:
+                    with open(fn, "rb") as f:
+                        data = f.read().replace(b'"https://desktrading-today.precifarm.com"; // Northchart address',
+                                                ('"' + self._base_url() + '"; // Northchart address').encode())
+                except OSError:
+                    return js({"ok": False, "error": "bridge file missing"}, 404) or True
+                return self._send_full(200, "application/octet-stream", data, {
+                    "Content-Disposition": f'attachment; filename="{os.path.basename(path)}"'}) or True
+            return js({"ok": False, "error": "not found"}, 404) or True
+        ln = int(self.headers.get("Content-Length", 0) or 0)
+        limit = 12_000_000 if path == "/api/brokers/import" else 4_000_000
+        if ln > limit:
+            return js({"ok": False, "error": "file too large (12 MB at most)"}, 413) or True
+        try:
+            body = json.loads(self.rfile.read(ln) or b"{}")
+            body = body if isinstance(body, dict) else {}
+        except Exception:
+            return js({"ok": False, "error": "invalid JSON"}, 400) or True
+        b = lambda k, d="": str(body.get(k) if body.get(k) is not None else d).strip()
+        acct_type = lambda v: {"REAL": "PERSONAL", "LIVE": "PERSONAL", "PERSONAL": "PERSONAL", "DEMO": "DEMO",
+                               "PROP": "PROP"}.get(str(v or "").upper(), "PERSONAL")
+        label_of = lambda broker, login: re.sub(r"[^A-Z0-9]+", "-", f"{broker}-{login}".upper()).strip("-")[:40]
+        try:
+            if path == "/api/ingest/bridge":
+                login, server = b("login"), b("server")
+                if not login or not server:
+                    return js({"ok": False, "error": "login and server are required"}, 400) or True
+                broker = b("broker", "MetaTrader")[:60]
+                fills = nb.bridge_fills(body)
+                res = conns.ingest({"kind": "bridge", "login": login, "server": server}, "bridge", broker,
+                                   label_of(broker, login), acct_type(body.get("account_mode")), fills,
+                                   broker=broker, platform=b("platform", "mt5"),
+                                   currency=b("currency"), label=f"{broker} {login}")
+                return js({"ok": True, **res}) or True
+            if path == "/api/brokers/import":
+                raw = base64.b64decode(b("content_b64") or "")
+                offset = float(body.get("offset_hours") or 0)
+                kind, fills, info = nb.parse_statement(b("filename"), raw, offset, body.get("mapping") or None)
+                if info.get("error") or info.get("missing"):
+                    return js({"ok": False, "kind": kind, "error": info.get("error") or
+                               "Some columns could not be matched. Pick them below.", **info}, 400) or True
+                if not fills:
+                    return js({"ok": False, "kind": kind, "error": "No closed trades found in this file."}, 400) or True
+                broker = b("broker", "Statement")[:60]
+                label = b("account_label") or label_of(broker, "IMPORT")
+                res = conns.ingest({"kind": "statement", "account_label": label}, "statement", broker, label,
+                                   acct_type(body.get("account_type")), fills, broker=broker,
+                                   label=f"{broker} statement", last_file=b("filename")[:80])
+                return js({"ok": True, "kind": kind, "found": len(fills), **res, **({"mapping": info.get("mapping")}
+                                                                                    if info.get("mapping") else {})}) or True
+            if path == "/api/brokers/metaapi":
+                api = metaapi_client()
+                if api is None:
+                    return js({"ok": False, "error": "MetaApi is not switched on for this desk. Use the free "
+                                                     "Northchart Bridge instead."}, 400) or True
+                login, server, pw = b("login"), b("server"), str(body.get("password") or "")
+                platform = b("platform", "mt5").lower()
+                if not (login and server and pw) or platform not in ("mt4", "mt5"):
+                    return js({"ok": False, "error": "Enter the account number, server and investor password."}, 400) or True
+                broker = b("broker", "MetaTrader")[:60]
+                acc_id, region = api.create(login, pw, server, platform, f"northchart {label_of(broker, login)}")
+                del pw, body["password"]
+                st, info = api.info(acc_id, region)
+                if st == 200 and info.get("investorMode") is False:
+                    api.remove(acc_id)
+                    return js({"ok": False, "error": "That is the master (trading) password. Northchart only "
+                                                     "accepts the investor (read-only) password."}, 400) or True
+                c = conns.upsert({"kind": "metaapi", "login": login, "server": server}, broker=broker,
+                                 platform=platform, account_label=label_of(broker, login),
+                                 account_type=acct_type(body.get("account_type")), label=f"{broker} {login}",
+                                 state="connecting", secret=_vault.seal({"account_id": acc_id, "region": region}),
+                                 investor_checked=(st == 200 and info.get("investorMode") is True))
+                threading.Thread(target=self._metaapi_first_sync, args=(u, c["id"]), daemon=True).start()
+                return js({"ok": True, "connection": c}) or True
+            if path == "/api/brokers/sync":
+                api = metaapi_client()
+                if api is None:
+                    return js({"ok": False, "error": "MetaApi is not switched on for this desk"}, 400) or True
+                return js({"ok": True, **conns.sync_metaapi(b("id"), api)}) or True
+            if path == "/api/brokers/remove":
+                c = conns.get(b("id"))
+                if not c:
+                    return js({"ok": False, "error": "unknown connection"}, 404) or True
+                if c.get("kind") == "metaapi" and metaapi_client():
+                    try:
+                        metaapi_client().remove(_vault.open(c["secret"])["account_id"])
+                    except Exception:
+                        pass
+                conns.remove(c["id"])
+                return js({"ok": True}) or True
+        except (ValueError, KeyError) as e:
+            return js({"ok": False, "error": str(e)}, 400) or True
+        return js({"ok": False, "error": "not found"}, 404) or True
+
+    def _metaapi_first_sync(self, u, cid):
+        enter_user(u)
+        try:
+            time.sleep(5)
+            broker_connections(u).sync_metaapi(cid, metaapi_client())
+        except Exception as e:
+            print(f"brokers: first sync {cid}: {e}", file=sys.stderr)
+
     def do_POST(self):
         if self._is_connect():
             return self._connect_http("POST")
@@ -2525,6 +2686,8 @@ class Handler(BaseHTTPRequestHandler):
         if not self._authorized():
             return self._deny()
         parsed = urllib.parse.urlparse(self.path)
+        if self._brokers_http("POST", parsed):
+            return
         if parsed.path.startswith("/api/agent/"):
             return self._agent_post(parsed)
         if parsed.path in ("/api/journal/update", "/api/journal/sync", "/api/journal/review", "/api/journal/draft"):
@@ -2639,6 +2802,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if not self._authorized():
             return self._deny()
+        if self._brokers_http("GET", parsed):
+            return
         qs = urllib.parse.parse_qs(parsed.query)
         sym = (qs.get("sym") or ["XAUUSD"])[0]
         if sym not in SYMBOLS:

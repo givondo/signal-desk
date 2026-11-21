@@ -366,7 +366,7 @@ class Journal:
                     flags.append("Overtrading")
             if r["setup"].startswith("Against desk"):
                 flags.append("Against desk")
-            first, last = r["_stop_first"], r["stop"]
+            first, last = r["_stop_first"], (r["_stop_last"] if r["_stop_last"] is not None else r["stop"])
             if first is not None and last is not None and \
                     ((side == "LONG" and last < first) or (side == "SHORT" and last > first)):
                 flags.append("Moved stop")
@@ -561,7 +561,8 @@ class Journal:
                 "source": r.get("firm_or_broker") or "",
                 "path": self.path(sym, side, entry, path_stop, t_open, t_close, exit_,
                                   _num((snap or {}).get("tp1")) if snap and snap.get("dir") == side else None),
-                "_t_open": t_open, "_t_close": t_close, "_snap": snap, "_side": side, "_stop_first": first, "_m": m}
+                "_t_open": t_open, "_t_close": t_close, "_snap": snap, "_side": side, "_stop_first": first,
+                "_stop_last": _num(ex.get("stop_final")), "_m": m}
 
     @staticmethod
     def _stats(rows):
