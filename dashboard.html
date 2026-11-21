@@ -474,6 +474,28 @@ max-width:860px;margin:0 auto;transition:border-color .15s,box-shadow .15s}
 .composer .send:disabled{opacity:.35;cursor:default}
 .composer .send.stop{background:var(--tx);color:var(--p1)}
 .composer .hint{max-width:860px;margin:6px auto 0;font-size:10.5px;color:var(--dim2);display:flex;gap:10px;justify-content:space-between}
+/* desk team, voice, speed */
+.team{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}
+.agentt{border:1px solid var(--bd);border-radius:11px;background:var(--p2);padding:9px 11px;cursor:pointer;text-align:left;color:var(--tx);
+font:inherit;transition:border-color .15s}
+.agentt:hover{border-color:var(--bd2)}
+.agentt .r1{display:flex;align-items:center;gap:7px}
+.agentt .ic{width:20px;height:20px;border-radius:6px;background:var(--p3);display:grid;place-items:center;font:800 10px var(--mono);color:var(--dim)}
+.agentt .nm{font-size:12px;font-weight:700;flex:1}
+.agentt .sm{font-size:11.5px;color:var(--dim);margin-top:5px;line-height:1.4}
+.agentt ul{margin:6px 0 0;padding-left:16px;font-size:11.5px;color:var(--tx);line-height:1.45}
+.vpill{font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:var(--p3);color:var(--dim)}
+.vpill.bullish,.vpill.clear{color:var(--g);background:var(--gt)}
+.vpill.bearish,.vpill.blocked{color:var(--r);background:var(--rt)}
+.vpill.caution{color:var(--a);background:var(--at)}
+.mic{width:34px;height:34px;border-radius:50%;border:none;background:none;color:var(--dim);cursor:pointer;display:grid;place-items:center;flex-shrink:0;position:relative}
+.mic:hover{background:var(--p3);color:var(--tx)}
+.mic.on{color:#fff;background:var(--r)}
+.mic.on::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:2px solid var(--r);animation:ring 1.2s ease-out infinite}
+@keyframes ring{from{opacity:.8;transform:scale(.9)}to{opacity:0;transform:scale(1.35)}}
+.speedbtn{background:none;border:none;color:var(--dim2);font-size:10.5px;cursor:pointer;padding:0}
+.speedbtn:hover{color:var(--b)}
+@media(max-width:520px){.team{grid-template-columns:1fr}}
 .noticebar{font-size:11.5px;color:var(--a);background:var(--at);border-radius:8px;padding:6px 9px}
 .aempty{color:var(--dim);font-size:12px;text-align:center;padding:24px 10px}
 .ascrim{position:fixed;inset:0;z-index:64;background:rgba(16,24,40,.25)}
@@ -944,7 +966,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
           <div v-else class="turn-a">
             <div class="av">N</div>
             <div class="col">
-              <div class="modebadge" v-if="t.mode">{{ t.mode==='claude'?'Claude agent':'Desk engine' }} · <b>{{ t.symbol }}</b></div>
+              <div class="modebadge" v-if="t.mode">{{ t.mode==='claude'?'Claude team':'Desk team' }} · <b>{{ t.symbol }}</b></div>
               <div v-if="t.notice" class="noticebar">{{ t.notice }}</div>
               <details v-if="t.steps.length" class="trail" :open="t.streaming">
                 <summary><span v-if="t.streaming&&t.steps.some(x=>x.status==='running')" class="spin-s"></span><span v-else>✓</span>
@@ -957,8 +979,16 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
                 </div>
               </details>
               <template v-for="(bk,bi) in visibleBlocks(t)" :key="bi">
-                <div v-if="bk.type==='text'" class="md" v-html="md(bk.text)+((t.streaming||t.revealing)&&bk.text.length<bk.full.length||t.streaming&&bi===t.blocks.length-1?'<span class=&quot;caret&quot;></span>':'')"></div>
+                <div v-if="bk.type==='text'" class="md" v-html="mdCaret(bk.text,(t.streaming||t.revealing)&&bk.text.length<bk.full.length||t.streaming&&bi===t.blocks.length-1)"></div>
                 <nc-chart v-else-if="bk.type==='chart'" :chart="bk.chart" :dark="darkMode"></nc-chart>
+                <div v-else-if="bk.type==='team'" class="team" role="list" aria-label="Desk team">
+                  <button v-for="ag in bk.agents" :key="ag.id" class="agentt" role="listitem" @click="ag.open=!ag.open" :aria-expanded="!!ag.open">
+                    <div class="r1"><span class="ic">{{ ag.name[0] }}</span><span class="nm">{{ ag.name }}</span>
+                      <span v-if="ag.status==='running'" class="spin-s"></span><span v-else class="vpill" :class="ag.verdict.replace(' ','')">{{ ag.verdict }}</span></div>
+                    <div class="sm">{{ ag.status==='running'?ag.role:ag.summary }}</div>
+                    <ul v-if="ag.open&&ag.points&&ag.points.length"><li v-for="(pt,pi) in ag.points" :key="pi">{{ pt }}</li></ul>
+                  </button>
+                </div>
                 <div v-else-if="bk.type==='card'&&bk.card.kind==='route'" class="acard">
                   <div class="top"><span>Route preview · {{ bk.card.symbol }}</span><span>preview only</span></div>
                   <div class="in"><table class="atbl"><tr><th>Account</th><th>Answer</th><th>Size</th><th>Risk</th></tr>
@@ -1019,12 +1049,15 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
 
     <div class="composer" v-if="agentTab==='run'">
       <div class="box">
-        <textarea ref="ainput" v-model="agentQ" rows="1" :placeholder="'Ask about '+sym+', or any market…'" aria-label="Agent command"
+        <textarea ref="ainput" v-model="agentQ" rows="1" :placeholder="listening?'Listening… speak your question':'Ask about '+sym+', or any market…'" aria-label="Agent command"
           @keydown.enter.exact.prevent="ask()" @input="autoGrow"></textarea>
+        <button v-if="speechOk" class="mic" :class="{on:listening}" @click="toggleMic" :title="listening?'Stop listening':'Speak your question'" :aria-label="listening?'Stop listening':'Voice input'" :aria-pressed="listening">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v4"/></svg></button>
         <button v-if="streaming||(chat.length&&chat[chat.length-1].revealing)" class="send stop" @click="stopStream" title="Stop" aria-label="Stop">■</button>
         <button v-else class="send" :disabled="!agentQ.trim()" @click="ask()" title="Send (Enter)" aria-label="Send">↑</button>
       </div>
-      <div class="hint"><span>Read-only research: nothing here places orders.</span><span>{{ agentMode==='claude'?'Claude agent':'Desk engine' }} · Enter to send</span></div>
+      <div class="hint"><span>Read-only research: nothing here places orders.</span>
+        <span><button class="speedbtn" @click="cycleSpeed" title="Reading speed of answers">Speed: {{ speeds[speed].label }}</button> · {{ agentMode==='claude'?'Claude team':'Desk team' }}</span></div>
     </div>
   </aside>
   <div class="toastwrap"><transition-group name="toast">
@@ -1053,6 +1086,8 @@ const app=createApp({
     darkMode:false, roster:[], refreshing:false,
     agentOpen:false, agentTab:'run', agentQ:'', agentFeed:[], agentStatus:{}, agentUnread:0, agentSeenTs:0, agentId:0,
     chat:[], streaming:false, abortCtl:null, agentWide:false, agentMode:'desk', stick:true, menuOpen:false, installPrompt:null, isStandalone:false, installHelp:false, installHint:'other',
+    listening:false, speechOk:false, speed:'normal',
+    speeds:{slow:{label:'Slow',cps:30,sentence:420,para:650},normal:{label:'Normal',cps:55,sentence:200,para:340},fast:{label:'Fast',cps:120,sentence:90,para:160}},
     heroTiles:[['Why no trade on gold?','Levels, evidence and what would change the view'],['Scan all markets','Conviction across all 15 instruments'],
       ['Chart USDJPY','15-minute candles with desk levels'],['Route XAUUSD','Sized for every account, preview only']],
   }},
@@ -1319,6 +1354,8 @@ const app=createApp({
       if(pre!==null) html+='<pre>'+esc(pre.join('\n'))+'</pre>';
       flushP(); flushL(); return html;
     },
+    mdCaret(text,on){ const h=this.md(text); if(!on) return h; const c='<span class="caret"></span>';
+      const m=h.match(/<\/(p|li|h4|pre)>(<\/(ul|ol)>)?$/); return m?h.slice(0,m.index)+c+h.slice(m.index):h+c },
     autoGrow(e){ const el=e?e.target:this.$refs.ainput; if(!el) return; el.style.height='auto'; el.style.height=Math.min(160,el.scrollHeight)+'px' },
     newChat(){ this.stopStream(); this.chat=[]; this.agentTab='run'; this.$nextTick(()=>this.$refs.ainput&&this.$refs.ainput.focus()) },
     async installDesktop(){
@@ -1366,28 +1403,49 @@ const app=createApp({
         if(last&&last.type==='text') last.full+=ev.delta; else t.blocks.push({type:'text',full:ev.delta,text:''});
         this.pace(t) }
       else if(ev.type==='chart') t.blocks.push({type:'chart',chart:ev.chart});
+      else if(ev.type==='team') t.blocks.push({type:'team',agents:ev.agents.map(a=>({...a,status:'running',verdict:'',summary:'',points:[],open:false}))});
+      else if(ev.type==='agent'){ const tb=[...t.blocks].reverse().find(b=>b.type==='team'); const ag=tb&&tb.agents.find(a=>a.id===ev.id);
+        if(ag) Object.assign(ag,ev) }
       else if(ev.type==='card') t.blocks.push({type:'card',card:ev.card});
       else if(ev.type==='suggestions') t.suggestions=ev.items||[];
       else if(ev.type==='notice') t.notice=ev.message;
       else if(ev.type==='error') t.error=ev.message;
       this.scrollAgent();
     },
-    // Reveal streamed text at a steady reading pace (about 30 words a second), speeding up only
-    // when a long answer has built up, so bursts from the server never dump a wall of text.
-    pace(t){ if(t._raf) return; let prev=performance.now(), carry=0;
+    // Reveal streamed text at a human reading pace. Speed is the user's choice (Slow, Normal, Fast);
+    // there is a short pause after each sentence and paragraph, and only a very long answer speeds up.
+    pace(t){ if(t._raf) return; let prev=performance.now(), carry=0, hold=0;
       const step=now=>{ const dt=Math.min(100,now-prev); prev=now;
         const blk=t.blocks.find(b=>b.type==='text'&&b.text.length<b.full.length);
         if(!blk){ t._raf=null; t.revealing=false; return }
         t.revealing=true;
-        const backlog=t.blocks.filter(b=>b.type==='text').reduce((a,b)=>a+b.full.length-b.text.length,0);
-        const cps=160+Math.max(0,backlog-500)*0.8;          // characters per second (~30 words/s)
+        if(hold>0){ hold-=dt; t._raf=requestAnimationFrame(step); return }
+        const sp=this.speeds[this.speed]; const backlog=t.blocks.filter(b=>b.type==='text').reduce((a,b)=>a+b.full.length-b.text.length,0);
+        const cps=sp.cps+Math.max(0,backlog-1500)*0.25;      // characters per second
         carry+=cps*dt/1000;
         if(carry>=1){ const len=blk.text.length; let end=len+Math.floor(carry);
-          const sp=blk.full.indexOf(' ',end); if(sp>-1&&sp-end<8) end=sp+1;      // finish the word
-          end=Math.min(end,blk.full.length); carry-=end-len;                     // words borrow from the budget
-          blk.text=blk.full.slice(0,end); this.scrollAgent() }
+          const ws=blk.full.indexOf(' ',end); if(ws>-1&&ws-end<8) end=ws+1;       // whole words only
+          end=Math.min(end,blk.full.length);
+          const seg=blk.full.slice(len,end), m=seg.search(/[.!?]\s|\n/);      // stop at a sentence end and breathe
+          if(m>-1){ end=len+m+1; hold=blk.full[len+m]==='\n'?sp.para:sp.sentence }
+          carry-=end-len; blk.text=blk.full.slice(0,end); this.scrollAgent() }
         t._raf=requestAnimationFrame(step) };
       t._raf=requestAnimationFrame(step) },
+    cycleSpeed(){ const order=['slow','normal','fast']; this.speed=order[(order.indexOf(this.speed)+1)%3];
+      try{localStorage.setItem('nc-speed',this.speed)}catch(e){} },
+    // voice input (Web Speech API: Chrome, Edge, Safari)
+    toggleMic(){
+      const SR=window.SpeechRecognition||window.webkitSpeechRecognition; if(!SR) return;
+      if(this.listening&&this._rec){ this._rec.stop(); return }
+      const r=new SR(); r.lang=navigator.language||'en-GB'; r.interimResults=true; r.continuous=false; r.maxAlternatives=1;
+      const base=this.agentQ.trim()?this.agentQ.trim()+' ':''; let fin='';
+      r.onresult=e=>{ let interim=''; for(let i=e.resultIndex;i<e.results.length;i++){ const tx=e.results[i][0].transcript;
+          if(e.results[i].isFinal) fin+=tx; else interim+=tx }
+        this.agentQ=base+fin+interim; this.$nextTick(()=>this.autoGrow()) };
+      r.onerror=e=>{ if(e.error==='not-allowed'||e.error==='service-not-allowed') this.toast('Microphone blocked: allow it from the address bar');
+        else if(e.error!=='no-speech'&&e.error!=='aborted') this.toast('Voice input stopped: '+e.error) };
+      r.onend=()=>{ this.listening=false; this._rec=null; if(fin.trim()&&!this.streaming) this.ask() };
+      try{ r.start(); this.listening=true; this._rec=r }catch(e){ this.toast('Voice input is not available here') } },
     visibleBlocks(t){ const out=[]; for(const b of t.blocks){ out.push(b); if(b.type==='text'&&b.text.length<b.full.length) break } return out },
     onChatScroll(){ const el=this.$refs.arun; if(!el||this._autoScrolling) return;
       this.stick=(el.scrollHeight-el.scrollTop-el.clientHeight)<80 },
@@ -1427,6 +1485,8 @@ const app=createApp({
     if(location.hash==='#agents') this.toggleAgent(true);
     document.addEventListener('click',()=>{this.menuOpen=false;this.installHelp=false});
     this.isStandalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+    this.speechOk=!!(window.SpeechRecognition||window.webkitSpeechRecognition);
+    try{ const sp=localStorage.getItem('nc-speed'); if(sp&&this.speeds[sp]) this.speed=sp }catch(e){}
     window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); this.installPrompt=e });
     window.addEventListener('appinstalled',()=>{ this.isStandalone=true; this.installPrompt=null; this.installHelp=false; this.toast('Northchart installed') });
     if('serviceWorker' in navigator){ navigator.serviceWorker.register('/sw.js').catch(()=>{}) }

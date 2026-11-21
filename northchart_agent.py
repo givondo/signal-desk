@@ -35,6 +35,8 @@ import time
 import urllib.error
 import urllib.request
 
+import northchart_team as team
+
 CLIENT = "Agent desk"
 MAX_TURNS = 6
 WORD_DELAY = float(os.environ.get("NORTHCHART_STREAM_DELAY", "0"))  # the browser paces the reveal
@@ -167,7 +169,10 @@ class DeskAgent:
         if key and os.environ.get("NORTHCHART_AGENT_MODE", "auto") != "desk":
             yield {"type": "start", "mode": "claude", "symbol": sym}
             try:
-                yield from self._claude(question, sym, history or [], key)
+                if self._intent(question) == "analyse":
+                    yield from self._desk_analyse(question, sym, key=key)
+                else:
+                    yield from self._claude(question, sym, history or [], key)
                 yield {"type": "done"}
                 return
             except Exception as e:  # network, quota, bad key: answer from the desk instead
@@ -302,7 +307,7 @@ class DeskAgent:
                              f"{_fmt(m.get('total_r'))}R, win rate {_fmt(m.get('win_rate'))}")
         yield from self._stream_text("\n".join(lines))
 
-    def _desk_analyse(self, q, sym, chart_only=False):
+    def _desk_analyse(self, q, sym, chart_only=False, key=None):
         yield from self._run("get_market_snapshot", {"symbol": sym})
         ok, snap = self._last
         if not ok:
@@ -313,17 +318,55 @@ class DeskAgent:
         detail = detail if ok_d else {}
         yield from self._run("get_candles", {"symbol": sym, "limit": 96})
         ok_c, candles = self._last
-        chart = self._candle_chart(sym, candles if ok_c else {}, detail, snap)
+        candles = candles if ok_c else {}
+        chart = self._candle_chart(sym, candles, detail, snap)
         if chart:
             yield {"type": "chart", "chart": chart}
-        answer = None
-        generic = re.fullmatch(r"\s*(analy[sz]e|snapshot|snap|price|levels|detail|chart|candles?)?\s*"
+        if chart_only:
+            yield from self._stream_text(self._compose(sym, snap, detail, None, True))
+            yield {"type": "suggestions", "items": self._suggest(sym, snap)}
+            return
+        copilot = None
+        generic = re.fullmatch(r"\s*(analy[sz]e|snapshot|snap|price|levels|detail)?\s*"
                                rf"({sym}|{sym.lower()})?\s*", q or "", flags=re.I)
-        if q and not generic and not chart_only:
+        if q and not generic:
             yield from self._run("ask_desk", {"symbol": sym, "question": q})
             ok_a, a = self._last
-            answer = a.get("answer") if ok_a else None
-        yield from self._stream_text(self._compose(sym, snap, detail, answer, chart_only))
+            copilot = a.get("answer") if ok_a else None
+        # the desk team: specialists in parallel, then the lead writes the answer
+        yield {"type": "team", "agents": team.TEAM}
+        for ag in team.TEAM:
+            yield {"type": "agent", "id": ag["id"], "status": "running"}
+        reports = {}
+        once = (lambda sys_p, user: self._anthropic_once(key, sys_p, user)) if key else None
+        for ag, rep in team.run_team(sym, snap, detail, candles, claude=once):
+            reports[ag["id"]] = rep
+            yield {"type": "agent", "id": ag["id"], "status": "done", **rep}
+        lead_text = None
+        if key:
+            try:
+                lead_text = ""
+                user = json.dumps({"question": q or f"Analyse {sym}", "instrument": sym, "reports": reports,
+                                   "snapshot": snap, "levels": detail.get("levels"),
+                                   "invalidate": (detail.get("reasons") or {}).get("invalidate"),
+                                   "desk_copilot": copilot}, default=str)
+                for ev in self._anthropic_stream(key, self._model(), [{"role": "user", "content": user}], None,
+                                                 system=team.LEAD_PROMPT, max_tokens=900):
+                    if ev.get("type") == "content_block_delta" and ev["delta"].get("type") == "text_delta":
+                        lead_text += ev["delta"]["text"]
+                        yield {"type": "text", "delta": _clean(ev["delta"]["text"])}
+                    elif ev.get("type") == "error":
+                        raise RuntimeError("lead stream error")
+            except Exception:
+                if lead_text:
+                    yield {"type": "text", "delta": "\n\n(The lead analyst was cut off.)"}
+                else:
+                    lead_text = None
+        if key and (not lead_text or any(r.get("source") == "rules" for r in reports.values())):
+            yield {"type": "notice", "message": "Claude was unavailable for part of this answer, so the desk's "
+                                                "rule-based specialists filled in."}
+        if not lead_text:
+            yield from self._stream_text(team.lead_report(sym, snap, detail, reports, q, copilot))
         yield {"type": "suggestions", "items": self._suggest(sym, snap)}
 
     def _compose(self, sym, s, d, answer, chart_only):
@@ -392,7 +435,7 @@ class DeskAgent:
             if h.get("role") in ("user", "assistant") and isinstance(h.get("content"), str) and h["content"].strip():
                 msgs.append({"role": h["role"], "content": h["content"][:4000]})
         msgs.append({"role": "user", "content": f"[Instrument on screen: {sym}]\n{question}"})
-        model = os.environ.get("NORTHCHART_AGENT_MODEL", "claude-sonnet-5-5")
+        model = self._model()
         charted = set()
         for _ in range(MAX_TURNS):
             blocks, stop = [], None
@@ -459,9 +502,28 @@ class DeskAgent:
             msgs.append({"role": "user", "content": results})
         yield {"type": "text", "delta": "\n\n(Stopped after the maximum number of tool rounds.)"}
 
-    def _anthropic_stream(self, key, model, msgs, tools):
-        body = json.dumps({"model": model, "max_tokens": 1500, "system": SYSTEM_PROMPT, "messages": msgs,
-                           "tools": tools, "stream": True}).encode()
+    @staticmethod
+    def _model():
+        return os.environ.get("NORTHCHART_AGENT_MODEL", "claude-sonnet-5-5")
+
+    def _anthropic_once(self, key, system, user, max_tokens=400):
+        """One non-streamed reply (used by the specialists)."""
+        url = os.environ.get("NORTHCHART_ANTHROPIC_URL", "https://api.anthropic.com/v1/messages")
+        body = json.dumps({"model": os.environ.get("NORTHCHART_TEAM_MODEL", self._model()),
+                           "max_tokens": max_tokens, "system": system,
+                           "messages": [{"role": "user", "content": user}]}).encode()
+        req = urllib.request.Request(url, data=body, method="POST", headers={
+            "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"})
+        with urllib.request.urlopen(req, timeout=45) as resp:
+            out = json.loads(resp.read())
+        return "".join(b.get("text", "") for b in out.get("content", []) if b.get("type") == "text")
+
+    def _anthropic_stream(self, key, model, msgs, tools, system=None, max_tokens=1500):
+        req_body = {"model": model, "max_tokens": max_tokens, "system": system or SYSTEM_PROMPT,
+                    "messages": msgs, "stream": True}
+        if tools:
+            req_body["tools"] = tools
+        body = json.dumps(req_body).encode()
         url = os.environ.get("NORTHCHART_ANTHROPIC_URL", "https://api.anthropic.com/v1/messages")
         req = urllib.request.Request(url, data=body, method="POST", headers={
             "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json",

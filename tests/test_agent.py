@@ -69,6 +69,27 @@ class MockAnthropic(BaseHTTPRequestHandler):
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         MockAnthropic.calls.append(body)
+        if not body.get("stream"):                      # a specialist: one JSON reply
+            reply = {"content": [{"type": "text", "text": json.dumps({
+                "verdict": "bullish", "confidence": 70, "summary": "Claude specialist view",
+                "points": ["point one", "point two"]})}]}
+            out = json.dumps(reply).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(out)))
+            self.end_headers()
+            self.wfile.write(out)
+            return
+        if "lead analyst" in (body.get("system") or ""):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.end_headers()
+            for e in [{"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}},
+                      {"type": "content_block_delta", "index": 0,
+                       "delta": {"type": "text_delta", "text": "Lead view: all four specialists agree."}},
+                      {"type": "message_delta", "delta": {"stop_reason": "end_turn"}}]:
+                self.wfile.write(f"data: {json.dumps(e)}\n\n".encode())
+            return
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.end_headers()
@@ -158,14 +179,48 @@ class AgentStreaming(unittest.TestCase):
         result = MockAnthropic.calls[1]["messages"][-1]["content"][0]
         self.assertEqual(result["tool_use_id"], "tu1")
 
+    def test_desk_team_reports_then_lead(self):
+        with DeskServer() as s:
+            evs = stream(s.port, "why no trade on gold?")
+        done = {e["id"]: e for e in evs if e["type"] == "agent" and e["status"] == "done"}
+        self.assertEqual(set(done), {"market", "macro", "news", "risk"})
+        self.assertTrue(all(e["verdict"] in ("bullish", "bearish", "neutral", "clear", "blocked", "caution",
+                                             "no read") for e in done.values()))
+        kinds = [e["type"] for e in evs]
+        self.assertLess(kinds.index("team"), kinds.index("text"))
+        text = "".join(e["delta"] for e in evs if e["type"] == "text")
+        self.assertIn("specialists agree", text)
+        self.assertIn("Risk manager", text)
+
+    def test_claude_team_runs_specialists_in_parallel_then_streams_lead(self):
+        mock = ThreadingHTTPServer(("127.0.0.1", 0), MockAnthropic)
+        threading.Thread(target=mock.serve_forever, daemon=True).start()
+        MockAnthropic.calls = []
+        os.environ["ANTHROPIC_API_KEY"] = "test-key"
+        os.environ["NORTHCHART_ANTHROPIC_URL"] = f"http://127.0.0.1:{mock.server_address[1]}/v1/messages"
+        try:
+            with DeskServer() as s:
+                evs = stream(s.port, "why no trade on gold?")
+        finally:
+            mock.shutdown()
+            mock.server_close()
+        specialists = [c for c in MockAnthropic.calls if not c.get("stream")]
+        self.assertEqual(len(specialists), 4)
+        done = [e for e in evs if e["type"] == "agent" and e["status"] == "done"]
+        self.assertTrue(all(e["source"] == "claude" for e in done))
+        text = "".join(e["delta"] for e in evs if e["type"] == "text")
+        self.assertIn("Lead view", text)
+        self.assertFalse(any(e["type"] == "notice" for e in evs))
+
     def test_claude_failure_falls_back_to_desk(self):
         os.environ["ANTHROPIC_API_KEY"] = "test-key"
         os.environ["NORTHCHART_ANTHROPIC_URL"] = "http://127.0.0.1:9/v1/messages"
         with DeskServer() as s:
             evs = stream(s.port, "why no trade on gold?")
         self.assertTrue(any(e["type"] == "notice" for e in evs))
-        self.assertTrue(any(e["type"] == "start" and e["mode"] == "desk" for e in evs))
         self.assertEqual(evs[-1]["type"], "done")
+        text = "".join(e["delta"] for e in evs if e["type"] == "text")
+        self.assertIn("What the team found", text)          # rule-based team still answered
 
     def test_stream_requires_desk_login(self):
         with DeskServer() as s:

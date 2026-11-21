@@ -258,7 +258,8 @@ def build_tools(ctx) -> dict:
         s, st = live(args)
         out = {k: st.get(k) for k in SNAPSHOT_KEYS if k in st}
         for k in ("levels", "reasons", "warnings", "scores", "matrix", "pivots", "ema", "sl_dist",
-                  "sl_basis", "hold_est", "exp_dd", "desk_action", "score", "tech_score", "macro_score"):
+                  "sl_basis", "hold_est", "exp_dd", "desk_action", "score", "tech_score", "macro_score",
+                  "news_sentiment", "engine", "governor"):
             if k in st:
                 out[k] = st[k]
         macro = st.get("macro") or {}
