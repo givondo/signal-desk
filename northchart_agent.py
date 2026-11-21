@@ -37,7 +37,7 @@ import urllib.request
 
 CLIENT = "Agent desk"
 MAX_TURNS = 6
-WORD_DELAY = float(os.environ.get("NORTHCHART_STREAM_DELAY", "0.012"))
+WORD_DELAY = float(os.environ.get("NORTHCHART_STREAM_DELAY", "0"))  # the browser paces the reveal
 
 SYSTEM_PROMPT = """You are the Northchart desk agent, a research assistant on a multi-asset trading desk \
 (gold first, plus FX majors, crypto, US indices and WTI oil). You work only through the Northchart tools, \
