@@ -32,6 +32,8 @@ fi
 mkdir -p /opt/signaldesk/data
 cp /opt/signaldesk-src/*.py /opt/signaldesk-src/*.html /opt/signaldesk/
 rm -rf /opt/signaldesk/trading_os && cp -r /opt/signaldesk-src/trading_os /opt/signaldesk/trading_os
+mkdir -p /opt/signaldesk/tools && rm -rf /opt/signaldesk/tools/northchart_bridge
+cp -r /opt/signaldesk-src/tools/northchart_bridge /opt/signaldesk/tools/northchart_bridge
 cp /opt/signaldesk-src/deploy/signaldesk.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl restart signaldesk
