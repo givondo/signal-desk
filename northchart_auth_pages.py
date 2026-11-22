@@ -68,6 +68,37 @@ table.t th{font:600 9.5px var(--nc-font);letter-spacing:.9px;text-transform:uppe
 .grid2 .f{margin:0}.f select{width:100%;font:14px var(--nc-font);padding:9px 10px;border:1px solid var(--bd2);border-radius:8px;background:var(--p1);color:var(--tx)}
 @media(max-width:640px){.grid2{grid-template-columns:1fr}}
 code.k{font:12.5px var(--nc-mono);background:var(--p3);padding:6px 9px;border-radius:6px;display:block;word-break:break-all;margin-top:8px}
+.acct [hidden]{display:none!important}
+.acct a{color:var(--b)}
+.acct{width:100%;max-width:1000px;margin:0 auto;padding:26px 16px 70px;display:grid;grid-template-columns:220px minmax(0,1fr);gap:28px;align-items:start}
+.acct .lead{color:var(--dim);font-size:12.5px;line-height:1.55}
+.side{position:sticky;top:78px}
+.me{display:flex;gap:10px;align-items:center;padding:2px 10px 16px}
+.av{width:36px;height:36px;border-radius:50%;background:var(--p3);color:var(--tx);display:flex;align-items:center;justify-content:center;font:700 14px var(--nc-font);flex-shrink:0}
+.av.lg{width:48px;height:48px;font-size:19px}
+.me .n{font-weight:700;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.me .e{font-size:11.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tabs{display:flex;flex-direction:column;gap:2px}
+.tab{font:500 13.5px var(--nc-font);text-align:left;padding:8px 10px;border:0;border-radius:8px;background:none;color:var(--dim);cursor:pointer;white-space:nowrap}
+.tab:hover{background:var(--p2);color:var(--tx)}.tab[aria-selected=true]{background:var(--p3);color:var(--tx);font-weight:600}
+.pane{display:none}.pane.on{display:block}
+.pane>h2{font:700 21px var(--nc-font);letter-spacing:-.2px;margin-bottom:4px}.pane>.lead{font-size:13px;margin-bottom:16px;max-width:620px}
+.card2{background:var(--p1);border:1px solid var(--bd);border-radius:12px;padding:18px 20px;margin-bottom:14px}
+.card2 h3{font:600 14.5px var(--nc-font)}
+.item{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--bd)}.item:first-child{border-top:0}
+.t1{font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.t2{font-size:12px;color:var(--dim);margin-top:2px;line-height:1.5}
+.note{display:flex;align-items:center;gap:10px;font-size:12.5px;padding:9px 12px;border-radius:8px;margin-top:12px}.note.warn{background:var(--at);color:var(--tx)}
+.gl{width:36px;height:36px;border-radius:50%;border:1px solid var(--bd2);display:flex;align-items:center;justify-content:center;font:700 15px var(--nc-font);color:var(--b);flex-shrink:0}
+.btn2.pri{background:var(--tx);color:var(--bg);border-color:var(--tx)}.btn2.pri:hover{background:var(--tx);opacity:.88}.btn2[disabled]{opacity:.45;cursor:default}
+.chip2.on{border-color:var(--tx);background:var(--p3);font-weight:600}
+.acct .route ol{margin:8px 0 12px;padding-left:20px}
+.bhead{display:flex;align-items:center;gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid var(--bd)}
+details.more summary,details.adv summary{cursor:pointer;font:600 13px var(--nc-font);color:var(--tx);list-style:none}
+details.more summary{margin-top:14px;color:var(--b)}details.more summary::-webkit-details-marker,details.adv summary::-webkit-details-marker{display:none}
+details.more summary:before,details.adv summary:before{content:"▸ ";color:var(--dim)}details[open].more summary:before,details[open].adv summary:before{content:"▾ "}
+.dz{border-color:var(--rt)}
+@media(max-width:760px){.acct{grid-template-columns:1fr;gap:16px;padding-top:14px}.side{position:static}.me{display:none}
+.tabs{flex-direction:row;overflow-x:auto;gap:4px;padding-bottom:4px}.row .f{min-width:100%}}
 .legal{max-width:760px;margin:0 auto;padding:26px 18px 60px;line-height:1.7;font-size:14px}
 .legal h1{font:700 24px var(--nc-font);margin-bottom:6px}.legal h2{font:700 16px var(--nc-font);margin:20px 0 6px}
 .legal p,.legal li{color:var(--tx)}.legal ul{padding-left:20px}
@@ -244,105 +275,160 @@ def message(title, text, link="/", link_text="Go to the desk"):
 
 
 def account():
-    inner = """<main class="wrap2">
+    inner = """<main class="acct">
+<aside class="side">
+  <div class="me"><div class="av" id="av">·</div><div style="min-width:0"><div class="n" id="meName">Loading…</div><div class="e" id="meEmail"></div></div></div>
+  <nav class="tabs" role="tablist" aria-label="Account sections">
+    <button class="tab" role="tab" data-pane="profile">Profile</button>
+    <button class="tab" role="tab" data-pane="brokers">Brokers</button>
+    <button class="tab" role="tab" data-pane="security">Sign-in and security</button>
+    <button class="tab" role="tab" data-pane="plan">Plan</button>
+    <button class="tab" role="tab" data-pane="invites" id="invTab" hidden>Invites</button>
+    <button class="tab" role="tab" data-pane="data">Your data</button>
+  </nav>
+</aside>
+<div>
 <div id="welcome" class="msg"></div>
-<section class="sec"><h2>Profile</h2><p class="lead" id="who">Loading…</p>
-  <div class="row"><div class="f"><label for="name">Name</label><input id="name"></div>
-  <button class="btn2" id="saveName">Save</button><button class="btn2" id="resend" hidden>Resend confirmation email</button>
-  <button class="btn2" id="signout">Sign out</button></div>
-  <div class="row" id="gRow" hidden style="margin-top:12px;align-items:center"><span class="lead" style="margin:0;flex:1" id="gText"></span>
-  <a class="btn2" id="gLink" href="/auth/google/start?mode=link" style="text-decoration:none">Connect Google</a>
-  <button class="btn2" id="gUnlink" hidden>Disconnect Google</button></div></section>
 
-<section class="sec" id="planSec"><div class="row" style="align-items:center"><div style="flex:1">
-  <h2>Plan</h2><p class="lead" style="margin:0" id="planText">Loading…</p></div>
-  <a class="btn2" href="/billing" style="text-decoration:none" id="planBtn">Plans and billing</a></div></section>
-
-<section class="sec" id="brokers"><h2>Brokers and data</h2>
-  <p class="lead">Connect the accounts you trade from and every closed trade lands in your journal by itself.
-  Northchart only ever reads: it cannot place, change or cancel orders.</p>
-  <div id="conns"></div>
-  <div class="f" style="margin-top:12px"><label for="bq">Add a broker</label>
-    <input id="bq" placeholder="Find your broker: Exness, HFM, FXPesa, Pepperstone, prop firm…" autocomplete="off"></div>
-  <div id="bres" class="chips2"></div>
-  <div id="bpanel"></div>
-  <details style="margin-top:12px"><summary class="lead" style="cursor:pointer;margin:0">Coming next</summary><div id="planned"></div></details>
-  <div id="tvRow" hidden style="margin-top:12px"><button class="btn2" onclick="location.href='/#tradingview'">TradingView data login (desk owner)</button></div>
+<section class="pane" id="pane-profile">
+  <h2>Profile</h2><p class="lead">How you appear on this desk.</p>
+  <div class="card2">
+    <div class="item" style="border:0;padding-top:0"><div class="av lg" id="av2">·</div>
+      <div style="flex:1;min-width:0"><div class="t1" id="pName"></div><div class="t2" id="pEmail"></div></div>
+      <span class="badge ok" id="roleBadge" hidden>Owner</span></div>
+    <div class="note warn" id="unverified" hidden><span style="flex:1">Your email is not confirmed yet.</span>
+      <button class="btn2" id="resend">Resend email</button></div>
+    <div class="row" style="margin-top:14px"><div class="f"><label for="name">Name</label><input id="name" autocomplete="name"></div>
+      <button class="btn2 pri" id="saveName" disabled>Save</button></div>
+  </div>
+  <div class="card2" id="gRow" hidden><div class="item" style="border:0;padding:0">
+    <div class="gl" aria-hidden="true">G</div>
+    <div style="flex:1;min-width:0"><div class="t1">Google</div><div class="t2" id="gText"></div></div>
+    <a class="btn2" id="gLink" href="/auth/google/start?mode=link" style="text-decoration:none">Connect</a>
+    <button class="btn2" id="gUnlink" hidden>Disconnect</button></div></div>
+  <button class="btn2" id="signout">Sign out</button>
 </section>
 
-<section class="sec"><h2>Sync tokens</h2>
-  <p class="lead">For scripts that send your trades in: TradingView trade sync, the Northchart Bridge for MetaTrader.
-  A token can only add trades to your journal; it cannot read anything or sign in. You see it once.</p>
-  <div class="row"><div class="f"><label for="tokLabel">Label</label><input id="tokLabel" placeholder="e.g. Laptop TradingView sync"></div>
-  <button class="btn2" id="newTok">Create token</button></div><div id="tokOut"></div>
-  <table class="t" id="toks"></table></section>
+<section class="pane" id="pane-plan">
+  <h2>Plan</h2><p class="lead">What your plan includes and how you pay for it.</p>
+  <div class="card2"><div class="item" style="border:0;padding:0"><div style="flex:1;min-width:0">
+    <div class="t1" id="planName">Loading…</div><div class="t2" id="planText"></div></div>
+    <a class="btn2 pri" href="/billing" style="text-decoration:none" id="planBtn">Plans and billing</a></div></div>
+</section>
 
-<section class="sec" id="invSec" hidden><h2>Invites</h2>
-  <p class="lead">Sign-up on this desk is by invite. Each code works once and lasts 14 days.</p>
-  <div class="row"><div class="f"><label for="invEmail">Email (optional, locks the code to it)</label><input id="invEmail" type="email"></div>
-  <button class="btn2" id="newInv">Create invite</button></div><div id="invOut"></div>
-  <table class="t" id="invs"></table></section>
+<section class="pane" id="pane-brokers">
+  <h2>Brokers</h2><p class="lead">Connect the account you trade from and your closed trades appear in your journal
+  automatically. Northchart only reads; it can never place or change a trade.</p>
+  <div class="card2" id="connCard"><div id="conns"></div></div>
+  <div class="card2"><h3 id="addTitle">Connect a broker</h3>
+    <div class="f" style="margin:10px 0 8px"><input id="bq" placeholder="Search: Exness, HFM, FXPesa, Pepperstone…" autocomplete="off" aria-label="Find your broker"></div>
+    <div id="bres" class="chips2"></div>
+    <div id="bpanel"></div>
+    <p class="lead" id="planned" style="margin-top:12px"></p>
+  </div>
+  <details class="card2 adv"><summary>Advanced: sync tokens for scripts</summary>
+    <p class="lead" style="margin-top:10px">Only needed if you run the TradingView sync script yourself. The broker steps
+    above create a token for you. A token can only add trades to your journal and is shown once.</p>
+    <div class="row"><div class="f"><label for="tokLabel">Name it</label><input id="tokLabel" autocomplete="off" placeholder="e.g. Laptop TradingView sync"></div>
+      <button class="btn2" id="newTok">Create token</button></div>
+    <div id="tokOut"></div><div id="toks" style="margin-top:8px"></div>
+    <div id="tvRow" hidden style="margin-top:12px"><button class="btn2" onclick="location.href='/#tradingview'">TradingView data login (desk owner)</button></div>
+  </details>
+</section>
 
-<section class="sec"><h2>Password</h2>
-  <div class="row"><div class="f"><label for="oldpw">Current password</label><input id="oldpw" type="password" autocomplete="current-password"></div>
-  <div class="f"><label for="newpw">New password</label><input id="newpw" type="password" autocomplete="new-password"></div>
-  <button class="btn2" id="savePw">Change password</button></div></section>
+<section class="pane" id="pane-security">
+  <h2>Sign-in and security</h2><p class="lead">Your password and the devices signed in to your account.</p>
+  <div class="card2"><h3 id="pwTitle">Password</h3>
+    <div class="row" style="margin-top:10px"><div class="f"><label for="oldpw">Current password</label><input id="oldpw" type="password" autocomplete="current-password"></div>
+      <div class="f"><label for="newpw">New password</label><input id="newpw" type="password" autocomplete="new-password" placeholder="At least 10 characters"></div>
+      <button class="btn2 pri" id="savePw">Change password</button></div></div>
+  <div class="card2"><h3>Devices</h3><div id="sess" style="margin-top:6px"></div>
+    <button class="btn2" id="others" style="margin-top:12px">Sign out of all other devices</button></div>
+</section>
 
-<section class="sec"><h2>Where you are signed in</h2><table class="t" id="sess"></table>
-  <div style="margin-top:10px"><button class="btn2" id="others">Sign out everywhere else</button></div></section>
+<section class="pane" id="pane-invites">
+  <h2>Invites</h2><p class="lead">New traders join this desk by invite. Each link works once and lasts 14 days.</p>
+  <div class="card2"><div class="row"><div class="f"><label for="invEmail">Their email (optional)</label><input id="invEmail" type="email" autocomplete="off"></div>
+    <button class="btn2 pri" id="newInv">Create invite link</button></div><div id="invOut"></div><div id="invs" style="margin-top:8px"></div></div>
+</section>
 
-<section class="sec"><h2>Your data</h2>
-  <p class="lead">Download your journal as a zip of CSV files at any time. Deleting your account removes your
-  journal, tokens and sessions from this desk.</p>
-  <div class="row"><a class="btn2" href="/api/auth/export.zip" style="text-decoration:none">Download my data</a>
-  <span style="flex:1"></span><button class="btn2 danger" id="del">Delete account</button></div></section>
+<section class="pane" id="pane-data">
+  <h2>Your data</h2><p class="lead">Your journal belongs to you.</p>
+  <div class="card2"><div class="item" style="border:0;padding:0"><div style="flex:1"><div class="t1">Download your journal</div>
+    <div class="t2">Every trade and note, as CSV files in a zip.</div></div>
+    <a class="btn2" href="/api/auth/export.zip" style="text-decoration:none">Download</a></div></div>
+  <div class="card2 dz"><div class="item" style="border:0;padding:0"><div style="flex:1"><div class="t1">Delete account</div>
+    <div class="t2">Removes your journal, broker connections and sign-ins from this desk. This cannot be undone.</div></div>
+    <button class="btn2 danger" id="del">Delete</button></div></div>
+</section>
+</div>
 <div id="msg" class="msg" role="alert" style="position:fixed;bottom:14px;right:14px;max-width:360px;z-index:9"></div>
 </main>"""
     script = r"""<script>
-const when=t=>t?new Date(t*1000).toLocaleString("en-GB",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}):"never";
+const when=t=>t?new Date(t*1000).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):"never";
 const escH=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function flash(t,ok){ show($("msg"),t,ok); clearTimeout(flash.h); flash.h=setTimeout(()=>$("msg").className="msg",3500) }
+function device(ua){ ua=ua||"";
+  const b=/Edg\//.test(ua)?"Edge":/OPR\//.test(ua)?"Opera":/Chrome\//.test(ua)?"Chrome":/Firefox\//.test(ua)?"Firefox":/Safari\//.test(ua)?"Safari":"A browser";
+  const o=/Windows/.test(ua)?"Windows":/Android/.test(ua)?"Android":/iPhone|iPad/.test(ua)?"iPhone or iPad":/Mac OS X|Macintosh/.test(ua)?"Mac":/Linux/.test(ua)?"Linux":"";
+  return o?b+" on "+o:b }
+const place=ip=>!ip?"":/^(127\.|::1$|::ffff:127\.)/.test(ip)?"this computer":ip;
+function pick(name){ if(!$("pane-"+name)||(name==="invites"&&$("invTab").hidden)) name="profile";
+  document.querySelectorAll(".pane").forEach(p=>p.classList.toggle("on",p.id==="pane-"+name));
+  document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected",t.dataset.pane===name));
+  if(location.hash!=="#"+name) history.replaceState(null,"","#"+name) }
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>pick(t.dataset.pane));
+let ME=null;
 async function load(){
   const me=await (await fetch("/api/auth/me")).json(); if(!me.user){ location.href="/signin?next=/account"; return }
-  const u=me.user;
-  $("who").innerHTML=`${escH(u.email)} · <span class="badge ${u.role==="owner"?"ok":"mut"}">${u.role==="owner"?"Owner":"Member"}</span> `+
-    (u.verified?'<span class="badge ok">Email confirmed</span>':'<span class="badge warn">Email not confirmed</span>');
-  $("name").value=u.name||""; $("resend").hidden=!!u.verified;
-  const pn={free:"Free",plus:"Plus",pro:"Pro"}[me.plan]||"Free";
-  $("planText").textContent=u.role==="owner"?"You own this desk, so every feature is on.":me.billing==="off"?"Every feature is open on this desk for now.":
-    me.plan==="free"?"Free: desk calls, the chart and your manual journal. Plus adds automatic broker sync and the agent desk.":`Northchart ${pn}.`;
-  $("planBtn").textContent=me.plan==="free"&&u.role!=="owner"&&me.billing!=="off"?"Upgrade":"Plans and billing";
+  const u=ME=me.user, initial=(u.name||u.email||"?").trim().charAt(0).toUpperCase();
+  $("av").textContent=$("av2").textContent=initial;
+  $("meName").textContent=$("pName").textContent=u.name||"No name yet"; $("meEmail").textContent=$("pEmail").textContent=u.email;
+  $("roleBadge").hidden=u.role!=="owner"; $("unverified").hidden=!!u.verified;
+  if(document.activeElement!==$("name")){ $("name").value=u.name||""; $("saveName").disabled=true }
+  const pn={free:"Free",plus:"Plus",pro:"Pro"}[me.plan]||"Free", owner=u.role==="owner";
+  $("planName").textContent=owner?"Owner":me.billing==="off"?"Everything is open":"Northchart "+pn;
+  $("planText").textContent=owner?"You own this desk, so every feature is on.":me.billing==="off"?"Every feature is open on this desk for now.":
+    me.plan==="free"?"Desk calls, the chart and your manual journal. Plus adds automatic broker sync and the agent desk.":"Manage payments and receipts on the billing page.";
+  $("planBtn").textContent=me.plan==="free"&&!owner&&me.billing!=="off"?"Upgrade":"Plans and billing";
   $("gRow").hidden=!me.google&&!u.google;
-  $("gText").innerHTML=u.google?`Signs in with Google as <b>${escH(u.google_email)}</b>`:"Sign in faster with your Google account.";
+  $("gText").innerHTML=u.google?`Connected as ${escH(u.google_email)}`:"Sign in with one click.";
   $("gLink").hidden=!!u.google; $("gUnlink").hidden=!u.google;
   $("oldpw").closest(".f").hidden=!u.has_password; $("savePw").textContent=u.has_password?"Change password":"Set a password";
-  $("invSec").hidden=!(u.role==="owner"&&me.signup_mode==="invite"); $("tvRow").hidden=u.role!=="owner";
+  $("pwTitle").textContent=u.has_password?"Password":"Add a password";
+  $("invTab").hidden=!(u.role==="owner"&&me.signup_mode==="invite"); $("tvRow").hidden=u.role!=="owner";
   const t=await (await fetch("/api/auth/tokens")).json();
-  $("toks").innerHTML=(t.tokens||[]).length?"<tr><th>Label</th><th>Created</th><th>Last used</th><th></th></tr>"+t.tokens.map(k=>
-    `<tr><td>${escH(k.label)}</td><td>${when(k.created)}</td><td>${when(k.last)}</td><td><button class="btn2 danger" data-tok="${k.id}">Revoke</button></td></tr>`).join(""):"";
+  $("toks").innerHTML=(t.tokens||[]).map(k=>`<div class="item"><div style="flex:1;min-width:0"><div class="t1">${escH(k.label||"Token")}</div>
+    <div class="t2">Created ${when(k.created)} · last used ${when(k.last)}</div></div><button class="btn2 danger" data-tok="${k.id}">Revoke</button></div>`).join("");
   const s=await (await fetch("/api/auth/sessions")).json();
-  $("sess").innerHTML="<tr><th>Device</th><th>IP address</th><th>Signed in</th><th></th></tr>"+(s.sessions||[]).map(x=>
-    `<tr><td>${escH((x.ua||"").replace(/\(.*?\)/g,"").slice(0,60)||"Unknown")}</td><td>${escH(x.ip||"")}</td><td>${when(x.created)}</td><td>${x.current?'<span class="badge ok">This device</span>':`<button class="btn2" data-sid="${x.sid}">Sign out</button>`}</td></tr>`).join("");
-  if(!$("invSec").hidden){ const iv=await (await fetch("/api/auth/invites")).json();
-    $("invs").innerHTML=(iv.invites||[]).length?"<tr><th>Code</th><th>For</th><th>Expires</th><th>Status</th><th></th></tr>"+iv.invites.map(i=>
-      `<tr><td><code>${escH(i.hint)}</code></td><td>${escH(i.email||"Anyone")}</td><td>${when(i.exp)}</td><td>${i.used_by?"Used by "+escH(i.used_by):"Open"}</td><td>${i.used_by?"":`<button class="btn2 danger" data-inv="${i.id}">Revoke</button>`}</td></tr>`).join(""):"" }
+  $("sess").innerHTML=(s.sessions||[]).sort((a,b)=>(b.current?1:0)-(a.current?1:0)).map(x=>`<div class="item"><div style="flex:1;min-width:0">
+    <div class="t1">${escH(device(x.ua))}</div><div class="t2">Signed in ${when(x.created)}${place(x.ip)?" · "+escH(place(x.ip)):""}</div></div>
+    ${x.current?'<span class="badge ok">This device</span>':`<button class="btn2" data-sid="${x.sid}">Sign out</button>`}</div>`).join("");
+  $("others").hidden=(s.sessions||[]).length<2;
+  if(!$("invTab").hidden){ const iv=await (await fetch("/api/auth/invites")).json();
+    $("invs").innerHTML=(iv.invites||[]).map(i=>`<div class="item"><div style="flex:1;min-width:0"><div class="t1">${escH(i.email||"Anyone with the link")}</div>
+      <div class="t2">${i.used_by?"Used by "+escH(i.used_by):"Open · expires "+when(i.exp)} · code ${escH(i.hint)}</div></div>
+      ${i.used_by?"":`<button class="btn2 danger" data-inv="${i.id}">Revoke</button>`}</div>`).join("") }
 }
-if(new URLSearchParams(location.search).get("welcome")) show($("welcome"),"Welcome to Northchart. Next: connect a broker or create a sync token so your trades start arriving.",true);
-const act=(id,fn)=>$(id).onclick=async()=>{ try{ await fn() }catch(e){ flash(e.message) } };
-act("saveName",async()=>{ await post("/api/auth/profile",{name:$("name").value}); flash("Saved",true) });
+const qs=new URLSearchParams(location.search);
+if(qs.get("welcome")) show($("welcome"),"Welcome to Northchart. Connect your broker below and your trades will start arriving.",true);
+if(qs.get("google")==="linked") show($("welcome"),"Google connected. You can now sign in with it.",true);
+pick(location.hash.slice(1)||(qs.get("welcome")?"brokers":"profile"));
+const act=(id,fn)=>$(id).onclick=async()=>{ const b=$(id); b.disabled=true; try{ await fn() }catch(e){ flash(e.message) } finally{ b.disabled=false } };
+$("name").addEventListener("input",()=>$("saveName").disabled=!ME||$("name").value.trim()===(ME.name||""));
+act("saveName",async()=>{ await post("/api/auth/profile",{name:$("name").value}); flash("Saved",true); await load() });
 act("resend",async()=>{ await post("/api/auth/verify/resend"); flash("Confirmation email sent",true) });
 act("gUnlink",async()=>{ await post("/api/auth/google/unlink"); flash("Google disconnected",true); load() });
-if(new URLSearchParams(location.search).get("google")==="linked") show($("welcome"),"Google connected. You can now sign in with it.",true);
-{ const ge=new URLSearchParams(location.search).get("gerr"); if(ge) show($("welcome"),ge) }
+{ const ge=qs.get("gerr"); if(ge) show($("welcome"),ge) }
 act("signout",async()=>{ await post("/api/auth/signout"); location.href="/signin" });
-act("savePw",async()=>{ await post("/api/auth/password",{old:$("oldpw").value,new:$("newpw").value}); $("oldpw").value=$("newpw").value=""; flash("Password changed. Other devices were signed out.",true); load() });
-act("others",async()=>{ await post("/api/auth/sessions/revoke",{others:true}); flash("Signed out everywhere else",true); load() });
-act("newTok",async()=>{ const j=await post("/api/auth/tokens",{label:$("tokLabel").value});
+act("savePw",async()=>{ await post("/api/auth/password",{old:$("oldpw").value,new:$("newpw").value}); $("oldpw").value=$("newpw").value=""; flash("Password saved. Other devices were signed out.",true); load() });
+act("others",async()=>{ await post("/api/auth/sessions/revoke",{others:true}); flash("Signed out of all other devices",true); load() });
+act("newTok",async()=>{ const j=await post("/api/auth/tokens",{label:$("tokLabel").value}); $("tokLabel").value="";
   $("tokOut").innerHTML=`<p class="lead" style="margin:10px 0 0">Copy it now; it will not be shown again.</p><code class="k">${escH(j.token)}</code>`; load() });
 act("newInv",async()=>{ const j=await post("/api/auth/invites",{email:$("invEmail").value});
   const link=location.origin+"/signup?invite="+encodeURIComponent(j.code);
-  $("invOut").innerHTML=`<p class="lead" style="margin:10px 0 0">Send this link; it is shown once.</p><code class="k">${escH(link)}</code>`; load() });
-act("del",async()=>{ const pw=prompt("Type your password (or, if you only use Google, your email address) to delete your account and journal from this desk. This cannot be undone.");
+  $("invOut").innerHTML=`<p class="lead" style="margin:10px 0 0">Send this link. It is shown once.</p><code class="k">${escH(link)}</code>`; load() });
+act("del",async()=>{ const pw=prompt("To delete your account and journal, type your password (or your email address if you only sign in with Google). This cannot be undone.");
   if(!pw) return; await post("/api/auth/delete",{password:pw}); location.href="/signin" });
 document.addEventListener("click",async e=>{ const b=e.target.closest("button[data-tok],button[data-sid],button[data-inv]"); if(!b) return;
   try{ if(b.dataset.tok) await post("/api/auth/tokens/revoke",{id:b.dataset.tok});
@@ -350,51 +436,56 @@ document.addEventListener("click",async e=>{ const b=e.target.closest("button[da
     if(b.dataset.inv) await post("/api/auth/invites/revoke",{id:b.dataset.inv}); load() }catch(err){ flash(err.message) } });
 
 let BK=null;
-const kindName={bridge:"Northchart Bridge",metaapi:"MetaApi",statement:"Statement",tradingview:"TradingView sync"};
+const kindName={bridge:"Northchart Bridge",metaapi:"Investor password",statement:"Statement upload",tradingview:"TradingView sync"};
 async function loadBrokers(){
   BK=await (await fetch("/api/brokers")).json();
-  $("conns").innerHTML=(BK.connections||[]).length?BK.connections.map(c=>`<div class="conn"><div style="flex:1"><b>${escH(c.label||c.broker)}</b>
-    <span class="badge ${c.state==="error"?"warn":"ok"}">${escH(kindName[c.kind]||c.kind)}</span> <span class="badge mut">Read-only</span>
-    <p class="lead">${c.trades||0} trade(s) pulled · last sync ${when(c.last_sync)}${c.last_error?' · <span style="color:var(--r)">'+escH(c.last_error)+'</span>':""}</p></div>
-    ${c.kind==="metaapi"?`<button class="btn2" data-sync="${c.id}">Sync now</button>`:""}<button class="btn2 danger" data-rm="${c.id}">Disconnect</button></div>`).join("")
-    :'<p class="lead" style="margin:0">No brokers connected yet.</p>';
-  $("planned").innerHTML=(BK.planned||[]).map(p=>`<p class="lead" style="margin:6px 0 0"><b>${escH(p.name)}</b>: ${escH(p.why)}</p>`).join("");
-  showBrokers("");
+  const cs=BK.connections||[];
+  $("connCard").hidden=!cs.length; $("addTitle").textContent=cs.length?"Connect another broker":"Connect a broker";
+  $("conns").innerHTML=cs.map(c=>`<div class="item"><div style="flex:1;min-width:0"><div class="t1">${escH(c.label||c.broker)}
+    <span class="badge ${c.state==="error"?"warn":"ok"}">${c.state==="error"?"Needs attention":"Connected"}</span></div>
+    <div class="t2">${escH(kindName[c.kind]||c.kind)} · ${c.trades||0} trade${c.trades===1?"":"s"} · last sync ${when(c.last_sync)}${c.last_error?' · <span style="color:var(--r)">'+escH(c.last_error)+'</span>':""}</div></div>
+    ${c.kind==="metaapi"?`<button class="btn2" data-sync="${c.id}">Sync now</button>`:""}<button class="btn2 danger" data-rm="${c.id}">Disconnect</button></div>`).join("");
+  const pl=(BK.planned||[]).map(p=>p.name); $("planned").textContent=pl.length?"Coming soon: "+pl.join(", ")+".":"";
+  showBrokers($("bq").value);
 }
 function showBrokers(q){
   q=q.trim().toLowerCase();
   const list=(BK.brokers||[]).filter(b=>!q||b.name.toLowerCase().includes(q)||b.platform_names.join(" ").toLowerCase().includes(q));
-  $("bres").innerHTML=list.slice(0,q?12:8).map(b=>`<button class="chip2" data-b="${b.id}">${escH(b.name)}${b.cma?'<span class="cma">CMA</span>':""}</button>`).join("")
-    +(q&&!list.length?'<p class="lead">Not listed? Pick "Any other MetaTrader broker", or upload a statement as CSV.</p>':"");
+  $("bres").innerHTML=list.slice(0,q?12:8).map(b=>`<button class="chip2${$("bpanel").dataset.b===b.id?" on":""}" data-b="${b.id}">${escH(b.name)}</button>`).join("")
+    +(q&&!list.length?'<p class="lead" style="margin:4px 0 0">Not listed? Pick "Any other MetaTrader broker", or upload a statement.</p>':"");
 }
 function brokerPanel(id){
   const b=BK.brokers.find(x=>x.id===id); const mt=b.platforms.some(p=>p==="mt5"||p==="mt4");
-  let h=`<div class="route" style="background:var(--p1)"><h3>${escH(b.name)}</h3><p class="lead" style="margin:0">${escH(b.platform_names.join(", "))}${b.note?" · "+escH(b.note):""}</p></div>`;
-  if(mt) h+=`<div class="route"><h3>Northchart Bridge <span class="badge ok">Free · recommended</span></h3>
-    <p class="lead" style="margin:0">A small add-on for your own MetaTrader. It reads closed trades and sends them here. It has no trading code, and your password never leaves your computer.</p>
-    <ol><li>Download the add-on: <a href="/bridge/NorthchartBridge.mq5">MetaTrader 5</a> or <a href="/bridge/NorthchartBridge.mq4">MetaTrader 4</a>.</li>
-    <li>In MetaTrader: File &gt; Open Data Folder &gt; MQL5 (or MQL4) &gt; Experts. Put the file there and refresh the Navigator.</li>
-    <li>Tools &gt; Options &gt; Expert Advisors: tick <i>Allow WebRequest for listed URL</i> and add <code>${escH(BK.desk_url)}</code>.</li>
-    <li>Drag Northchart Bridge onto any chart and paste the token below. Algo trading does not need to be on.</li></ol>
-    <button class="btn2" id="brTok">Create a token for ${escH(b.name)}</button><div id="brTokOut"></div></div>`;
-  if(mt) h+=`<div class="route"><h3>Investor password <span class="badge mut">MetaApi</span></h3>`+(BK.routes.metaapi?`
-    <p class="lead" style="margin:0">No install. Use the <b>investor</b> (read-only) password from your broker, never the master password; the desk checks and refuses a master password. The password goes to MetaApi once and is not stored here.</p>
+  const routes=[];
+  if(mt) routes.push(`<div class="route"><h3>Install the Northchart Bridge <span class="badge ok">Free · recommended</span></h3>
+    <p class="lead" style="margin:0">A small read-only add-on for your MetaTrader. Your password never leaves your computer.</p>
+    <ol><li>Download it for <a href="/bridge/NorthchartBridge.mq5">MetaTrader 5</a> or <a href="/bridge/NorthchartBridge.mq4">MetaTrader 4</a>.</li>
+    <li>In MetaTrader, open File &gt; Open Data Folder &gt; MQL5 (or MQL4) &gt; Experts, put the file there, then refresh the Navigator.</li>
+    <li>Open Tools &gt; Options &gt; Expert Advisors, tick <i>Allow WebRequest for listed URL</i> and add <code>${escH(BK.desk_url)}</code>.</li>
+    <li>Drag Northchart Bridge onto any chart and paste your token.</li></ol>
+    <button class="btn2 pri" id="brTok">Get my token</button><div id="brTokOut"></div></div>`);
+  if(mt) routes.push(`<div class="route"><h3>Use your investor password <span class="badge mut">No install</span></h3>`+(BK.routes.metaapi?`
+    <p class="lead" style="margin:0">Use the <b>investor</b> (read-only) password from your broker, never the master password. Northchart refuses a master password and does not store it.</p>
     <div class="grid2" style="margin-top:10px"><div class="f"><label>Platform</label><select id="maPlat">${b.platforms.filter(p=>p==="mt5"||p==="mt4").map(p=>`<option value="${p}">${p==="mt5"?"MetaTrader 5":"MetaTrader 4"}</option>`).join("")}</select></div>
     <div class="f"><label>Account type</label><select id="maType"><option value="REAL">Live</option><option value="DEMO">Demo</option><option value="PROP">Prop firm</option></select></div>
-    <div class="f"><label>Account number</label><input id="maLogin" inputmode="numeric"></div>
-    <div class="f"><label>Server</label><input id="maServer" placeholder="e.g. Exness-MT5Real8"></div>
+    <div class="f"><label>Account number</label><input id="maLogin" inputmode="numeric" autocomplete="off"></div>
+    <div class="f"><label>Server</label><input id="maServer" placeholder="e.g. Exness-MT5Real8" autocomplete="off"></div>
     <div class="f" style="grid-column:1/-1"><label>Investor password</label><input id="maPw" type="password" autocomplete="off"></div></div>
-    <button class="btn2" id="maGo" style="margin-top:10px">Connect read-only</button>`:`<p class="lead" style="margin:0">Not switched on for this desk. The Bridge above does the same job for free.</p>`)+`</div>`;
-  if(b.platforms.includes("tradingview")) h+=`<div class="route"><h3>TradingView trade sync</h3><p class="lead" style="margin:0">If you trade ${escH(b.name)} through TradingView, run <code>tools/start_tradingview_sync.ps1</code> with <code>DESK_TOKEN</code> set to a sync token from this page.</p></div>`;
-  h+=`<div class="route"><h3>Upload a statement</h3><p class="lead" style="margin:0">MetaTrader: History tab, right-click &gt; Report &gt; HTML. cTrader and prop firms: export history as CSV. Trades already in your journal are skipped.</p>
+    <button class="btn2 pri" id="maGo" style="margin-top:10px">Connect read-only</button>`:`<p class="lead" style="margin:0">Not switched on for this desk. The Bridge does the same job for free.</p>`)+`</div>`);
+  if(b.platforms.includes("tradingview")) routes.push(`<div class="route"><h3>TradingView trade sync</h3><p class="lead" style="margin:0">If you trade ${escH(b.name)} through TradingView, run <code>tools/start_tradingview_sync.ps1</code> with <code>DESK_TOKEN</code> set to a token from Advanced, below.</p></div>`);
+  routes.push(`<div class="route"><h3>Upload a statement</h3><p class="lead" style="margin:0">MetaTrader: History tab, right-click &gt; Report &gt; HTML. cTrader and prop firms: export history as CSV. Trades already in your journal are skipped.</p>
     <div class="grid2" style="margin-top:10px"><div class="f"><label>File</label><input id="stFile" type="file" accept=".htm,.html,.csv,.txt"></div>
     <div class="f"><label>Times in the file are</label><select id="stOff">${[0,1,2,3,-4,-5].map(o=>`<option value="${o}">UTC${o>0?"+"+o:o<0?o:""}${o===0?" (Exness, cTrader)":o===2||o===3?" (most MetaTrader servers)":""}</option>`).join("")}</select></div>
     <div class="f"><label>Account type</label><select id="stType"><option value="REAL">Live</option><option value="DEMO">Demo</option><option value="PROP">Prop firm</option></select></div>
-    <div class="f"><label>Account name</label><input id="stLabel" placeholder="${escH(b.name.toUpperCase().replace(/[^A-Z0-9]+/g,"-"))}-01"></div></div>
-    <div id="stMap"></div><button class="btn2" id="stGo" style="margin-top:10px">Import trades</button></div>`;
-  $("bpanel").innerHTML=h; $("bpanel").dataset.b=id;
+    <div class="f"><label>Account name</label><input id="stLabel" autocomplete="off" placeholder="${escH(b.name.toUpperCase().replace(/[^A-Z0-9]+/g,"-"))}-01"></div></div>
+    <div id="stMap"></div><button class="btn2 pri" id="stGo" style="margin-top:10px">Import trades</button></div>`);
+  let h=`<div class="bhead"><div style="flex:1;min-width:0"><div class="t1">${escH(b.name)}${b.cma?' <span class="badge ok">CMA licensed</span>':""}</div>
+    <div class="t2">${escH(b.platform_names.join(", "))}${b.note?" · "+escH(b.note):""}</div></div><button class="btn2" id="bClose">Close</button></div>`+routes[0];
+  if(routes.length>1) h+=`<details class="more"><summary>Other ways to connect (${routes.length-1})</summary>${routes.slice(1).join("")}</details>`;
+  $("bpanel").innerHTML=h; $("bpanel").dataset.b=id; showBrokers($("bq").value);
+  $("bClose").onclick=()=>{ $("bpanel").innerHTML=""; delete $("bpanel").dataset.b; showBrokers($("bq").value) };
   const tok=$("brTok"); if(tok) tok.onclick=async()=>{ try{ const j=await post("/api/auth/tokens",{label:b.name+" Bridge"});
-    $("brTokOut").innerHTML=`<p class="lead" style="margin:10px 0 0">Paste this into the Bridge. Shown once.</p><code class="k">${escH(j.token)}</code>`; load() }catch(e){ flash(e.message) } };
+    $("brTokOut").innerHTML=`<p class="lead" style="margin:10px 0 0">Paste this into the Bridge. It is shown once.</p><code class="k">${escH(j.token)}</code>`; load() }catch(e){ flash(e.message) } };
   const ma=$("maGo"); if(ma) ma.onclick=async()=>{ ma.disabled=true; try{ await post("/api/brokers/metaapi",{broker:b.name,platform:$("maPlat").value,account_type:$("maType").value,
     login:$("maLogin").value,server:$("maServer").value,password:$("maPw").value}); $("maPw").value=""; flash("Connected. The first sync runs in the background.",true); loadBrokers() }
     catch(e){ flash(e.message) } finally{ ma.disabled=false } };
@@ -405,7 +496,7 @@ async function importStatement(b, mapping){
   const buf=new Uint8Array(await f.arrayBuffer()); let bin=""; for(let i=0;i<buf.length;i+=0x8000) bin+=String.fromCharCode.apply(null,buf.subarray(i,i+0x8000));
   try{ const j=await post("/api/brokers/import",{filename:f.name,content_b64:btoa(bin),offset_hours:+$("stOff").value,account_type:$("stType").value,
       account_label:$("stLabel").value,broker:b.name,mapping});
-    flash(`${j.kind}: ${j.found} trade(s) found, ${j.added} new, ${j.duplicates} already in your journal.`,true); $("stMap").innerHTML=""; loadBrokers() }
+    flash(`${j.found} trade(s) found: ${j.added} new, ${j.duplicates} already in your journal.`,true); $("stMap").innerHTML=""; loadBrokers() }
   catch(e){ flash(e.message); if(e.data&&e.data.headers&&e.data.headers.length) mapUI(b,e.data) }
 }
 function mapUI(b,j){
@@ -416,7 +507,7 @@ function mapUI(b,j){
 }
 $("bq").addEventListener("input",e=>showBrokers(e.target.value));
 document.addEventListener("click",async e=>{ const c=e.target.closest("[data-b]"); if(c){ brokerPanel(c.dataset.b); return }
-  const rm=e.target.closest("[data-rm]"); if(rm){ if(!confirm("Disconnect this broker? Trades already journalled stay.")) return;
+  const rm=e.target.closest("[data-rm]"); if(rm){ if(!confirm("Disconnect this broker? Trades already in your journal stay.")) return;
     try{ await post("/api/brokers/remove",{id:rm.dataset.rm}); loadBrokers() }catch(err){ flash(err.message) } return }
   const sy=e.target.closest("[data-sync]"); if(sy){ try{ const j=await post("/api/brokers/sync",{id:sy.dataset.sync}); flash(`${j.added} new trade(s)`,true); loadBrokers() }catch(err){ flash(err.message) } } });
 loadBrokers();
