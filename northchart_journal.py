@@ -1,4 +1,4 @@
-"""Automatic trade journal for Northchart.
+"""Automatic trade journal for Northcharts.
 
 Every trade you take reaches the desk as a fill (TradingView trade sync, broker
 imports). This module turns fills into journal rows without you typing them:

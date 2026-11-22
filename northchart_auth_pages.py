@@ -1,6 +1,6 @@
 """Pages for signing in, signing up, the owner's first-run setup, password reset and the account page.
 
-Every page shares the Northchart design (northchart_ui). Forms post JSON to /api/auth/*
+Every page shares the Northcharts design (northchart_ui). Forms post JSON to /api/auth/*
 with fetch, so the server can check the Origin header on every write.
 """
 
@@ -125,15 +125,15 @@ function wire(formId,fn){ const f=$(formId); f.addEventListener("submit",async e
 </script>
 """
 
-FOOT = ('<p class="fine">Northchart is research software. It does not place trades and nothing on it is '
+FOOT = ('<p class="fine">Northcharts is research software. It does not place trades and nothing on it is '
         'investment advice. <a href="/legal/terms">Terms</a> · <a href="/legal/privacy">Privacy</a> · '
         '<a href="/legal/risk">Risk notice</a></p>')
 
 
 def _bare_head(title):
     return ('<header class="nc-head"><div class="nc-bar">'
-            '<a class="nc-brand" href="/" aria-label="Northchart home"><div class="nc-mark" aria-hidden="true">N</div>'
-            f'<div><div class="nc-name">Northchart</div><div class="nc-sub">{html.escape(title)}</div></div></a>'
+            '<a class="nc-brand" href="/" aria-label="Northcharts home"><div class="nc-mark" aria-hidden="true">N</div>'
+            f'<div><div class="nc-name">Northcharts</div><div class="nc-sub">{html.escape(title)}</div></div></a>'
             '<nav class="nc-actions"><button type="button" class="nc-icon" id="nc-theme" onclick="ncToggleTheme()">☾</button></nav>'
             '</div></header>' + ui.THEME_SWITCH)
 
@@ -142,7 +142,7 @@ def page(title, inner, script="", nav=None):
     head = ui.nav(nav) if nav else _bare_head(title)
     return ("<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>"
             "<meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'>"
-            f"<title>{html.escape(title)} · Northchart</title><meta name='robots' content='noindex'>"
+            f"<title>{html.escape(title)} · Northcharts</title><meta name='robots' content='noindex'>"
             f"{ui.head()}<style>{CSS}</style></head><body>{head}{inner}{JS}{script}</body></html>").encode("utf-8")
 
 
@@ -152,7 +152,7 @@ def _field(name, label, typ="text", auto="", help_="", extra=""):
             + (f'<div class="help">{help_}</div>' if help_ else "") + "</div>")
 
 
-def _google_block(href, label, note="Google confirms your email. Northchart never sees your Google password."):
+def _google_block(href, label, note="Google confirms your email. Northcharts never sees your Google password."):
     return (f'<a class="gbtn" id="gbtn" href="{html.escape(href)}" data-label="{html.escape(label)}">'
             f'<span class="gmark" aria-hidden="true">G</span><span class="gl">{html.escape(label)}</span>'
             '<span class="last" id="glast" hidden>Last used</span></a>'
@@ -201,7 +201,7 @@ def signup(mode, invite="", google=False):
                   f'required form="f" value="{html.escape(invite)}"') if mode == "invite" else "")
     inner = f"""<main class="auth"><div class="box">
 <h1>Create your account</h1><p class="lead">Connect your broker and every trade you take is journalled for you,
-matched to the desk's view at entry. Read-only: Northchart never places trades.</p>
+matched to the desk's view at entry. Read-only: Northcharts never places trades.</p>
 <div id="msg" class="msg" role="alert"></div>
 {inv}
 {_google_block("/auth/google/start", "Sign up with Google") if google else ""}
@@ -318,7 +318,7 @@ def account():
 
 <section class="pane" id="pane-brokers">
   <h2>Brokers</h2><p class="lead">Connect the account you trade from and your closed trades appear in your journal
-  automatically. Northchart only reads; it can never place or change a trade.</p>
+  automatically. Northcharts only reads; it can never place or change a trade.</p>
   <div class="card2" id="connCard"><div id="conns"></div></div>
   <div class="card2"><h3 id="addTitle">Connect a broker</h3>
     <div class="f" style="margin:10px 0 8px"><input id="bq" placeholder="Search: Exness, HFM, FXPesa, Pepperstone…" autocomplete="off" aria-label="Find your broker"></div>
@@ -387,7 +387,7 @@ async function load(){
   $("roleBadge").hidden=u.role!=="owner"; $("unverified").hidden=!!u.verified;
   if(document.activeElement!==$("name")){ $("name").value=u.name||""; $("saveName").disabled=true }
   const pn={free:"Free",plus:"Plus",pro:"Pro"}[me.plan]||"Free", owner=u.role==="owner";
-  $("planName").textContent=owner?"Owner":me.billing==="off"?"Everything is open":"Northchart "+pn;
+  $("planName").textContent=owner?"Owner":me.billing==="off"?"Everything is open":"Northcharts "+pn;
   $("planText").textContent=owner?"You own this desk, so every feature is on.":me.billing==="off"?"Every feature is open on this desk for now.":
     me.plan==="free"?"Desk calls, the chart and your manual journal. Plus adds automatic broker sync and the agent desk.":"Manage payments and receipts on the billing page.";
   $("planBtn").textContent=me.plan==="free"&&!owner&&me.billing!=="off"?"Upgrade":"Plans and billing";
@@ -411,7 +411,7 @@ async function load(){
       ${i.used_by?"":`<button class="btn2 danger" data-inv="${i.id}">Revoke</button>`}</div>`).join("") }
 }
 const qs=new URLSearchParams(location.search);
-if(qs.get("welcome")) show($("welcome"),"Welcome to Northchart. Connect your broker below and your trades will start arriving.",true);
+if(qs.get("welcome")) show($("welcome"),"Welcome to Northcharts. Connect your broker below and your trades will start arriving.",true);
 if(qs.get("google")==="linked") show($("welcome"),"Google connected. You can now sign in with it.",true);
 pick(location.hash.slice(1)||(qs.get("welcome")?"brokers":"profile"));
 const act=(id,fn)=>$(id).onclick=async()=>{ const b=$(id); b.disabled=true; try{ await fn() }catch(e){ flash(e.message) } finally{ b.disabled=false } };
@@ -436,7 +436,7 @@ document.addEventListener("click",async e=>{ const b=e.target.closest("button[da
     if(b.dataset.inv) await post("/api/auth/invites/revoke",{id:b.dataset.inv}); load() }catch(err){ flash(err.message) } });
 
 let BK=null;
-const kindName={bridge:"Northchart Bridge",metaapi:"Investor password",statement:"Statement upload",tradingview:"TradingView sync"};
+const kindName={bridge:"Northcharts Bridge",metaapi:"Investor password",statement:"Statement upload",tradingview:"TradingView sync"};
 async function loadBrokers(){
   BK=await (await fetch("/api/brokers")).json();
   const cs=BK.connections||[];
@@ -458,15 +458,15 @@ function showBrokers(q){
 function brokerPanel(id){
   const b=BK.brokers.find(x=>x.id===id); const mt=b.platforms.some(p=>p==="mt5"||p==="mt4");
   const routes=[];
-  if(mt) routes.push(`<div class="route"><h3>Install the Northchart Bridge <span class="badge ok">Free · recommended</span></h3>
+  if(mt) routes.push(`<div class="route"><h3>Install the Northcharts Bridge <span class="badge ok">Free · recommended</span></h3>
     <p class="lead" style="margin:0">A small read-only add-on for your MetaTrader. Your password never leaves your computer.</p>
     <ol><li>Download it for <a href="/bridge/NorthchartBridge.mq5">MetaTrader 5</a> or <a href="/bridge/NorthchartBridge.mq4">MetaTrader 4</a>.</li>
     <li>In MetaTrader, open File &gt; Open Data Folder &gt; MQL5 (or MQL4) &gt; Experts, put the file there, then refresh the Navigator.</li>
     <li>Open Tools &gt; Options &gt; Expert Advisors, tick <i>Allow WebRequest for listed URL</i> and add <code>${escH(BK.desk_url)}</code>.</li>
-    <li>Drag Northchart Bridge onto any chart and paste your token.</li></ol>
+    <li>Drag Northcharts Bridge onto any chart and paste your token.</li></ol>
     <button class="btn2 pri" id="brTok">Get my token</button><div id="brTokOut"></div></div>`);
   if(mt) routes.push(`<div class="route"><h3>Use your investor password <span class="badge mut">No install</span></h3>`+(BK.routes.metaapi?`
-    <p class="lead" style="margin:0">Use the <b>investor</b> (read-only) password from your broker, never the master password. Northchart refuses a master password and does not store it.</p>
+    <p class="lead" style="margin:0">Use the <b>investor</b> (read-only) password from your broker, never the master password. Northcharts refuses a master password and does not store it.</p>
     <div class="grid2" style="margin-top:10px"><div class="f"><label>Platform</label><select id="maPlat">${b.platforms.filter(p=>p==="mt5"||p==="mt4").map(p=>`<option value="${p}">${p==="mt5"?"MetaTrader 5":"MetaTrader 4"}</option>`).join("")}</select></div>
     <div class="f"><label>Account type</label><select id="maType"><option value="REAL">Live</option><option value="DEMO">Demo</option><option value="PROP">Prop firm</option></select></div>
     <div class="f"><label>Account number</label><input id="maLogin" inputmode="numeric" autocomplete="off"></div>
@@ -482,7 +482,7 @@ function brokerPanel(id){
     <div id="stMap"></div><button class="btn2 pri" id="stGo" style="margin-top:10px">Import trades</button></div>`);
   let h=`<div class="bhead"><div style="flex:1;min-width:0"><div class="t1">${escH(b.name)}${b.cma?' <span class="badge ok">CMA licensed</span>':""}</div>
     <div class="t2">${escH(b.platform_names.join(", "))}${b.note?" · "+escH(b.note):""}</div></div><button class="btn2" id="bClose">Close</button></div>`
-    +(!b.cma&&!b.prop&&b.id!=="other_mt"?`<div class="note warn" style="margin-top:12px">${escH(b.name)} is not on the CMA register of brokers licensed in Kenya. Northchart can still journal its trades; check where your money is held before you deposit.</div>`:"")+routes[0];
+    +(!b.cma&&!b.prop&&b.id!=="other_mt"?`<div class="note warn" style="margin-top:12px">${escH(b.name)} is not on the CMA register of brokers licensed in Kenya. Northcharts can still journal its trades; check where your money is held before you deposit.</div>`:"")+routes[0];
   if(routes.length>1) h+=`<details class="more"><summary>Other ways to connect (${routes.length-1})</summary>${routes.slice(1).join("")}</details>`;
   $("bpanel").innerHTML=h; $("bpanel").dataset.b=id; showBrokers($("bq").value);
   $("bClose").onclick=()=>{ $("bpanel").innerHTML=""; delete $("bpanel").dataset.b; showBrokers($("bq").value) };
@@ -520,13 +520,13 @@ load();
 
 LEGAL = {
     "terms": ("Terms of use", """
-<p>These terms cover your use of Northchart, a trading research desk run by Precifarm AI Ltd, Nairobi, Kenya.</p>
-<h2>What Northchart is</h2><p>Northchart shows market data, the desk's analysis of it, and a journal of trades you take
+<p>These terms cover your use of Northcharts, a trading research desk run by Precifarm AI Ltd, Nairobi, Kenya.</p>
+<h2>What Northcharts is</h2><p>Northcharts shows market data, the desk's analysis of it, and a journal of trades you take
 elsewhere. It is research software. It does not hold money, execute trades, or act as a broker or investment adviser.</p>
 <h2>Your account</h2><p>Keep your password private. You are responsible for what happens under your account. Tell the desk
 owner straight away if you think someone else has used it.</p>
 <h2>Broker connections</h2><p>You connect a broker with read-only credentials (an investor password, a read-only key or a
-statement file). Northchart only reads closed trades and account history. You can disconnect at any time, which deletes
+statement file). Northcharts only reads closed trades and account history. You can disconnect at any time, which deletes
 the stored credentials.</p>
 <h2>Plans and payments</h2><p>Desk calls, the chart and the manual journal are free. Plus and Pro are paid monthly,
 in advance, through M-Pesa (Safaricom) or a card (Paystack). Prices are listed in US dollars and charged in
@@ -540,7 +540,7 @@ refunded for part of a period, except where the law requires it or a charge was 
 will be uninterrupted or error free.</p>
 <h2>Changes</h2><p>These terms may change. Material changes will be shown when you next sign in.</p>"""),
     "privacy": ("Privacy notice", """
-<p>Precifarm AI Ltd runs Northchart and is responsible for your personal data under the Kenya Data Protection Act, 2019.</p>
+<p>Precifarm AI Ltd runs Northcharts and is responsible for your personal data under the Kenya Data Protection Act, 2019.</p>
 <h2>What we collect</h2><ul><li>Account details: name, email, a hash of your password (never the password itself).</li>
 <li>Sign-in records: when and from which IP address and browser you signed in.</li>
 <li>Your trades: closed trades from the brokers or files you connect, and the notes, emotions and stops you add.</li>
@@ -556,7 +556,7 @@ sessions from the desk.</p>"""),
     "risk": ("Risk notice", """
 <p><b>Trading foreign exchange, metals, indices and crypto on margin carries a high level of risk and may not suit
 you.</b> Leverage can work against you as well as for you, and you can lose more than you deposit with some brokers.</p>
-<p>Northchart's signals, grades, levels and agent answers are information for research. They are not personal
+<p>Northcharts' signals, grades, levels and agent answers are information for research. They are not personal
 recommendations, they do not take your circumstances into account, and past results do not predict future results.</p>
 <p>Before trading, make sure you understand the risks and use a broker licensed by the Capital Markets Authority
 of Kenya or by the regulator where you live. Seek independent advice if you are unsure.</p>"""),

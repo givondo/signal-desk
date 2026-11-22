@@ -1,31 +1,31 @@
 //+------------------------------------------------------------------+
-//| Northchart Bridge for MetaTrader 4                                |
-//| Sends your closed trades to your Northchart journal.              |
-//|                                                                    |
-//| Read-only by design: this add-on only reads account history. It    |
-//| contains no OrderSend, OrderModify or OrderClose calls, so it      |
-//| cannot place, change or cancel trades. It signs in to Northchart   |
-//| with a sync token that can only add trades to your journal.        |
-//|                                                                    |
-//| Setup:                                                             |
-//| 1. Northchart > Account > Sync tokens: create a token, copy it.    |
-//| 2. MetaTrader: Tools > Options > Expert Advisors > tick "Allow     |
-//|    WebRequest for listed URL" and add your desk address.           |
-//| 3. In the Account History tab, right-click > All History, so the   |
-//|    terminal has your past trades loaded.                           |
-//| 4. Copy this file to File > Open Data Folder > MQL4 > Experts,     |
-//|    refresh the Navigator, drag it onto any chart, paste the token. |
-//|                                                                    |
-//| MT4 keeps only the last stop of each trade, so the journal uses    |
-//| that stop. MT5 also records the stop at entry.                     |
+//| Northcharts Bridge for MetaTrader 4                               |
+//| Sends your closed trades to your Northcharts journal.             |
+//|                                                                   |
+//| Read-only by design: this add-on only reads account history. It   |
+//| contains no OrderSend, OrderModify or OrderClose calls, so it     |
+//| cannot place, change or cancel trades. It signs in to Northcharts |
+//| with a sync token that can only add trades to your journal.       |
+//|                                                                   |
+//| Setup:                                                            |
+//| 1. Northcharts > Account > Sync tokens: create a token, copy it.  |
+//| 2. MetaTrader: Tools > Options > Expert Advisors > tick "Allow    |
+//|    WebRequest for listed URL" and add your desk address.          |
+//| 3. In the Account History tab, right-click > All History, so the  |
+//|    terminal has your past trades loaded.                          |
+//| 4. Copy this file to File > Open Data Folder > MQL4 > Experts,    |
+//|    refresh the Navigator, drag it onto any chart, paste the token.|
+//|                                                                   |
+//| MT4 keeps only the last stop of each trade, so the journal uses   |
+//| that stop. MT5 also records the stop at entry.                    |
 //+------------------------------------------------------------------+
 #property copyright "Precifarm AI Ltd"
 #property link      "https://desktrading-today.precifarm.com"
 #property version   "1.00"
 #property strict
-#property description "Sends closed trades to your Northchart journal. Read-only: it never trades."
+#property description "Sends closed trades to your Northcharts journal. Read-only: it never trades."
 
-input string DeskUrl        = "https://desktrading-today.precifarm.com"; // Northchart address
+input string DeskUrl        = "https://desktrading-today.precifarm.com"; // Northcharts address
 input string SyncToken      = "";                                        // Sync token (starts nci_)
 input string BrokerName     = "";                                        // Broker name (blank = from the terminal)
 input int    LookbackDays   = 30;                                        // History sent on the first run
@@ -37,7 +37,7 @@ int OnInit()
 {
    if(StringLen(SyncToken) < 10 || StringSubstr(SyncToken, 0, 4) != "nci_")
    {
-      Alert("Northchart Bridge: paste your sync token (Account > Sync tokens on Northchart).");
+      Alert("Northcharts Bridge: paste your sync token (Account > Sync tokens on Northcharts).");
       return(INIT_PARAMETERS_INCORRECT);
    }
    g_key = "NC_BRIDGE_" + IntegerToString(AccountNumber());
@@ -121,16 +121,16 @@ bool Post(string items, int count)
    {
       int err = GetLastError();
       if(err == 4060 || err == 4014)
-         Print("Northchart Bridge: allow ", url, " in Tools > Options > Expert Advisors > Allow WebRequest.");
+         Print("Northcharts Bridge: allow ", url, " in Tools > Options > Expert Advisors > Allow WebRequest.");
       else
-         Print("Northchart Bridge: could not reach the desk (error ", err, "). Will retry.");
+         Print("Northcharts Bridge: could not reach the desk (error ", err, "). Will retry.");
       return false;
    }
    if(code != 200)
    {
-      Print("Northchart Bridge: desk answered ", code, ": ", CharArrayToString(result, 0, -1, CP_UTF8));
+      Print("Northcharts Bridge: desk answered ", code, ": ", CharArrayToString(result, 0, -1, CP_UTF8));
       return false;
    }
-   Print("Northchart Bridge: sent ", count, " closed trade(s).");
+   Print("Northcharts Bridge: sent ", count, " closed trade(s).");
    return true;
 }

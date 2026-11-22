@@ -1,4 +1,4 @@
-"""Price history for the Northchart chart: any timeframe, from Yahoo Finance.
+"""Price history for the Northcharts chart: any timeframe, from Yahoo Finance.
 
 * Timeframes 1m, 5m, 15m, 30m, 1h, 4h, 1D, 1W. Yahoo has no 4h bars, so 4h is built
   from 1h bars on UTC boundaries (00, 04, 08, ...).
@@ -42,7 +42,7 @@ class Bars:
     def _fetch(ticker, interval, rng):
         url = (f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(ticker)}"
                f"?interval={interval}&range={rng}&includePrePost=false")
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 Northchart"})
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 Northcharts"})
         with urllib.request.urlopen(req, timeout=20) as r:
             return json.loads(r.read())
 

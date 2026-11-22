@@ -96,9 +96,9 @@ paid for, then the account moves to Free. Your journal and data stay.</p></detai
 <details><summary>Can I upgrade or downgrade?</summary><p>Upgrading starts straight away and the unused part of your current
 plan is taken off the price. Downgrading takes effect when the current period ends.</p></details>
 <details><summary>Do you see my card or M-Pesa PIN?</summary><p>No. Card payments run on Paystack's secure page and M-Pesa
-asks for your PIN on your own phone. Northchart only keeps the last four digits of the card and a masked phone number.</p></details>
-<details><summary>Is the desk investment advice?</summary><p>No. Northchart is research software: desk calls are model
-output for your own analysis, free on every plan, and Northchart never places trades. See the <a href="/legal/risk">risk notice</a>.</p></details>
+asks for your PIN on your own phone. Northcharts only keeps the last four digits of the card and a masked phone number.</p></details>
+<details><summary>Is the desk investment advice?</summary><p>No. Northcharts is research software: desk calls are model
+output for your own analysis, free on every plan, and Northcharts never places trades. See the <a href="/legal/risk">risk notice</a>.</p></details>
 </div>"""
 
 
@@ -106,7 +106,7 @@ def pricing(signed_in: bool, catalogue: dict):
     inner = f"""<main class="wrap3">{CSS}
 <div class="hero"><h1>Trade with a desk behind you</h1>
 <p>Desk calls and the chart are free for everyone. Plus and Pro add the tools that save you hours: a journal that fills
-itself from your broker, the agent desk, and Northchart inside ChatGPT and Claude.</p>{SEG}</div>
+itself from your broker, the agent desk, and Northcharts inside ChatGPT and Claude.</p>{SEG}</div>
 <div class="plans" id="plans"></div>
 <div class="pay"><span><i class="dot"></i>Lipa na M-Pesa</span><span><i class="dot"></i>Visa and Mastercard</span>
 <span><i class="dot"></i>Cancel any time</span></div>{FAQ}</main>"""
@@ -239,7 +239,7 @@ async function choose(plan){
   let q; try{ q=await (await fetch(`/api/billing/quote?plan=${plan}&interval=${IV}`)).json() }catch(e){ return flash("Could not price that plan.") }
   if(q.ok===false) return flash(q.error);
   const pn=({plus:"Plus",pro:"Pro"})[plan];
-  $("coTitle").textContent=`Northchart ${pn}, monthly`;
+  $("coTitle").textContent=`Northcharts ${pn}, monthly`;
   $("coSum").innerHTML=`<div>${fmtUsd(q.usd)} a month${q.credit?`<br><span class="lead" style="font-size:12px">Less ${fmtKes(q.credit)} for unused time on your current plan</span>`:""}</div>
     <div style="text-align:right">To pay now<br><b>${fmtKes(q.amount)}</b></div>`;
   $("tMpesa").disabled=!CAT.methods.mpesa; $("tCard").disabled=!CAT.methods.card;
@@ -313,14 +313,14 @@ load();
 
 
 def receipt(p: dict, u: dict):
-    legal = os.environ.get("NORTHCHART_LEGAL_NAME") or "Northchart"
+    legal = os.environ.get("NORTHCHART_LEGAL_NAME") or "Northcharts"
     pin = os.environ.get("NORTHCHART_KRA_PIN") or ""
     names = {"plus": "Plus", "pro": "Pro"}
     meth = {"mpesa": "M-Pesa", "card": "Card", "credit": "Plan credit", "comp": "Given by the desk"}.get(p["method"], p["method"])
     when = time.strftime("%d %B %Y, %H:%M", time.gmtime((p.get("paid_at") or p["created"]) + 3 * 3600)) + " EAT"
     e = html.escape
     rows = [("Receipt number", p["ref"]), ("Date", when), ("Billed to", (u.get("name") + ", " if u.get("name") else "") + u["email"]),
-            ("Item", f"Northchart {names.get(p['plan'], p['plan'])}, one month"),
+            ("Item", f"Northcharts {names.get(p['plan'], p['plan'])}, one month"),
             ("Paid by", meth)]
     if p.get("receipt") and p["receipt"] != p["ref"]:
         rows.append(("M-Pesa receipt" if p["method"] == "mpesa" else "Payment reference", p["receipt"]))
@@ -331,7 +331,7 @@ def receipt(p: dict, u: dict):
 <div><h1>Receipt</h1><p class="lead" style="margin-top:4px">{e(legal)}{' · PIN ' + e(pin) if pin else ''}</p></div><span class="paid">Paid</span></div>
 <table>{''.join(f'<tr><td>{e(k)}</td><td>{e(str(v))}</td></tr>' for k, v in rows)}
 <tr><td><b>Total</b></td><td><b>{e(amount)}</b></td></tr></table>
-<p class="lead" style="margin-top:18px">Thank you for using Northchart. Questions about this payment: reply to the receipt email.</p>
+<p class="lead" style="margin-top:18px">Thank you for using Northcharts. Questions about this payment: reply to the receipt email.</p>
 <div class="noprint" style="margin-top:16px;display:flex;gap:8px"><button class="btn2" onclick="print()">Print or save as PDF</button>
 <a class="btn2" href="/billing" style="text-decoration:none">Back to billing</a></div></div>"""
     return ap.page("Receipt " + p["ref"], inner, nav="billing")

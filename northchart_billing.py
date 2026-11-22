@@ -1,4 +1,4 @@
-"""Northchart billing: plans, checkout, renewals and what each plan unlocks.
+"""Northcharts billing: plans, checkout, renewals and what each plan unlocks.
 
 Standard library only.
 
@@ -6,11 +6,11 @@ Plans (USD list prices; change them with environment variables, see PRICE_ENV):
     Free   desk view, live chart, desk signals, manual journal and statement import
     Plus   $25 a month: automatic broker sync, agent (fair use), Claude journal drafts
     Pro    $200 a month: everything in Plus, more brokers, a much larger agent
-           allowance, and Northchart Connect (ChatGPT and Claude)
+           allowance, and Northcharts Connect (ChatGPT and Claude)
     Plans are monthly only.
 
 Payments
-    Card     Paystack (hosted checkout, so card numbers never touch Northchart).
+    Card     Paystack (hosted checkout, so card numbers never touch Northcharts).
              The first payment saves a reusable card authorisation; renewals charge it
              with /transaction/charge_authorization. Webhooks are checked with
              HMAC-SHA512 over the raw body using the secret key, and every success is
@@ -63,19 +63,19 @@ MPESA_MAX_KES = 250_000      # Safaricom's limit for one M-Pesa payment (and for
 PLANS = {
     "free": {"name": "Free", "usd": {"month": 0},
              "tagline": "The desk, free for every trader.",
-             "features": ["Live desk calls and grades on every instrument", "Northchart chart with drawing tools",
+             "features": ["Live desk calls and grades on every instrument", "Northcharts chart with drawing tools",
                           "Manual trade journal with statistics", "Import MT4 and MT5 statements",
                           "3 agent questions a day"]},
     "plus": {"name": "Plus", "usd": {"month": 25},
              "tagline": "Your journal fills itself.",
              "features": ["Everything in Free", "Automatic broker sync (2 accounts)",
-                          "Northchart Bridge and TradingView sync", "Agent desk, 60 questions a day",
+                          "Northcharts Bridge and TradingView sync", "Agent desk, 60 questions a day",
                           "Claude-written journal notes", "Discipline flags and review queue"]},
     "pro": {"name": "Pro", "usd": {"month": 200},
             "tagline": "For full-time and funded traders.",
             "features": ["Everything in Plus", "Automatic broker sync (20 accounts)",
                          "Agent desk with the specialist team, 1,000 questions a day",
-                         "Northchart Connect for ChatGPT and Claude", "MetaApi cloud sync",
+                         "Northcharts Connect for ChatGPT and Claude", "MetaApi cloud sync",
                          "Priority support"]},
 }
 
@@ -84,7 +84,7 @@ FEATURES = {
     "broker_sync": "plus",       # Bridge EA, MetaApi, TradingView sync tokens
     "metaapi": "pro",
     "journal_drafts": "plus",    # Claude writes the trade notes
-    "connect": "pro",            # Northchart Connect (MCP for ChatGPT and Claude)
+    "connect": "pro",            # Northcharts Connect (MCP for ChatGPT and Claude)
 }
 LIMITS = {
     "free": {"brokers": 0, "agent_day": 3},
@@ -95,7 +95,7 @@ FEATURE_TEXT = {
     "broker_sync": "Automatic broker sync",
     "metaapi": "MetaApi cloud sync",
     "journal_drafts": "Claude-written journal notes",
-    "connect": "Northchart Connect",
+    "connect": "Northcharts Connect",
     "brokers": "Another broker account",
     "agent_day": "More agent questions today",
 }
@@ -125,9 +125,9 @@ class Upgrade(Exception):
             n = LIMITS[have]["brokers"]
             self.text = (f"{mine} connects {n} broker account{'' if n == 1 else 's'} automatically. "
                          f"{name} connects {LIMITS[need]['brokers']}." if n else
-                         f"Automatic broker sync is part of Northchart {name}.")
+                         f"Automatic broker sync is part of Northcharts {name}.")
         else:
-            self.text = f"{FEATURE_TEXT.get(feature, feature)} is part of Northchart {name}."
+            self.text = f"{FEATURE_TEXT.get(feature, feature)} is part of Northcharts {name}."
         super().__init__(self.text + " Upgrade at /billing.")
 
     def payload(self):
@@ -184,7 +184,7 @@ def mask_phone(p: str) -> str:
 
 def http_json(method, url, headers=None, body=None, timeout=30):
     data = None if body is None else (body if isinstance(body, bytes) else json.dumps(body).encode())
-    h = {"Accept": "application/json", "User-Agent": "Northchart/1.0"}
+    h = {"Accept": "application/json", "User-Agent": "Northcharts/1.0"}
     if body is not None:
         h["Content-Type"] = "application/json"
     h.update(headers or {})
@@ -441,7 +441,7 @@ class Billing:
                 raise PaymentError(d.get("gateway_response") or d.get("message") or "M-Pesa prompt failed.")
             return
         pay["via"] = "daraja"
-        r = self.daraja.stk_push(phone, amount, self._account_ref(uid), "Northchart",
+        r = self.daraja.stk_push(phone, amount, self._account_ref(uid), "Northcharts",
                                  base + "/api/billing/mpesa/callback")
         pay["checkout_id"] = r.get("CheckoutRequestID")
 
@@ -590,7 +590,7 @@ class Billing:
             d = self.paystack.initialize(u["email"], minor, ref, base + "/billing/return",
                                          {"uid": u["uid"], "plan": plan, "interval": interval,
                                           "custom_fields": [{"display_name": "Plan", "variable_name": "plan",
-                                                             "value": f"Northchart {PLANS[plan]['name']} ({interval}ly)"}]})
+                                                             "value": f"Northcharts {PLANS[plan]['name']} ({interval}ly)"}]})
             return {"ref": ref, "redirect": d.get("authorization_url")}
         if method == "mpesa":
             if not self.mpesa_ready():
@@ -799,8 +799,8 @@ class Billing:
         u = self.accounts.get(uid) if self.accounts else None
         if u and self.accounts:
             end = time.strftime("%d %B %Y", time.gmtime(s["period_end"]))
-            self.accounts.mail(u["email"], f"Receipt {ref}: Northchart {PLANS[p['plan']]['name']}",
-                               f"Thank you. We received {p['currency']} {p['amount']:,} for Northchart "
+            self.accounts.mail(u["email"], f"Receipt {ref}: Northcharts {PLANS[p['plan']]['name']}",
+                               f"Thank you. We received {p['currency']} {p['amount']:,} for Northcharts "
                                f"{PLANS[p['plan']]['name']} ({p['interval']}ly).\n\nReceipt: {ref}"
                                f"{' (' + p['receipt'] + ')' if p.get('receipt') and p['receipt'] != ref else ''}\n"
                                f"Paid by: {'M-Pesa' if p['method'] == 'mpesa' else 'card' if p['method'] == 'card' else p['method']}\n"
@@ -860,9 +860,9 @@ class Billing:
                 amount = self.kes(s["plan"], s.get("interval") or "month")
                 if amount > MPESA_MAX_KES:
                     raise PaymentError(f"A standing order can be at most KES {MPESA_MAX_KES:,}. Use a card for this plan.")
-                r = self.daraja.ratiba(p, amount, self._account_ref(u["uid"]), "Northchart", s["period_end"],
+                r = self.daraja.ratiba(p, amount, self._account_ref(u["uid"]), "Northcharts", s["period_end"],
                                        s.get("interval") or "month", base + "/api/billing/mpesa/ratiba",
-                                       f"Northchart {PLANS[s['plan']]['name']} {u['uid'][:8]}")
+                                       f"Northcharts {PLANS[s['plan']]['name']} {u['uid'][:8]}")
                 hdr = r.get("ResponseHeader") or r.get("responseHeader") or {}
                 s["ratiba"] = {"state": "requested", "request": hdr.get("responseRefID") or "", "amount": amount,
                                "created": _now()}
@@ -953,16 +953,16 @@ class Billing:
                 and not s.get("comp"):
             when = time.strftime("%d %B", time.gmtime(end))
             if s.get("cancel_at_period_end"):
-                text = f"Your Northchart {name} plan ends on {when}. Renew any time at {base}/billing."
+                text = f"Your Northcharts {name} plan ends on {when}. Renew any time at {base}/billing."
             elif s.get("method") == "card" and s.get("card"):
-                text = (f"Your Northchart {name} plan renews on {when}. We will charge your "
+                text = (f"Your Northcharts {name} plan renews on {when}. We will charge your "
                         f"{s['card']['brand']} ending {s['card']['last4']}. Manage it at {base}/billing.")
             elif (s.get("ratiba") or {}).get("state") == "active":
-                text = f"Your Northchart {name} plan renews on {when} through your M-Pesa Ratiba standing order."
+                text = f"Your Northcharts {name} plan renews on {when} through your M-Pesa Ratiba standing order."
             else:
-                text = (f"Your Northchart {name} plan renews on {when}. We will send an M-Pesa request to "
+                text = (f"Your Northcharts {name} plan renews on {when}. We will send an M-Pesa request to "
                         f"{s.get('phone_masked') or 'your phone'} that day, or pay now at {base}/billing.")
-            self.accounts.mail(u["email"], f"Northchart {name} renews on {when}", text)
+            self.accounts.mail(u["email"], f"Northcharts {name} renews on {when}", text)
             with self.lock:
                 s["reminded"] = now
                 self._save()
@@ -974,7 +974,7 @@ class Billing:
             with self.lock:
                 s["status"] = "cancelled"
                 self._save()
-            self.accounts.mail(u["email"], f"Your Northchart {name} plan has ended",
+            self.accounts.mail(u["email"], f"Your Northcharts {name} plan has ended",
                                f"Your plan has ended and your account is on Free. Your journal and data are kept. "
                                f"Come back any time at {base}/billing.")
             return out + [(uid, "ended")]
@@ -1017,8 +1017,8 @@ class Billing:
                     s.pop("card_tried", None)
                     self._save()
                 return out + [(uid, "renewed")]
-            self.accounts.mail(u["email"], f"Northchart {name}: card renewal failed",
-                               f"We could not charge your card for Northchart {name}. You have {GRACE_DAYS} days "
+            self.accounts.mail(u["email"], f"Northcharts {name}: card renewal failed",
+                               f"We could not charge your card for Northcharts {name}. You have {GRACE_DAYS} days "
                                f"to pay with M-Pesa or another card at {base}/billing before the account moves to Free.")
             out.append((uid, "card_failed"))
         elif s.get("phone") and s.get("stk_tries", 0) < STK_MAX_TRIES and self.kes(plan, interval) <= MPESA_MAX_KES \
@@ -1049,7 +1049,7 @@ class Billing:
             with self.lock:
                 s["status"] = "expired"
                 self._save()
-            self.accounts.mail(u["email"], f"Your Northchart {name} plan has lapsed",
+            self.accounts.mail(u["email"], f"Your Northcharts {name} plan has lapsed",
                                f"We did not receive the renewal, so your account is now on Free. Your journal and "
                                f"data are kept. Pick up where you left off at {base}/billing.")
             out.append((uid, "expired"))

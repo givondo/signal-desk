@@ -1,5 +1,5 @@
 """
-Northchart engine v4.4 (formerly Signal Desk) - terminal backend
+Northcharts engine v4.4 (formerly Signal Desk) - terminal backend
 -----------------------------------------------------
 Serves http://localhost:8899 (dashboard.html) and a JSON API:
 
@@ -333,7 +333,7 @@ def _paper_tickets():
     return {s: list(t.resolved) for s, t in trackers.items()}
 
 
-# ---------------------------------------------------------- Northchart Connect
+# ---------------------------------------------------------- Northcharts Connect
 # One backend, two channels: the agent panel in the UI and remote MCP clients
 # (ChatGPT, Claude) run the same read-only tools over the same engine state.
 _connect = None
@@ -2352,7 +2352,7 @@ class Handler(BaseHTTPRequestHandler):
             nxt = urllib.parse.quote(self.path, safe="/?=&")
             return self._send_full(302, "text/plain", b"", {"Location": "/signin?next=" + nxt})
         status = 403 if self.user else 401
-        msg = self.deny_reason or "sign in to Northchart"
+        msg = self.deny_reason or "sign in to Northcharts"
         return self._send_full(status, "application/json", json.dumps({"ok": False, "error": msg}).encode())
 
     # ------------------------------------------------------------ accounts: pages and API
@@ -2604,7 +2604,7 @@ class Handler(BaseHTTPRequestHandler):
                                                  latest_signal=latest_signal)
         self._send_full(status, ctype, out, headers)
 
-    # ------------------------------------------------ Northchart Connect (MCP)
+    # ------------------------------------------------ Northcharts Connect (MCP)
     def _base_url(self):
         fixed = os.environ.get("NORTHCHART_PUBLIC_URL")
         if fixed:
@@ -2713,7 +2713,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._agent_stream(svc, body)
         if parsed.path == "/api/agent/run":
             ok, result = svc.run_tool(str(body.get("tool") or ""), body.get("args") or {},
-                                      client="Northchart UI")
+                                      client="Northcharts UI")
             return self._send(json.dumps({"ok": ok, "result": result}, default=str).encode(),
                               "application/json")
         if parsed.path == "/api/agent/revoke":
@@ -2739,8 +2739,8 @@ class Handler(BaseHTTPRequestHandler):
                 fn = os.path.join(BASE_DIR, "tools", "northchart_bridge", os.path.basename(path))
                 try:
                     with open(fn, "rb") as f:
-                        data = f.read().replace(b'"https://desktrading-today.precifarm.com"; // Northchart address',
-                                                ('"' + self._base_url() + '"; // Northchart address').encode())
+                        data = f.read().replace(b'"https://desktrading-today.precifarm.com"; // Northcharts address',
+                                                ('"' + self._base_url() + '"; // Northcharts address').encode())
                 except OSError:
                     return js({"ok": False, "error": "bridge file missing"}, 404) or True
                 return self._send_full(200, "application/octet-stream", data, {
@@ -2801,7 +2801,7 @@ class Handler(BaseHTTPRequestHandler):
                 api = metaapi_client()
                 if api is None:
                     return js({"ok": False, "error": "MetaApi is not switched on for this desk. Use the free "
-                                                     "Northchart Bridge instead."}, 400) or True
+                                                     "Northcharts Bridge instead."}, 400) or True
                 login, server, pw = b("login"), b("server"), str(body.get("password") or "")
                 platform = b("platform", "mt5").lower()
                 if not (login and server and pw) or platform not in ("mt4", "mt5"):
@@ -2812,7 +2812,7 @@ class Handler(BaseHTTPRequestHandler):
                 st, info = api.info(acc_id, region)
                 if st == 200 and info.get("investorMode") is False:
                     api.remove(acc_id)
-                    return js({"ok": False, "error": "That is the master (trading) password. Northchart only "
+                    return js({"ok": False, "error": "That is the master (trading) password. Northcharts only "
                                                      "accepts the investor (read-only) password."}, 400) or True
                 c = conns.upsert({"kind": "metaapi", "login": login, "server": server}, broker=broker,
                                  platform=platform, account_label=label_of(broker, login),
@@ -3231,7 +3231,7 @@ def main():
         sys.exit(1)
     load_auth()
     threading.Thread(target=poller, daemon=True).start()
-    print(f"Northchart (engine v{ENGINE_V}) -> http://localhost:{PORT} (and Tailscale devices)")
+    print(f"Northcharts (engine v{ENGINE_V}) -> http://localhost:{PORT} (and Tailscale devices)")
     srv.serve_forever()
 
 

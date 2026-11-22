@@ -1,4 +1,4 @@
-"""Shared Northchart look for every page: one source of design, injected by the server.
+"""Shared Northcharts look for every page: one source of design, injected by the server.
 
 The home page (dashboard.html) defines the design. This module carries the same
 tokens (colours, fonts, radii, light and dark themes), the same app bar and the
@@ -115,8 +115,8 @@ def nav(page: str) -> str:
         f'{current if key == page else ""}>{html.escape(label)}</a>'
         for href, label, key in links)
     return (f'<header class="nc-head"><div class="nc-bar">'
-            f'<a class="nc-brand" href="/" aria-label="Northchart home"><div class="nc-mark" aria-hidden="true">N</div>'
-            f'<div><div class="nc-name">Northchart</div><div class="nc-sub">{html.escape(title)} · {html.escape(sub)}</div></div></a>'
+            f'<a class="nc-brand" href="/" aria-label="Northcharts home"><div class="nc-mark" aria-hidden="true">N</div>'
+            f'<div><div class="nc-name">Northcharts</div><div class="nc-sub">{html.escape(title)} · {html.escape(sub)}</div></div></a>'
             f'<nav class="nc-actions" aria-label="Main">{pills}'
             f'<button type="button" class="nc-icon" id="nc-theme" onclick="ncToggleTheme()">☾</button></nav>'
             f'</div></header>' + THEME_SWITCH)
