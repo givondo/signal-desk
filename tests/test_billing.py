@@ -34,11 +34,12 @@ class MockPay:
     charges = []
     charge_status = "success"
     ratiba = []
+    mm = []             # Paystack M-Pesa charges
     srv = None
 
     @classmethod
     def reset(cls):
-        cls.stk, cls.stk_result, cls.verify, cls.charges, cls.ratiba = [], {}, {}, [], []
+        cls.stk, cls.stk_result, cls.verify, cls.charges, cls.ratiba, cls.mm = [], {}, {}, [], [], []
         cls.charge_status = "success"
 
     @classmethod
@@ -87,6 +88,11 @@ class MockPay:
                 if self.path == "/transaction/initialize":
                     return self.out({"status": True, "data": {"authorization_url": "https://checkout.paystack.test/abc",
                                                               "reference": body["reference"]}})
+                if self.path == "/charge":
+                    assert self.headers["Authorization"] == "Bearer " + SK
+                    MockPay.mm.append(body)
+                    return self.out({"status": True, "data": {"status": "pay_offline", "reference": body["reference"],
+                                                              "display_text": "Please complete authorization on your phone"}})
                 if self.path == "/transaction/charge_authorization":
                     MockPay.charges.append(body)
                     return self.out({"status": True, "data": {
@@ -123,7 +129,8 @@ class Base(unittest.TestCase):
         os.environ.update({"NORTHCHART_BILLING": "test", "NORTHCHART_KES_PER_USD": "129.4",
                            "PAYSTACK_SECRET_KEY": SK, "PAYSTACK_API_URL": self.url,
                            "DARAJA_CONSUMER_KEY": "k", "DARAJA_CONSUMER_SECRET": "s", "DARAJA_API_URL": self.url,
-                           "DARAJA_ENV": "sandbox", "DARAJA_CALLBACK_IPS": "196.201.214.200,127.0.0.0/8"})
+                           "DARAJA_ENV": "sandbox", "DARAJA_CALLBACK_IPS": "196.201.214.200,127.0.0.0/8",
+                           "MPESA_PROVIDER": "daraja"})
         for k in ("PAYSTACK_CURRENCY", "DARAJA_TILL", "NORTHCHART_PRICE_PLUS_MONTH", "NORTHCHART_PRICE_PLUS_MONTH_KES"):
             os.environ.pop(k, None)
         self.dir = tempfile.mkdtemp(prefix="nc-bill-")
@@ -498,3 +505,61 @@ import unittest.mock  # noqa: E402
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PaystackMpesa(Base):
+    """Default route: M-Pesa through the Paystack account, no Daraja keys needed."""
+
+    def setUp(self):
+        super().setUp()
+        os.environ["MPESA_PROVIDER"] = "paystack"
+        for k in ("DARAJA_CONSUMER_KEY", "DARAJA_CONSUMER_SECRET"):
+            os.environ.pop(k, None)
+
+    def _settle(self, ref, amount_kes, status="success"):
+        MockPay.verify[ref] = {"status": status, "reference": ref, "amount": amount_kes * 100, "currency": "KES",
+                               "id": 4242, "channel": "mobile_money", "receipt_number": "TKA1BC2DEF",
+                               "authorization": {"authorization_code": "AUTH_mm", "reusable": False, "channel": "mobile_money"}}
+        p = self.bl.data["payments"][ref]
+        p["created"] -= 10
+        return self.bl.check(ref, self.m["uid"])
+
+    def test_default_route_and_checkout(self):
+        os.environ.pop("MPESA_PROVIDER")
+        self.assertEqual(nbl.mpesa_via(), "paystack")
+        cat = self.bl.catalogue()
+        self.assertTrue(cat["methods"]["mpesa"])
+        self.assertFalse(cat["methods"]["ratiba"])
+        out = self.bl.checkout(self.m, "plus", "month", "mpesa", "https://desk.test", "0712 345 678")
+        self.assertEqual(out["status"], "pending")
+        c = MockPay.mm[-1]
+        self.assertEqual((c["currency"], c["amount"]), ("KES", 325000))
+        self.assertEqual(c["mobile_money"], {"phone": "+254712345678", "provider": "mpesa"})
+        self.assertEqual(MockPay.stk, [])                       # Daraja never called
+        self.assertEqual(self._settle(out["ref"], 3250), "paid")
+        st = self.bl.status(self.m)
+        self.assertEqual(st["plan"], "plus")
+        self.assertEqual(self.bl.payment(out["ref"])["receipt"], "TKA1BC2DEF")
+        self.assertNotIn("card", self.bl.data["subs"][self.m["uid"]])   # M-Pesa never saves a card
+
+    def test_short_payment_and_pending(self):
+        out = self.bl.checkout(self.m, "plus", "month", "mpesa", "https://desk.test", "0712345678")
+        MockPay.verify[out["ref"]] = {"status": "ongoing", "reference": out["ref"]}
+        self.bl.data["payments"][out["ref"]]["created"] -= 10
+        self.assertEqual(self.bl.check(out["ref"], self.m["uid"]), "pending")
+        self.assertEqual(self._settle(out["ref"], 100), "failed")
+
+    def test_ratiba_needs_daraja(self):
+        out = self.bl.checkout(self.m, "plus", "month", "mpesa", "https://desk.test", "0712345678")
+        self._settle(out["ref"], 3250)
+        with self.assertRaises(nbl.PaymentError):
+            self.bl.set_autopay(self.m, "ratiba", "https://desk.test", "0712345678")
+
+    def test_renewal_prompt_goes_through_paystack(self):
+        out = self.bl.checkout(self.m, "plus", "month", "mpesa", "https://desk.test", "0712345678")
+        self._settle(out["ref"], 3250)
+        s = self.bl.data["subs"][self.m["uid"]]
+        done = self.bl.tick("https://desk.test", now=s["period_end"] + 60)
+        self.assertIn((self.m["uid"], "stk_sent"), done)
+        self.assertEqual(len(MockPay.mm), 2)
+        self.assertEqual(MockPay.mm[-1]["mobile_money"]["phone"], "+254712345678")

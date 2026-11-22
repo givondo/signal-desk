@@ -74,10 +74,14 @@ Desk calls stay free. Members pay for the tools (`northchart_billing.py`, pages 
 | Plus | $25 a month | Automatic broker sync (2 accounts), Bridge and TradingView sync, agent desk (60 a day), Claude journal notes |
 | Pro | $200 a month | 20 broker accounts, MetaApi, agent desk (1,000 a day), Northchart Connect for ChatGPT and Claude |
 
-* **M-Pesa** through Safaricom Daraja: STK push to your Paybill or Till. Callbacks are unsigned, so each one only
-  triggers an `stkpushquery`, and the query decides. Renewal is a prompt on the due date (three tries, a day apart) or an
-  M-Pesa Ratiba standing order; Ratiba debits arrive as C2B confirmations, accepted only from Safaricom's addresses for
-  the member's account reference and the right amount. Plans are monthly only.
+* **M-Pesa** through Paystack by default (`MPESA_PROVIDER=paystack`): an STK push from the same Paystack account
+  that takes cards, so one account, one dashboard and one payout. Every result is re-checked with
+  `/transaction/verify`. Paystack cannot repeat an M-Pesa payment on its own, so renewal is a prompt on the due date
+  (three tries, a day apart). Turn on Mobile Money in the Paystack dashboard (Settings, Preferences).
+  With a Paybill or Till of your own, `MPESA_PROVIDER=daraja` sends the prompt through Safaricom Daraja instead:
+  callbacks are unsigned, so each one only triggers an `stkpushquery`, and the query decides. Daraja also enables
+  M-Pesa Ratiba standing orders; Ratiba debits arrive as C2B confirmations, accepted only from Safaricom's addresses
+  for the member's account reference and the right amount. Plans are monthly only.
 * **Cards** through Paystack's hosted page (no card data touches the desk). The first payment saves a reusable
   authorisation, sealed in the vault; renewals use `charge_authorization`. Webhooks are checked with HMAC-SHA512 and
   every success is re-verified with `/transaction/verify`.
