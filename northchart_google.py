@@ -1,4 +1,4 @@
-"""Sign in with Google for Northchart (OpenID Connect, authorisation code flow).
+"""Sign in with Google for Northcharts (OpenID Connect, authorisation code flow).
 
 * PKCE (S256), a random state bound to the browser by a short-lived HttpOnly cookie,
   and a nonce checked inside the ID token.

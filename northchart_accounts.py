@@ -1,4 +1,4 @@
-"""Northchart accounts: sign in, sign up and per-user data.
+"""Northcharts accounts: sign in, sign up and per-user data.
 
 Standard library only.
 
@@ -17,7 +17,7 @@ Standard library only.
   password when one is set (SIGNALDESK_PASS), or a request from this computer
   when none is. The owner keeps the desk's existing journal; every other user
   gets an empty journal under DATA_DIR/users/<uid>/.
-* Scripts: TradingView sync and the Northchart Bridge send a per-user ingest token
+* Scripts: TradingView sync and the Northcharts Bridge send a per-user ingest token
   (Bearer nci_...) that can only add trades, or the account email and password as
   HTTP Basic. The old desk password keeps working as the owner for one release
   (NORTHCHART_LEGACY_BASIC=0 turns it off).
@@ -282,7 +282,7 @@ class Accounts:
                 if not u:
                     raise AuthError("Sign in first, then connect Google.")
                 if owner_of_sub and owner_of_sub["uid"] != u["uid"]:
-                    raise AuthError("That Google account is already connected to another Northchart account.")
+                    raise AuthError("That Google account is already connected to another Northcharts account.")
                 u["google_sub"], u["google_email"] = sub, email
                 self._save()
                 return u, False
@@ -481,8 +481,8 @@ class Accounts:
 
     def send_verify(self, u, base):
         tok = self._link("verify", u["uid"], VERIFY_TTL)
-        self.mail(u["email"], "Confirm your Northchart email",
-                  f"Hello {u.get('name') or ''},\n\nConfirm your email for Northchart:\n{base}/verify?token={tok}\n\n"
+        self.mail(u["email"], "Confirm your Northcharts email",
+                  f"Hello {u.get('name') or ''},\n\nConfirm your email for Northcharts:\n{base}/verify?token={tok}\n\n"
                   "The link works for three days. If you did not sign up, ignore this email.\n")
 
     def verify(self, tok):
@@ -503,7 +503,7 @@ class Accounts:
         if not u:
             return
         tok = self._link("reset", u["uid"], RESET_TTL)
-        self.mail(u["email"], "Reset your Northchart password",
+        self.mail(u["email"], "Reset your Northcharts password",
                   f"Someone asked to reset the password for {u['email']}.\n\nSet a new password here:\n"
                   f"{base}/reset?token={tok}\n\nThe link works for one hour. If it was not you, ignore this email; "
                   "your password has not changed.\n")
@@ -564,7 +564,7 @@ class Accounts:
     def mail(self, to, subject, text):
         if self.smtp_ready():
             msg = EmailMessage()
-            msg["From"] = os.environ.get("SMTP_FROM") or os.environ.get("SMTP_USER") or "Northchart <no-reply@localhost>"
+            msg["From"] = os.environ.get("SMTP_FROM") or os.environ.get("SMTP_USER") or "Northcharts <no-reply@localhost>"
             msg["To"], msg["Subject"] = to, subject
             msg.set_content(text)
             port = int(os.environ.get("SMTP_PORT") or 587)

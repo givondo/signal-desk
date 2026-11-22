@@ -1,5 +1,5 @@
 """
-Northchart engine v4.4 (formerly Signal Desk) - terminal backend
+Northcharts engine v4.4 (formerly Signal Desk) - terminal backend
 -----------------------------------------------------
 Serves http://localhost:8899 (dashboard.html) and a JSON API:
 
@@ -333,7 +333,7 @@ def _paper_tickets():
     return {s: list(t.resolved) for s, t in trackers.items()}
 
 
-# ---------------------------------------------------------- Northchart Connect
+# ---------------------------------------------------------- Northcharts Connect
 # One backend, two channels: the agent panel in the UI and remote MCP clients
 # (ChatGPT, Claude) run the same read-only tools over the same engine state.
 _connect = None
@@ -431,6 +431,20 @@ def accounts_service():
 
 
 _vault = None
+_bars = None
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+STATIC_TYPES = {".js": "application/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
+                ".png": "image/png", ".svg": "image/svg+xml", ".txt": "text/plain; charset=utf-8",
+                ".LICENSE": "text/plain; charset=utf-8"}
+
+
+def bars_service():
+    global _bars
+    with _connect_lock:
+        if _bars is None:
+            import northchart_chart as nch
+            _bars = nch.Bars(lambda: SYMBOLS, lambda s: latest.get(s))
+        return _bars
 
 
 def broker_connections(u=None):
@@ -443,6 +457,58 @@ def broker_connections(u=None):
         if _vault is None:
             _vault = nb.Vault(DATA_DIR)
     return nb.Connections(accounts_service().user_dir(u), _vault, _tracker_module)
+
+
+_billing = None
+_fx = {"rate": None, "ts": 0}
+
+
+def _usdkes():
+    """USD to KES for pricing: cached for 12 hours, from Yahoo; None when unreachable."""
+    if time.time() - _fx["ts"] < 12 * 3600:
+        return _fx["rate"]
+    _fx["ts"] = time.time()
+    try:
+        req = urllib.request.Request("https://query1.finance.yahoo.com/v8/finance/chart/USDKES=X?range=5d&interval=1d",
+                                     headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=8) as r:
+            meta = json.loads(r.read())["chart"]["result"][0]["meta"]
+        _fx["rate"] = float(meta.get("regularMarketPrice") or 0) or None
+    except Exception:
+        pass
+    return _fx["rate"]
+
+
+def billing_service():
+    global _billing, _vault
+    with _connect_lock:
+        if _billing is None:
+            import northchart_billing as nbl
+            import northchart_brokers as nb
+            if _vault is None:
+                _vault = nb.Vault(DATA_DIR)
+            _billing = nbl.Billing(DATA_DIR, accounts_service(), _vault, _usdkes)
+        return _billing
+
+
+def _plan_allows(u, feature):
+    import northchart_billing as nbl
+    try:
+        billing_service().require(u, feature)
+        return True
+    except nbl.Upgrade:
+        return False
+
+
+AUTO_KINDS = ("bridge", "metaapi", "tradingview")
+
+
+def _require_broker_room(u, conns, match=None):
+    """Plan check before a new automatic broker connection is added."""
+    if match and any(all(c.get(k) == v for k, v in match.items()) for c in conns.list()):
+        return    # already connected: no new slot needed
+    used = sum(1 for c in conns.list() if c.get("kind") in AUTO_KINDS)
+    billing_service().require_room(u, "brokers", used)
 
 
 def metaapi_client():
@@ -460,6 +526,8 @@ def sync_all_brokers(min_age=600):
         return
     users = [None] + [u for u in accounts_service().data["users"].values() if not _is_owner(u)]
     for u in users:
+        if u is not None and not _plan_allows(u, "metaapi"):
+            continue    # plan lapsed or below Pro: MetaApi sync pauses, data stays
         enter_user(u)
         conns = broker_connections(u)
         for c in conns.list():
@@ -554,6 +622,7 @@ def connect_service():
                 "user_exists": lambda uid: bool(accounts_service().get(uid)),
                 "enter_user": lambda uid: enter_user(accounts_service().get(uid) if uid else None),
                 "is_owner": lambda: _is_owner(__import__("northchart_accounts").current_user.get()),
+                "plan_allows_connect": lambda uid: _plan_allows(accounts_service().get(uid) if uid else None, "connect"),
             }, DATA_DIR)
         return _connect
 
@@ -2189,6 +2258,14 @@ def poller():
                 enter_user(None)
         except Exception as e:
             print(f"journal: {e}", file=sys.stderr)
+        if n % 20 == 5:
+            try:
+                import northchart_billing as nbl
+                if nbl.mode() != "off":
+                    for ev in billing_service().tick(os.environ.get("NORTHCHART_PUBLIC_URL", "").rstrip("/")):
+                        print(f"billing: {ev}", file=sys.stderr)
+            except Exception as e:
+                print(f"billing: {e}", file=sys.stderr)
         n += 1
         time.sleep(POLL_SECONDS)
 
@@ -2275,7 +2352,7 @@ class Handler(BaseHTTPRequestHandler):
             nxt = urllib.parse.quote(self.path, safe="/?=&")
             return self._send_full(302, "text/plain", b"", {"Location": "/signin?next=" + nxt})
         status = 403 if self.user else 401
-        msg = self.deny_reason or "sign in to Northchart"
+        msg = self.deny_reason or "sign in to Northcharts"
         return self._send_full(status, "application/json", json.dumps({"ok": False, "error": msg}).encode())
 
     # ------------------------------------------------------------ accounts: pages and API
@@ -2291,8 +2368,9 @@ class Handler(BaseHTTPRequestHandler):
     def _google(self, path, q, acc, pages, u, via, base):
         import northchart_accounts as na
         import northchart_google as ng
-        bad = lambda msg, st=400: self._send_full(st, "text/html; charset=utf-8", pages.message(
-            "Google sign-in", msg, "/signin", "Back to sign in"))
+        def bad(msg, st=400, to="/signin"):
+            # back to the page the person came from, with the reason shown in place
+            return self._send_full(302, "text/plain", b"", {"Location": to + "?gerr=" + urllib.parse.quote(msg[:200])})
         if not ng.enabled():
             return bad("Google sign-in is not switched on for this desk yet. Sign in with email and password.")
         nxt = q("next") if q("next").startswith("/") and not q("next").startswith("//") else "/"
@@ -2306,11 +2384,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_full(302, "text/plain", b"", {"Location": url, "Set-Cookie": cookie})
         if q("error"):
             return bad("Google sign-in was cancelled.")
+        p = {}
         try:
             claims, p = _google_service().finish(base, q("code"), q("state"), self._cookie("nc_g"))
             user, created = acc.google_user(claims, p.get("invite") or "", self._client_ip(), p["mode"], p.get("uid"))
         except (ValueError, na.AuthError) as e:
-            return bad(str(e))
+            dest = "/account" if p.get("mode") == "link" else ("/signup" if "invite" in str(e).lower() else "/signin")
+            return bad(str(e), to=dest)
         if p["mode"] == "link":
             dest = "/account?google=linked"
             tok = self._cookie("nc_s")
@@ -2369,9 +2449,12 @@ class Handler(BaseHTTPRequestHandler):
                 return js({"has_users": acc.has_users(), "signup_mode": acc.signup_mode(),
                            "smtp": acc.smtp_ready(), "google": _google_enabled()}) or True
             if path == "/api/auth/me":
-                return js({"user": acc.public(u) if via in ("session", "basic", "open") else None,
+                signed = via in ("session", "basic", "open")
+                return js({"user": acc.public(u) if signed else None,
                            "signup_mode": acc.signup_mode(), "has_users": acc.has_users(),
-                           "via": via, "google": _google_enabled()}) or True
+                           "via": via, "google": _google_enabled(),
+                           "plan": billing_service().plan_of(u) if signed else None,
+                           "billing": __import__("northchart_billing").mode()}) or True
         # everything below needs a signed-in user
         public_post = ("/api/auth/signin", "/api/auth/signup", "/api/auth/setup", "/api/auth/forgot",
                        "/api/auth/reset")
@@ -2456,6 +2539,11 @@ class Handler(BaseHTTPRequestHandler):
                     acc.revoke_sessions(uid, sid=None if body.get("others") else b("sid"), keep_token=tok)
                     return js({"ok": True}) or True
                 if path == "/api/auth/tokens":
+                    import northchart_billing as nbl
+                    try:
+                        billing_service().require(u, "broker_sync")
+                    except nbl.Upgrade as e:
+                        return js(e.payload(), 402) or True
                     return js({"ok": True, "token": acc.new_ingest_token(uid, b("label"))}) or True
                 if path == "/api/auth/tokens/revoke":
                     acc.revoke_ingest(uid, b("id"))
@@ -2516,7 +2604,7 @@ class Handler(BaseHTTPRequestHandler):
                                                  latest_signal=latest_signal)
         self._send_full(status, ctype, out, headers)
 
-    # ------------------------------------------------ Northchart Connect (MCP)
+    # ------------------------------------------------ Northcharts Connect (MCP)
     def _base_url(self):
         fixed = os.environ.get("NORTHCHART_PUBLIC_URL")
         if fixed:
@@ -2607,10 +2695,25 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_full(400, "application/json", b'{"ok": false, "error": "invalid JSON"}')
         svc = connect_service()
         if parsed.path == "/api/agent/stream":
+            import northchart_billing as nbl
+            try:
+                billing_service().use_agent(self.user)
+            except nbl.Upgrade as e:
+                self.close_connection = True
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                ev = {"type": "upgrade", "message": e.text,
+                      "need": e.need, "href": "/billing?plan=" + e.need,
+                      "plan_name": nbl.PLANS[e.need]["name"]}
+                for x in (ev, {"type": "done"}):
+                    self.wfile.write(b"data: " + json.dumps(x).encode() + b"\n\n")
+                return
             return self._agent_stream(svc, body)
         if parsed.path == "/api/agent/run":
             ok, result = svc.run_tool(str(body.get("tool") or ""), body.get("args") or {},
-                                      client="Northchart UI")
+                                      client="Northcharts UI")
             return self._send(json.dumps({"ok": ok, "result": result}, default=str).encode(),
                               "application/json")
         if parsed.path == "/api/agent/revoke":
@@ -2636,8 +2739,8 @@ class Handler(BaseHTTPRequestHandler):
                 fn = os.path.join(BASE_DIR, "tools", "northchart_bridge", os.path.basename(path))
                 try:
                     with open(fn, "rb") as f:
-                        data = f.read().replace(b'"https://desktrading-today.precifarm.com"; // Northchart address',
-                                                ('"' + self._base_url() + '"; // Northchart address').encode())
+                        data = f.read().replace(b'"https://desktrading-today.precifarm.com"; // Northcharts address',
+                                                ('"' + self._base_url() + '"; // Northcharts address').encode())
                 except OSError:
                     return js({"ok": False, "error": "bridge file missing"}, 404) or True
                 return self._send_full(200, "application/octet-stream", data, {
@@ -2656,6 +2759,16 @@ class Handler(BaseHTTPRequestHandler):
         acct_type = lambda v: {"REAL": "PERSONAL", "LIVE": "PERSONAL", "PERSONAL": "PERSONAL", "DEMO": "DEMO",
                                "PROP": "PROP"}.get(str(v or "").upper(), "PERSONAL")
         label_of = lambda broker, login: re.sub(r"[^A-Z0-9]+", "-", f"{broker}-{login}".upper()).strip("-")[:40]
+        import northchart_billing as nbl
+        try:
+            if path in ("/api/ingest/bridge", "/api/brokers/metaapi", "/api/brokers/sync"):
+                billing_service().require(u, "metaapi" if path != "/api/ingest/bridge" else "broker_sync")
+            if path == "/api/ingest/bridge":
+                _require_broker_room(u, conns, {"kind": "bridge", "login": b("login"), "server": b("server")})
+            if path == "/api/brokers/metaapi":
+                _require_broker_room(u, conns, {"kind": "metaapi", "login": b("login"), "server": b("server")})
+        except nbl.Upgrade as e:
+            return self._upgrade(e) or True
         try:
             if path == "/api/ingest/bridge":
                 login, server = b("login"), b("server")
@@ -2688,7 +2801,7 @@ class Handler(BaseHTTPRequestHandler):
                 api = metaapi_client()
                 if api is None:
                     return js({"ok": False, "error": "MetaApi is not switched on for this desk. Use the free "
-                                                     "Northchart Bridge instead."}, 400) or True
+                                                     "Northcharts Bridge instead."}, 400) or True
                 login, server, pw = b("login"), b("server"), str(body.get("password") or "")
                 platform = b("platform", "mt5").lower()
                 if not (login and server and pw) or platform not in ("mt4", "mt5"):
@@ -2699,7 +2812,7 @@ class Handler(BaseHTTPRequestHandler):
                 st, info = api.info(acc_id, region)
                 if st == 200 and info.get("investorMode") is False:
                     api.remove(acc_id)
-                    return js({"ok": False, "error": "That is the master (trading) password. Northchart only "
+                    return js({"ok": False, "error": "That is the master (trading) password. Northcharts only "
                                                      "accepts the investor (read-only) password."}, 400) or True
                 c = conns.upsert({"kind": "metaapi", "login": login, "server": server}, broker=broker,
                                  platform=platform, account_label=label_of(broker, login),
@@ -2728,6 +2841,136 @@ class Handler(BaseHTTPRequestHandler):
             return js({"ok": False, "error": str(e)}, 400) or True
         return js({"ok": False, "error": "not found"}, 404) or True
 
+    # ------------------------------------------------------------ billing
+    BILLING_CALLBACKS = ("/api/billing/paystack/webhook", "/api/billing/mpesa/callback", "/api/billing/mpesa/ratiba",
+                         "/api/billing/mpesa/c2b/confirm", "/api/billing/mpesa/c2b/validate")
+
+    def _billing_public(self, method, parsed):
+        """Pricing page, card return and payment-provider callbacks: no sign-in, each checked its own way."""
+        path = parsed.path.rstrip("/") or "/"
+        import northchart_billing as nbl
+        if method == "GET" and path == "/pricing":
+            import northchart_billing_pages as bp
+            u, via = self._identify()
+            signed = bool(u) and via in ("session", "basic")
+            return self._send_full(200, "text/html; charset=utf-8",
+                                   bp.pricing(signed, billing_service().catalogue())) or True
+        if method == "GET" and path == "/billing/return":
+            ref = (urllib.parse.parse_qs(parsed.query).get("reference") or [""])[0][:40]
+            try:
+                st = billing_service().check(ref)
+            except nbl.PaymentError as e:
+                st = str(e)
+            dest = "/billing?paid=1" if st == "paid" else \
+                "/billing?payerr=" + urllib.parse.quote("The card payment was not completed." if st != "pending"
+                                                       else "The bank is still confirming the payment. It will show here shortly.")
+            return self._send_full(302, "text/plain", b"", {"Location": dest}) or True
+        if method != "POST" or path not in self.BILLING_CALLBACKS:
+            return False
+        ln = int(self.headers.get("Content-Length", 0) or 0)
+        raw = self.rfile.read(min(ln, 200_000)) if ln else b""
+        bl = billing_service()
+        ok_mpesa = lambda: self._send_full(200, "application/json", b'{"ResultCode": 0, "ResultDesc": "Accepted"}') or True
+        try:
+            body = json.loads(raw or b"{}")
+            body = body if isinstance(body, dict) else {}
+        except ValueError:
+            body = {}
+        try:
+            if path == "/api/billing/paystack/webhook":
+                good = bl.paystack_webhook(raw, self.headers.get("x-paystack-signature") or "")
+                return self._send_full(200 if good else 401, "application/json", b"{}") or True
+            if path == "/api/billing/mpesa/callback":
+                threading.Thread(target=bl.mpesa_callback, args=(body,), daemon=True).start()
+                return ok_mpesa()    # answer Safaricom at once; the status query runs behind
+            if path == "/api/billing/mpesa/ratiba":
+                bl.ratiba_callback(body)
+                return ok_mpesa()
+            if path == "/api/billing/mpesa/c2b/validate":
+                return ok_mpesa()
+            if path == "/api/billing/mpesa/c2b/confirm":
+                bl.c2b_confirmation(body, self._client_ip())
+                return ok_mpesa()
+        except Exception as e:
+            print(f"billing callback {path}: {e}", file=sys.stderr)
+            return self._send_full(200, "application/json", b"{}") or True
+        return False
+
+    def _billing_http(self, method, parsed):
+        path = parsed.path.rstrip("/") or "/"
+        if not (path in ("/billing", "/billing/receipt") or path.startswith("/api/billing/")):
+            return False
+        import northchart_billing as nbl
+        import northchart_billing_pages as bp
+        bl = billing_service()
+        u = self.user
+        owner = _is_owner(u)
+        qs = urllib.parse.parse_qs(parsed.query)
+        q = lambda k, d="": (qs.get(k) or [d])[0]
+        js = lambda obj, status=200: self._send_full(status, "application/json", json.dumps(obj, default=str).encode()) or True
+        try:
+            if method == "GET":
+                if path == "/billing":
+                    return self._send_full(200, "text/html; charset=utf-8", bp.billing()) or True
+                if path == "/billing/receipt":
+                    p = bl.payment(q("ref")[:40], None if owner else u["uid"])
+                    if not p or p["status"] != "paid":
+                        return self._send_full(404, "text/plain", b"receipt not found") or True
+                    who = accounts_service().get(p["uid"]) or {"email": "", "name": ""}
+                    return self._send_full(200, "text/html; charset=utf-8", bp.receipt(p, who)) or True
+                if path == "/api/billing/state":
+                    return js({**bl.status(u), "catalogue": bl.catalogue()})
+                if path == "/api/billing/quote":
+                    return js({"ok": True, **bl.quote(u, q("plan"), q("interval", "month"))})
+                if path == "/api/billing/status":
+                    ref = q("ref")[:40]
+                    st = bl.check(ref, u["uid"])
+                    p = bl.payment(ref)
+                    return js({"ok": True, "status": st, "note": p.get("note") or ""})
+                if path == "/api/billing/admin":
+                    if not owner:
+                        return js({"ok": False, "error": "only the desk owner"}, 403)
+                    d = bl.daraja
+                    return js({**bl.overview(), "setup": {
+                        "daraja": d.ready(), "daraja_env": d.env, "shortcode": d.shortcode, "till": d.till,
+                        "mpesa_via": nbl.mpesa_via(),
+                        "paystack": bl.paystack.ready(), "paystack_test": bl.paystack.test_mode(),
+                        "public_url": bool(os.environ.get("NORTHCHART_PUBLIC_URL")),
+                        "signup_open": accounts_service().signup_mode() == "open"}})
+                return js({"ok": False, "error": "not found"}, 404)
+            ln = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                body = json.loads(self.rfile.read(ln) or b"{}") if ln <= 20000 else {}
+                body = body if isinstance(body, dict) else {}
+            except ValueError:
+                body = {}
+            b = lambda k: str(body.get(k) or "").strip()
+            base = self._base_url()
+            if path == "/api/billing/checkout":
+                return js({"ok": True, **bl.checkout(u, b("plan"), b("interval") or "month", b("method"), base, b("phone"))})
+            if path == "/api/billing/cancel":
+                return js({"ok": True, "until": bl.cancel(u)})
+            if path == "/api/billing/resume":
+                bl.resume(u)
+                return js({"ok": True})
+            if path == "/api/billing/autopay":
+                return js({"ok": True, **bl.set_autopay(u, b("method"), base, b("phone"))})
+            if path.startswith("/api/billing/admin/"):
+                if not owner:
+                    return js({"ok": False, "error": "only the desk owner"}, 403)
+                if path == "/api/billing/admin/grant":
+                    bl.grant(b("uid"), b("plan"), int(body.get("days") or 30), b("note"))
+                    return js({"ok": True})
+                if path == "/api/billing/admin/register-c2b":
+                    bl.daraja.register_c2b(base + "/api/billing/mpesa/c2b/confirm", base + "/api/billing/mpesa/c2b/validate")
+                    return js({"ok": True})
+        except nbl.PaymentError as e:
+            return js({"ok": False, "error": str(e)}, 400)
+        return js({"ok": False, "error": "not found"}, 404)
+
+    def _upgrade(self, e):
+        return self._send_full(402, "application/json", json.dumps(e.payload()).encode())
+
     def _metaapi_first_sync(self, u, cid):
         enter_user(u)
         try:
@@ -2739,11 +2982,23 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self._is_connect():
             return self._connect_http("POST")
+        if self._billing_public("POST", urllib.parse.urlparse(self.path)):
+            return
         if self._auth_http("POST", urllib.parse.urlparse(self.path)):
             return
         if not self._authorized():
             return self._deny()
         parsed = urllib.parse.urlparse(self.path)
+        import northchart_billing as nbl
+        try:
+            if self.via == "ingest" and parsed.path.startswith("/api/tracker/import/fills"):
+                billing_service().require(self.user, "broker_sync")       # TradingView sync
+            if parsed.path == "/api/journal/draft":
+                billing_service().require(self.user, "journal_drafts")
+        except nbl.Upgrade as e:
+            return self._upgrade(e)
+        if self._billing_http("POST", parsed):
+            return
         if self._brokers_http("POST", parsed):
             return
         if parsed.path.startswith("/api/agent/"):
@@ -2856,12 +3111,34 @@ class Handler(BaseHTTPRequestHandler):
                 "port": PORT,
             }).encode(), "application/json")
             return
+        if self._billing_public("GET", parsed):
+            return
         if self._auth_http("GET", parsed):
             return
         if not self._authorized():
             return self._deny()
+        if self._billing_http("GET", parsed):
+            return
         if self._brokers_http("GET", parsed):
             return
+        if parsed.path.startswith("/static/"):
+            name = os.path.basename(parsed.path)
+            ext = next((e for e in STATIC_TYPES if name.endswith(e)), None)
+            fn = os.path.join(STATIC_DIR, name)
+            if not ext or not os.path.isfile(fn):
+                return self._send_full(404, "text/plain", b"not found")
+            with open(fn, "rb") as f:
+                return self._send_full(200, STATIC_TYPES[ext], f.read(), {"Cache-Control": "public, max-age=86400"})
+        if parsed.path == "/api/chart/bars":
+            q = urllib.parse.parse_qs(parsed.query)
+            try:
+                out = bars_service().get((q.get("sym") or ["XAUUSD"])[0], (q.get("tf") or ["15m"])[0])
+                return self._send(json.dumps(out).encode(), "application/json")
+            except ValueError as e:
+                return self._send_full(400, "application/json", json.dumps({"ok": False, "error": str(e)}).encode())
+            except Exception as e:
+                return self._send_full(502, "application/json",
+                                       json.dumps({"ok": False, "error": f"price history unavailable: {e}"}).encode())
         qs = urllib.parse.parse_qs(parsed.query)
         sym = (qs.get("sym") or ["XAUUSD"])[0]
         if sym not in SYMBOLS:
@@ -2872,7 +3149,12 @@ class Handler(BaseHTTPRequestHandler):
             self._send(body, "application/json")
         elif parsed.path == "/api/ask":
             q = (qs.get("q") or [""])[0]
-            ans = copilot_answer(sym, q)
+            import northchart_billing as nbl
+            try:
+                billing_service().use_agent(self.user)
+                ans = copilot_answer(sym, q)
+            except nbl.Upgrade as e:
+                ans = str(e)
             self._send(json.dumps({"answer": ans}).encode(),
                        "application/json")
         elif parsed.path == "/api/desk/brief":
@@ -2949,7 +3231,7 @@ def main():
         sys.exit(1)
     load_auth()
     threading.Thread(target=poller, daemon=True).start()
-    print(f"Northchart (engine v{ENGINE_V}) -> http://localhost:{PORT} (and Tailscale devices)")
+    print(f"Northcharts (engine v{ENGINE_V}) -> http://localhost:{PORT} (and Tailscale devices)")
     srv.serve_forever()
 
 

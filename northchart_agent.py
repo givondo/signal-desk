@@ -1,4 +1,4 @@
-"""Northchart agent: the streaming brain behind the agent desk.
+"""Northcharts agent: the streaming brain behind the agent desk.
 
 ``DeskAgent.stream(question, symbol, history)`` yields events that the server
 sends to the browser as Server-Sent Events:
@@ -41,8 +41,8 @@ CLIENT = "Agent desk"
 MAX_TURNS = 6
 WORD_DELAY = float(os.environ.get("NORTHCHART_STREAM_DELAY", "0"))  # the browser paces the reveal
 
-SYSTEM_PROMPT = """You are the Northchart desk agent, a research assistant on a multi-asset trading desk \
-(gold first, plus FX majors, crypto, US indices and WTI oil). You work only through the Northchart tools, \
+SYSTEM_PROMPT = """You are the Northcharts desk agent, a research assistant on a multi-asset trading desk \
+(gold first, plus FX majors, crypto, US indices and WTI oil). You work only through the Northcharts tools, \
 which are read-only: nothing you do can place, change or cancel an order.
 
 Rules:
@@ -195,7 +195,9 @@ class DeskAgent:
             return "route"
         if re.search(r"\bbrief\b", ql):
             return "brief"
-        if re.search(r"\b(portfolio|journal|performance|prop|net worth)\b", ql):
+        if re.search(r"\b(journal|my trades|review my|trade review|discipline|mistakes?)\b", ql):
+            return "journal"
+        if re.search(r"\b(portfolio|performance|prop|net worth)\b", ql):
             return "portfolio"
         if re.search(r"\b(chart|candles?|price action)\b", ql):
             return "chart"
@@ -211,6 +213,8 @@ class DeskAgent:
             yield from self._desk_brief(sym)
         elif intent == "portfolio":
             yield from self._desk_portfolio()
+        elif intent == "journal":
+            yield from self._desk_journal()
         else:
             yield from self._desk_analyse(q, sym, chart_only=(intent == "chart"))
 
@@ -307,6 +311,64 @@ class DeskAgent:
                              f"{_fmt(m.get('total_r'))}R, win rate {_fmt(m.get('win_rate'))}")
         yield from self._stream_text("\n".join(lines))
 
+    def _desk_journal(self):
+        yield from self._run("get_journal", {"limit": 50})
+        ok, r = self._last
+        if not ok:
+            yield from self._stream_text(f"I could not read your journal: {r.get('error')}.")
+            return
+        st, rows = r.get("stats") or {}, r.get("trades") or []
+        if not rows:
+            yield from self._stream_text("Your journal is empty so far. Connect a broker from **Account** and your "
+                                         "closed trades will arrive by themselves.")
+            return
+        flags = st.get("flags") or {}
+        yield {"type": "card", "card": {"kind": "journal", "title": "Your journal", "stats": {
+            "trades": st.get("trades"), "win_rate": st.get("win_rate"), "avg_r": st.get("avg_r"),
+            "total_r": st.get("total_r"), "to_review": st.get("to_review"), "needs_stop": st.get("needs_stop"),
+            "breaches": st.get("discipline_breaches"), "with_desk": st.get("with_desk"),
+            "against_desk": st.get("against_desk")}, "flags": flags}}
+        out = []
+        if st.get("trades"):
+            out.append(f"Across **{st['trades']} journalled trades** you won **{st.get('win_rate')}%** with an "
+                       f"average of **{st.get('avg_r'):+}R** ({st.get('total_r'):+}R in total).")
+        else:
+            out.append("None of your trades has a confirmed stop yet, so there are no R figures to judge.")
+        if st.get("with_desk") or st.get("against_desk"):
+            out.append(f"You traded **with** the desk {st.get('with_desk', 0)} times and **against** it "
+                       f"{st.get('against_desk', 0)} times.")
+        if flags:
+            top = sorted(flags.items(), key=lambda kv: -kv[1])[:3]
+            out.append("Most common flags: " + ", ".join(f"**{k}** ({v})" for k, v in top) + ".")
+        todo = []
+        if st.get("needs_stop"):
+            todo.append(f"add the stop to {st['needs_stop']} trade(s)")
+        if st.get("to_review"):
+            todo.append(f"review {st['to_review']} trade(s)")
+        if todo:
+            out.append("Next: " + " and ".join(todo) + " in the **Journal**, so the figures count.")
+        out.append("\n_From your own journal; nothing here is advice._")
+        yield from self._stream_text("\n\n".join(out))
+
+    @staticmethod
+    def _verdict(sym, s, d):
+        """The headline card for an analysis: bias, grade, action and the plan, straight from the desk."""
+        lv = (d or {}).get("levels") or {}
+        da = s.get("desk_action") or {}
+        entry, sl = lv.get("entry"), lv.get("sl")
+        tps = [lv.get(k) for k in ("tp1", "tp2") if isinstance(lv.get(k), (int, float))]
+        rr = None
+        if isinstance(entry, (int, float)) and isinstance(sl, (int, float)) and tps and entry != sl:
+            rr = round(abs(tps[-1] - entry) / abs(entry - sl), 1)
+        reg = s.get("regime") if isinstance(s.get("regime"), dict) else {}
+        ses = s.get("session") if isinstance(s.get("session"), dict) else {}
+        return {"type": "verdict", "symbol": sym, "name": s.get("sym_name") or sym, "price": s.get("price"),
+                "dp": s.get("dp"), "change_pct": s.get("change_pct"), "direction": s.get("direction") or "NEUTRAL",
+                "grade": s.get("grade"), "confidence": s.get("confidence"), "quality": s.get("signal_quality"),
+                "action": da.get("mode"), "action_title": da.get("title"), "tradeable": bool(s.get("tradeable")),
+                "entry": entry, "stop": sl, "targets": tps, "rr": rr, "model": lv.get("model"),
+                "regime": reg.get("state"), "session": ses.get("name"), "time": s.get("ts")}
+
     def _desk_analyse(self, q, sym, chart_only=False, key=None):
         yield from self._run("get_market_snapshot", {"symbol": sym})
         ok, snap = self._last
@@ -316,6 +378,8 @@ class DeskAgent:
         yield from self._run("get_signal_detail", {"symbol": sym})   # levels for the chart
         ok_d, detail = self._last
         detail = detail if ok_d else {}
+        if not chart_only:
+            yield self._verdict(sym, snap, detail)
         yield from self._run("get_candles", {"symbol": sym, "limit": 96})
         ok_c, candles = self._last
         candles = candles if ok_c else {}
@@ -327,8 +391,14 @@ class DeskAgent:
             yield {"type": "suggestions", "items": self._suggest(sym, snap)}
             return
         copilot = None
-        generic = re.fullmatch(r"\s*(analy[sz]e|snapshot|snap|price|levels|detail)?\s*"
-                               rf"({sym}|{sym.lower()})?\s*", q or "", flags=re.I)
+        filler = {"analyse", "analyze", "analysis", "snapshot", "snap", "price", "levels", "detail", "for", "me",
+                  "please", "the", "a", "on", "of", "now", "today", "view", "take", "your", "what", "is", "about",
+                  "how", "looking", "look", "at", "give", "can", "you", "do", "an", "quick", "full", sym.lower()}
+        name_words = set(re.findall(r"[a-z]+", str(snap.get("sym_name") or "").lower()))
+        word = str(snap.get("word") or "").lower()
+        rest = [w for w in re.findall(r"[a-z0-9]+", (q or "").lower())
+                if w not in filler and w not in name_words and w != word]
+        generic = not rest
         if q and not generic:
             yield from self._run("ask_desk", {"symbol": sym, "question": q})
             ok_a, a = self._last
@@ -366,7 +436,7 @@ class DeskAgent:
             yield {"type": "notice", "message": "Claude was unavailable for part of this answer, so the desk's "
                                                 "rule-based specialists filled in."}
         if not lead_text:
-            yield from self._stream_text(team.lead_report(sym, snap, detail, reports, q, copilot))
+            yield from self._stream_text(team.lead_report(sym, snap, detail, reports, q, copilot, compact=True))
         yield {"type": "suggestions", "items": self._suggest(sym, snap)}
 
     def _compose(self, sym, s, d, answer, chart_only):

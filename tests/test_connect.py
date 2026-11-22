@@ -1,4 +1,4 @@
-"""Northchart Connect tests: OAuth 2.1 sign-in and the MCP endpoint, end to end
+"""Northcharts Connect tests: OAuth 2.1 sign-in and the MCP endpoint, end to end
 over a real HTTP server on localhost. Stdlib only, no network.
 
 Run: python -m unittest discover -s tests
@@ -136,7 +136,7 @@ class ConnectEndToEnd(unittest.TestCase):
                                                                       "clientInfo": {"name": "t", "version": "1"}}})
             init = json.loads(out)["result"]
             self.assertEqual(init["protocolVersion"], "2025-06-18")
-            self.assertEqual(init["serverInfo"]["title"], "Northchart Connect")
+            self.assertEqual(init["serverInfo"]["title"], "Northcharts Connect")
             st, _, out = self.mcp(s, tok["access_token"], {"jsonrpc": "2.0", "method": "notifications/initialized"})
             self.assertEqual(st, 202)
             st, _, out = self.mcp(s, tok["access_token"], {"jsonrpc": "2.0", "id": 2, "method": "tools/list"})

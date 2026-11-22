@@ -139,10 +139,27 @@ class AgentStreaming(unittest.TestCase):
         self.assertEqual(len(chart["bars"]), 40)
         self.assertTrue(any(lv["label"] == "Stop" for lv in chart["levels"]))
         self.assertLess(kinds.index("chart"), kinds.index("text"))     # chart arrives before the words
+        verdict = next(e for e in evs if e["type"] == "verdict")         # the plan comes first, as a card
+        self.assertLess(kinds.index("verdict"), kinds.index("team"))
+        self.assertEqual((verdict["direction"], verdict["price"]), ("LONG", 2650.5))
+        self.assertTrue(verdict["entry"] and verdict["stop"] and verdict["targets"] and verdict["rr"])
         text = "".join(e["delta"] for e in evs if e["type"] == "text")
-        self.assertIn("2,650.50", text)
+        self.assertIn("Risk manager", text)
+        self.assertNotIn("2,650.50", text)                               # the card has the price; no repeats
         self.assertNotIn("—", text)
         self.assertGreater(sum(1 for k in kinds if k == "text"), 20)    # really streamed, not one blob
+
+    def test_plain_analyse_question_does_not_repeat_itself(self):
+        with DeskServer() as s:
+            evs = stream(s.port, "Analyse gold for me")
+        tools = [e["name"] for e in evs if e["type"] == "tool" and e["status"] == "done"]
+        self.assertNotIn("ask_desk", tools)
+
+    def test_journal_review_intent(self):
+        with DeskServer() as s:
+            evs = stream(s.port, "Review my journal")
+        tools = [e["name"] for e in evs if e["type"] == "tool" and e["status"] == "done"]
+        self.assertEqual(tools, ["get_journal"])
 
     def test_overview_draws_a_bar_chart(self):
         with DeskServer() as s:
@@ -189,7 +206,7 @@ class AgentStreaming(unittest.TestCase):
         kinds = [e["type"] for e in evs]
         self.assertLess(kinds.index("team"), kinds.index("text"))
         text = "".join(e["delta"] for e in evs if e["type"] == "text")
-        self.assertIn("specialists agree", text)
+        self.assertIn("What the specialists found", text)
         self.assertIn("Risk manager", text)
 
     def test_claude_team_runs_specialists_in_parallel_then_streams_lead(self):
@@ -220,7 +237,7 @@ class AgentStreaming(unittest.TestCase):
         self.assertTrue(any(e["type"] == "notice" for e in evs))
         self.assertEqual(evs[-1]["type"], "done")
         text = "".join(e["delta"] for e in evs if e["type"] == "text")
-        self.assertIn("What the team found", text)          # rule-based team still answered
+        self.assertIn("What the specialists found", text)   # rule-based team still answered
 
     def test_stream_requires_desk_login(self):
         with DeskServer() as s:

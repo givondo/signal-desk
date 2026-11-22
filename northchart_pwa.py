@@ -1,7 +1,7 @@
-"""Installable desktop app (PWA) assets for Northchart, standard library only.
+"""Installable desktop app (PWA) assets for Northcharts, standard library only.
 
 Serves the web app manifest, a small service worker and the app icons, so
-Chrome and Edge offer "Install Northchart" and it opens in its own window
+Chrome and Edge offer "Install Northcharts" and it opens in its own window
 from the Start menu, dock or taskbar. Icons are drawn here as PNGs (no image
 files to ship or deploy).
 """
@@ -22,8 +22,8 @@ PUBLIC_PATHS = ("/manifest.webmanifest", "/sw.js", "/icons/icon-192.png", "/icon
 
 def manifest() -> bytes:
     return json.dumps({
-        "name": "Northchart",
-        "short_name": "Northchart",
+        "name": "Northcharts",
+        "short_name": "Northcharts",
         "description": "Charts, signals and an agent desk for gold, FX, crypto, indices and oil.",
         "id": "/",
         "start_url": "/?source=desktop",
@@ -44,7 +44,7 @@ def manifest() -> bytes:
     }).encode()
 
 
-SERVICE_WORKER = b"""// Northchart service worker: network first, so prices are never served stale.
+SERVICE_WORKER = b"""// Northcharts service worker: network first, so prices are never served stale.
 // If the network is down, the last copy of the app shell is shown instead.
 const SHELL = 'northchart-shell-v1';
 self.addEventListener('install', e => { self.skipWaiting(); });

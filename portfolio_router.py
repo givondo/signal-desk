@@ -478,7 +478,7 @@ def telegram_configured() -> bool:
 
 def alert_text(r: dict) -> str:
     s = r["signal"]
-    lines = [f"Northchart {s['symbol']} {s['direction']} ({s.get('grade') or '-'}, {s['mode']})",
+    lines = [f"Northcharts {s['symbol']} {s['direction']} ({s.get('grade') or '-'}, {s['mode']})",
              f"Entry {s['entry']}  Stop {s['stop']}  TP1 {s.get('tp1')}", ""]
     for a in r["accounts"]:
         if a["decision"] in ("TICKET", "WATCH", "DRY_RUN"):

@@ -155,7 +155,8 @@ RULES = {"market": market_analyst, "macro": macro_analyst, "news": news_analyst,
 
 # ------------------------------------------------------------------ lead analyst (rules)
 
-def lead_report(sym, s, d, reports, question=None, copilot=None):
+def lead_report(sym, s, d, reports, question=None, copilot=None, compact=False):
+    """compact=True when the reader already sees the verdict card (price, bias, grade, levels)."""
     dp = s.get("dp") if isinstance(s.get("dp"), int) else None
     name = s.get("sym_name") or sym
     bias = str(s.get("direction") or "NEUTRAL").upper()
@@ -166,21 +167,28 @@ def lead_report(sym, s, d, reports, question=None, copilot=None):
     against = [k for k, v in votes.items() if v in ("bullish", "bearish") and v != want]
     risk = reports.get("risk", {})
     chg = s.get("change_pct")
-    out = [f"**{name} ({sym}) {_f(s.get('price'), dp)}**"
+    out = [] if compact else [f"**{name} ({sym}) {_f(s.get('price'), dp)}**"
            + (f", {'up' if chg > 0 else 'down'} {abs(chg):.2f}% today" if isinstance(chg, (int, float)) and chg
               else "") + f". Data as of {s.get('ts')}."]
     team = {"market": "market", "macro": "macro", "news": "news"}
     if want == "neutral":
         verdict = "The desk has **no directional bias**"
+    elif compact:
+        verdict = ""
     else:
         verdict = (f"The desk leans **{bias}** ({s.get('confidence')}% confidence, grade {s.get('grade') or '-'})")
-    if agree or against:
+    if compact and want != "neutral":   # the card already shows the count; only call out dissent
+        verdict = (f"**{' and '.join(team[a].capitalize() for a in against)} "
+                   f"{'disagrees' if len(against) == 1 else 'disagree'} with the {bias} view.**" if against else
+                   "" if votes else f"The specialists had too little to go on, so the {bias} view rests on the desk engine.")
+    elif agree or against:
         verdict += (f"; {len(agree)} of {len(votes)} specialists agree"
                     + (f" ({', '.join(team[a] for a in agree)})" if agree else "")
                     + (f" and {', '.join(team[a] for a in against)} disagree" if against else "") + ".")
     else:
         verdict += "."
-    out.append("\n" + verdict)
+    if verdict:
+        out.append(("" if compact else "\n") + verdict)
     rv = risk.get("verdict")
     if rv == "blocked":
         out.append(f"**Risk manager: no trade.** {risk.get('summary', '')[len('No trade: '):].capitalize()}.")
@@ -191,7 +199,7 @@ def lead_report(sym, s, d, reports, question=None, copilot=None):
     if copilot:
         out.append(f"\n{copilot}")
     labels = {"market": "Market", "macro": "Macro", "news": "News", "risk": "Risk"}
-    out.append("\n#### What the team found")
+    out.append("\n#### What the specialists found")
     for k in ("market", "macro", "news", "risk"):
         r = reports.get(k)
         if not r:
@@ -199,7 +207,7 @@ def lead_report(sym, s, d, reports, question=None, copilot=None):
         pts = r.get("points") or []
         out.append(f"- **{labels[k]}, {r['verdict']}:** " + (pts[0] if pts else r.get("summary", "")))
     lv = d.get("levels") or {}
-    if lv.get("entry") is not None:
+    if lv.get("entry") is not None and not compact:
         tps = [lv.get(k) for k in ("tp1", "tp2", "tp3") if lv.get(k) is not None]
         out.append("\n#### Levels")
         out.append(f"- Entry {_f(lv.get('entry'), dp)} ({str(lv.get('model', 'n/a')).lower()}), stop "
@@ -215,21 +223,22 @@ def lead_report(sym, s, d, reports, question=None, copilot=None):
 
 # ------------------------------------------------------------------ Claude-backed team
 
-SPECIALIST_PROMPT = """You are the {name} on the Northchart trading desk. Your remit: {role}.
+SPECIALIST_PROMPT = """You are the {name} on the Northcharts trading desk. Your remit: {role}.
 You get the desk's live data for one instrument as JSON. Judge it only from your remit and only from the
 numbers given; never invent a level or figure. Reply with JSON only, no prose around it:
 {{"verdict": one of {verdicts}, "confidence": 0-100, "summary": "one line, max 14 words",
 "points": ["2 to 4 short evidence points with the numbers"]}}
 Use British English and no em or en dashes."""
 
-LEAD_PROMPT = """You are the lead analyst on the Northchart trading desk. Four specialists (market, macro, news,
+LEAD_PROMPT = """You are the lead analyst on the Northcharts trading desk. Four specialists (market, macro, news,
 risk) have each reported on one instrument. Write the answer to the user's question from their reports and the
 live data only. Never invent a number.
-Structure: one bold line with instrument, price and data time. Then the desk's view in one or two sentences,
-saying how many specialists agree and naming any who disagree. Then the risk manager's ruling. Then a heading
-'#### What the team found' with one bullet per specialist. Then levels if given and '#### What would change the
-view'. End with the italic line '_Research from the desk team, not personalised advice._'
-Under 230 words. British English. Never use em dashes or en dashes."""
+The reader already sees a card with the price, bias, grade, confidence, entry, stop, targets and reward to risk,
+so do not repeat those numbers. Structure: one sentence on why the desk holds this view, saying how many
+specialists agree and naming any who disagree. Then the risk manager's ruling in one sentence. Then a heading
+'#### What the specialists found' with one bullet per specialist. Then '#### What would change the view' with up
+to three bullets. End with the italic line '_Research from the desk team, not personalised advice._'
+Under 180 words. British English. Never use em dashes or en dashes."""
 
 
 def _payload(s, d, candles):

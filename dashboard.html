@@ -2,12 +2,12 @@
 <html lang="en" data-theme="light"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="Northchart: multi-asset charts, live confluence signals and an agent desk that works with ChatGPT and Claude.">
+<meta name="description" content="Northcharts: multi-asset charts, live confluence signals and an agent desk that works with ChatGPT and Claude.">
 <meta name="theme-color" content="#ffffff" id="meta-theme">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Northchart</title>
+<title>Northcharts</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230b0d10'/%3E%3Ctext x='32' y='44' font-size='30' font-weight='bold' text-anchor='middle' fill='%23c9a227' font-family='Consolas'%3ESD%3C/text%3E%3C/svg%3E">
@@ -80,6 +80,7 @@ background:var(--p2);cursor:pointer;transition:all .15s;white-space:nowrap}
 .tvlink.on{color:var(--g);border-color:rgba(13,155,110,.35);background:var(--gt)}
 .tvlink.here{color:var(--tx);border-color:var(--bd2);background:var(--p3);font-weight:600}
 .tvlink{display:inline-flex;align-items:center;gap:6px}
+.tvlink.upg{color:var(--bg);background:var(--tx);border-color:var(--tx);font-weight:600}
 .tvdot{width:7px;height:7px;border-radius:50%;background:var(--dim2)}.tvdot.on{background:var(--g)}
 .clockline{font-size:11px;color:var(--dim2);font-family:var(--mono);white-space:nowrap}
 
@@ -217,7 +218,49 @@ table{width:100%;border-collapse:collapse}
 .sc .v{width:36px;text-align:right;font-size:11px;font-weight:700}
 
 /* ---------- center ---------- */
-#tvchart{height:460px;width:100%}
+#tvchart,#ncchart{height:480px;width:100%}
+.ncp{display:flex;flex-direction:column;container-type:inline-size}
+@container (max-width:1000px){.ctool .lbl{display:none}.ctool .cbtn{padding:5px 6px}}
+.ctool{display:flex;align-items:center;gap:6px;padding:7px 10px;border-bottom:1px solid var(--bd);background:var(--p1);flex-wrap:wrap}
+.csym{font:700 12.5px var(--font);margin-right:4px;white-space:nowrap}
+.cseg{display:inline-flex;border:1px solid var(--bd2);border-radius:7px;overflow:hidden}
+.cseg button{border:0;background:transparent;color:var(--dim);font:600 11.5px var(--mono);padding:5px 8px;cursor:pointer}
+.cseg button+button{border-left:1px solid var(--bd)}
+.cseg button:hover{color:var(--tx);background:var(--p2)}.cseg button.on{background:var(--tx);color:var(--bg)}
+.cseg.small button{font:600 11px var(--font);padding:5px 9px}
+.csep{width:1px;height:20px;background:var(--bd)}
+.cbtn{display:inline-flex;align-items:center;gap:6px;border:1px solid transparent;background:transparent;color:var(--dim);font:600 11.5px var(--font);
+padding:5px 8px;border-radius:7px;cursor:pointer;white-space:nowrap}
+.cbtn:hover{background:var(--p2);color:var(--tx)}.cbtn.on{color:var(--b);background:var(--bt)}
+.cbtn svg,.crail svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.cbtn.icon{padding:5px 6px}
+.cnum{font:700 10px var(--mono);background:var(--b);color:#fff;border-radius:8px;padding:0 5px;line-height:15px}
+.cstat{font:11px var(--mono);margin-right:4px;white-space:nowrap}
+.cpop-wrap{position:relative}
+.cpop{position:absolute;top:calc(100% + 6px);left:0;z-index:30;min-width:170px;background:var(--p1);border:1px solid var(--bd2);border-radius:10px;
+box-shadow:var(--shadow-lg,0 8px 32px rgba(0,0,0,.18));padding:5px;max-height:420px;overflow:auto}
+.cpop.wide{min-width:280px}
+.cpop button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;background:transparent;color:var(--tx);font:12.5px var(--font);
+padding:7px 9px;border-radius:6px;cursor:pointer}
+.cpop button:hover{background:var(--p2)}.cpop button.on{font-weight:600}
+.cpop .ck{width:14px;color:var(--b);font-weight:700}.cpop-sub{margin-left:auto;font:10.5px var(--mono);color:var(--dim2)}
+.cpop-h{font:600 9.5px var(--font);letter-spacing:.8px;text-transform:uppercase;color:var(--dim);padding:8px 9px 4px}
+.cpop-sep{height:1px;background:var(--bd);margin:4px 0}
+.cfind{width:100%;font:12.5px var(--font);padding:7px 9px;border:1px solid var(--bd2);border-radius:7px;background:var(--p2);color:var(--tx);margin-bottom:4px}
+.cbody{display:flex;min-height:0}
+.crail{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px;border-right:1px solid var(--bd);background:var(--p1)}
+.crail button{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--dim);
+border-radius:7px;cursor:pointer}
+.crail button:hover{background:var(--p2);color:var(--tx)}.crail button.on{background:var(--bt);color:var(--b)}
+.crail button.sepb{margin-top:6px}
+.rsep{width:20px;height:1px;background:var(--bd);margin:6px 0}
+.cmain{flex:1;position:relative;min-width:0}
+.chint{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:var(--tx);color:var(--bg);font:600 11.5px var(--font);
+padding:5px 11px;border-radius:999px;pointer-events:none;opacity:.92}
+.cfoot{display:flex;gap:14px;flex-wrap:wrap;justify-content:space-between;padding:6px 12px;border-top:1px solid var(--bd);font-size:11px;color:var(--dim);background:var(--p1)}
+.clegend{display:inline-flex;align-items:center;gap:4px}.clegend i{width:10px;height:3px;border-radius:2px;display:inline-block}
+.ncp.fs{position:fixed;inset:0;z-index:80;border-radius:0}
+.ncp.fs #ncchart,.ncp.fs #tvchart{height:calc(100vh - 92px)}
 .qrow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
 .qbtn{background:var(--p2);border:1px solid var(--bd2);color:var(--dim);font-size:10.5px;padding:5px 10px;cursor:pointer;
 border-radius:var(--radius-sm);transition:all .15s;font-weight:500}
@@ -351,7 +394,9 @@ color:var(--r);font-size:12px;text-align:center}
   .factors{padding:6px 10px}
   .main{grid-template-columns:1fr;padding:8px;gap:8px}
   .colR{grid-column:auto;display:flex!important}
-  #tvchart{height:280px}
+  #tvchart,#ncchart{height:340px}
+  .crail{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--bd)}
+  .cbody{flex-direction:column}
   .bigpx{font-size:26px}
   .recdir{font-size:22px}
   .duo{grid-template-columns:1fr}
@@ -433,6 +478,40 @@ font-size:13.5px;white-space:pre-wrap}
 .turn-a .av{width:26px;height:26px;border-radius:8px;background:#0b0d10;color:var(--gold);font:800 11px var(--mono);
 display:grid;place-items:center;flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(201,162,39,.35);margin-top:1px}
 .turn-a .col{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.astage{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);font-weight:600}
+.vcard{border:1px solid var(--bd);border-radius:14px;background:var(--p1);padding:14px 16px;box-shadow:0 1px 2px rgba(16,24,40,.05);border-left:4px solid var(--bd2)}
+.vcard.LONG{border-left-color:var(--g)}.vcard.SHORT{border-left-color:var(--r)}
+.vtop{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.vname{font-weight:700;font-size:13.5px}.vname small{color:var(--dim);font:600 11px var(--mono);margin-left:4px}
+.vpx{font:700 15px var(--mono)}.vpx small{font-size:11.5px;margin-left:6px}
+.vmain{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 12px}
+.vdir{font:800 24px var(--font);letter-spacing:-.3px}.vcard.LONG .vdir{color:var(--g)}.vcard.SHORT .vdir{color:var(--r)}.vcard.NEUTRAL .vdir{color:var(--dim);font-size:19px}
+.vchip{font-size:11.5px;color:var(--dim);background:var(--p2);border:1px solid var(--bd);padding:3px 8px;border-radius:999px}.vchip b{color:var(--tx)}
+.vact{font:700 10.5px var(--font);letter-spacing:.6px;text-transform:uppercase;padding:4px 9px;border-radius:999px;margin-left:auto}
+.vact.go{color:var(--g);background:var(--gt)}.vact.wait{color:var(--a);background:var(--at)}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px}
+.vgrid>div{background:var(--p2);border:1px solid var(--bd);border-radius:9px;padding:7px 10px}
+.vgrid label{display:block;font:600 9.5px var(--font);letter-spacing:.8px;text-transform:uppercase;color:var(--dim)}
+.vgrid b{font:700 14px var(--mono)}.vgrid small{display:block;font-size:10.5px;color:var(--dim)}
+.vgrid .st b{color:var(--r)}.vgrid .tp b{color:var(--g)}
+.vfoot{margin-top:10px;font-size:11px;color:var(--dim)}
+.team2{border:1px solid var(--bd);border-radius:12px;padding:10px 12px;background:var(--p2)}
+.t2h{display:flex;justify-content:space-between;align-items:baseline;font:700 11px var(--font);letter-spacing:.7px;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
+.t2h .anote{text-transform:none;letter-spacing:0;font-weight:600;color:var(--tx)}
+.t2row{display:flex;flex-wrap:wrap;gap:6px}
+.t2chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--bd2);background:var(--p1);color:var(--tx);font:600 12px var(--font);padding:5px 10px;border-radius:999px;cursor:pointer}
+.t2chip i{width:8px;height:8px;border-radius:50%;background:var(--dim2)}
+.t2chip em{font-style:normal;font-weight:500;color:var(--dim);font-size:11.5px}
+.t2chip.bullish i,.t2chip.clear i{background:var(--g)}.t2chip.bearish i,.t2chip.blocked i{background:var(--r)}.t2chip.caution i{background:var(--a)}
+.t2chip.open{border-color:var(--b)}
+.t2det{margin-top:8px;font-size:12.5px;line-height:1.5}.t2det ul{margin:4px 0 0 16px}
+.aacts{display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap}
+.aacts>button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--bd2);background:var(--p1);color:var(--dim);font:600 11.5px var(--font);padding:5px 10px;border-radius:8px;cursor:pointer}
+.aacts>button:hover{color:var(--tx);background:var(--p2)}
+.aacts svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.srcs{font-size:11.5px;color:var(--dim);margin-left:auto}.srcs summary{cursor:pointer;padding:5px 4px;list-style:none}
+.srcs[open]{flex-basis:100%;margin-left:0;border:1px solid var(--bd);border-radius:10px;background:var(--p2)}
+.srcs[open] summary{padding:7px 10px;border-bottom:1px solid var(--bd)}
 .modebadge{font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;font-weight:700;color:var(--dim)}
 .modebadge b{color:var(--b)}
 .trail{border:1px solid var(--bd);border-radius:10px;background:var(--p2);font-size:12px;overflow:hidden}
@@ -508,6 +587,11 @@ font:inherit;transition:border-color .15s}
 .speedbtn:hover{color:var(--b)}
 @media(max-width:520px){.team{grid-template-columns:1fr}}
 .noticebar{font-size:11.5px;color:var(--a);background:var(--at);border-radius:8px;padding:6px 9px}
+.upcard{border:1px solid var(--bd2);border-radius:12px;padding:14px 16px;background:var(--p2);margin-top:4px}
+.upcard .upk{font:700 10px var(--nc-font,inherit);letter-spacing:.8px;text-transform:uppercase;color:var(--g)}
+.upcard .upm{font-size:13.5px;margin:4px 0 10px;line-height:1.5}
+.upcard .upa{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--dim)}
+.upcard .upb{font-weight:600;font-size:13px;padding:7px 14px;border-radius:8px;background:var(--tx);color:var(--bg);text-decoration:none}
 .aempty{color:var(--dim);font-size:12px;text-align:center;padding:24px 10px}
 .ascrim{position:fixed;inset:0;z-index:64;background:rgba(16,24,40,.25)}
 @media(min-width:1500px){.ascrim{display:none}}
@@ -521,7 +605,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
       <div class="brand">
         <div class="brand-mark" aria-hidden="true">N</div>
         <div class="brand-txt">
-          <div class="name">Northchart</div>
+          <div class="name">Northcharts</div>
           <div class="sub">Charts · signals · agents</div>
         </div>
       </div>
@@ -542,6 +626,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
         <button type="button" class="tvlink agentbtn" :class="{on:agentOpen}" @click="toggleAgent()" title="Agent desk: run tools, see what ChatGPT and Claude are doing, connect new agents (Ctrl+K)">
           <span class="adot" :class="{hot:agentUnread>0}"></span>Agents<span v-if="agentUnread" class="inboxbadge">{{ agentUnread }}</span>
         </button>
+        <a v-if="me&&me.email&&plan==='free'&&billing!=='off'" class="tvlink upg" href="/pricing" title="Automatic broker sync, the agent desk and Northcharts in ChatGPT and Claude" style="text-decoration:none">Upgrade</a>
         <a v-if="me&&me.email" class="tvlink acct" href="/account" :title="'Signed in as '+me.email" style="text-decoration:none"><span class="avatar">{{ initials }}</span>{{ me.name?me.name.split(' ')[0]:'Account' }}</a>
         <a v-else class="tvlink" :href="hasUsers?'/signin':'/setup'" style="text-decoration:none">{{ hasUsers?'Sign in':'Set up account' }}</a>
         <button type="button" class="iconbtn" @click="toggleTheme" :aria-label="darkMode?'Switch to light mode':'Switch to dark mode'" :title="darkMode?'Light mode':'Dark mode'">{{ darkMode?'☀':'☾' }}</button>
@@ -691,9 +776,65 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
 
     <!-- ============ CENTER ============ -->
     <div class="col">
-      <div class="panel-chart">
-        <div class="ph">Price chart · 15m · {{ d.sym_name||sym }} <span class="mono mut">{{ d.tv_chart }}</span></div>
-        <div id="tvchart"></div>
+      <div class="panel-chart ncp" ref="chartPanel" :class="{fs:chartFs}">
+        <div class="ctool" role="toolbar" aria-label="Chart tools">
+          <span class="csym">{{ d.sym_name||sym }}</span>
+          <div class="cseg" role="group" aria-label="Timeframe" v-show="engine==='nc'">
+            <button v-for="t in chartTfs" :key="t" type="button" :class="{on:chartTf===t}" @click="setTf(t)">{{ t }}</button>
+          </div>
+          <span class="csep" v-show="engine==='nc'"></span>
+          <div class="cpop-wrap" v-show="engine==='nc'">
+            <button type="button" class="cbtn" @click.stop="chartMenu=chartMenu==='type'?'':'type'" title="Chart type">
+              <svg viewBox="0 0 24 24"><path d="M6 4v16M6 8h-2v6h2M12 6v14M12 9h-2v7h2M18 3v12M18 6h-2v5h2"/></svg><span class="lbl">{{ chartTypes.find(x=>x[0]===chartType)[1] }}</span></button>
+            <div class="cpop" v-if="chartMenu==='type'" @click.stop>
+              <button v-for="t in chartTypes" :key="t[0]" type="button" :class="{on:chartType===t[0]}" @click="setChartType(t[0])">{{ t[1] }}</button>
+              <div class="cpop-sep"></div>
+              <button type="button" :class="{on:chartLog}" @click="toggleLog()">Log scale</button>
+            </div>
+          </div>
+          <div class="cpop-wrap" v-show="engine==='nc'">
+            <button type="button" class="cbtn" @click.stop="chartMenu=chartMenu==='ind'?'':'ind'" title="Indicators">
+              <svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 4 8-9"/><path d="M3 21h18"/></svg><span class="lbl">Indicators</span><b v-if="chartInds.length" class="cnum">{{ chartInds.length }}</b></button>
+            <div class="cpop wide" v-if="chartMenu==='ind'" @click.stop>
+              <input class="cfind" v-model="indQ" placeholder="Search indicators" aria-label="Search indicators">
+              <div class="cpop-h">On the price</div>
+              <button v-for="i in indList.filter(x=>x.main&&indMatch(x))" :key="i.id" type="button" :class="{on:chartInds.includes(i.id)}" @click="toggleInd(i.id)">
+                <span class="ck">{{ chartInds.includes(i.id)?'✓':'' }}</span>{{ i.label }}<span class="cpop-sub">{{ i.id }}</span></button>
+              <div class="cpop-h">Below the chart</div>
+              <button v-for="i in indList.filter(x=>!x.main&&indMatch(x))" :key="i.id" type="button" :class="{on:chartInds.includes(i.id)}" @click="toggleInd(i.id)">
+                <span class="ck">{{ chartInds.includes(i.id)?'✓':'' }}</span>{{ i.label }}<span class="cpop-sub">{{ i.id }}</span></button>
+            </div>
+          </div>
+          <button type="button" class="cbtn" :class="{on:showLevels}" v-show="engine==='nc'" @click="toggleLevels()" title="Show the desk's entry, stop and targets">
+            <svg viewBox="0 0 24 24"><path d="M3 7h18M3 12h18M3 17h18" stroke-dasharray="3 3"/></svg><span class="lbl">Desk levels</span></button>
+          <span style="flex:1"></span>
+          <span class="cstat mut" v-show="engine==='nc'">{{ chartStatus }}</span>
+          <button type="button" class="cbtn icon" v-show="engine==='nc'" @click="chartShot()" title="Save a picture of the chart" aria-label="Save chart picture">
+            <svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+          <button type="button" class="cbtn icon" @click="chartFull()" :title="chartFs?'Exit full screen':'Full screen'" aria-label="Full screen">
+            <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+          <button type="button" class="cbtn" @click="setEngine(engine==='nc'?'tv':'nc')" :title="engine==='nc'?'Switch to TradingView\'s own chart':'Back to the Northcharts chart with drawing tools and desk levels'">
+            <svg viewBox="0 0 24 24"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg><span class="lbl">{{ engine==='nc'?'TradingView view':'Northcharts view' }}</span></button>
+        </div>
+        <div class="cbody">
+          <div class="crail" v-show="engine==='nc'" role="toolbar" aria-label="Drawing tools" aria-orientation="vertical">
+            <button v-for="t in drawTools" :key="t.id" type="button" :class="{on:drawTool===t.id,sepb:t.sep}" @click="pickTool(t.id)" :title="t.label" :aria-label="t.label" v-html="t.icon"></button>
+            <span class="rsep"></span>
+            <button type="button" :class="{on:chartMagnet}" @click="chartMagnet=!chartMagnet; savePrefs()" :title="chartMagnet?'Magnet on: points snap to candle prices':'Magnet off'" aria-label="Magnet"><svg viewBox="0 0 24 24"><path d="M6 3v8a6 6 0 0 0 12 0V3h-4v8a2 2 0 0 1-4 0V3z"/><path d="M6 7h4M14 7h4"/></svg></button>
+            <button type="button" :class="{on:drawLocked}" @click="lockDrawings()" :title="drawLocked?'Unlock drawings':'Lock drawings'" aria-label="Lock drawings"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path :d="drawLocked?'M8 11V7a4 4 0 0 1 8 0v4':'M8 11V7a4 4 0 0 1 7.5-2'"/></svg></button>
+            <button type="button" :class="{on:drawHidden}" @click="hideDrawings()" :title="drawHidden?'Show drawings':'Hide drawings'" aria-label="Hide drawings"><svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path v-if="drawHidden" d="M4 4l16 16"/></svg></button>
+            <button type="button" @click="clearDrawings()" title="Remove all drawings on this instrument" aria-label="Remove all drawings"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
+          </div>
+          <div class="cmain">
+            <div id="ncchart" v-show="engine==='nc'"></div>
+            <div id="tvchart" v-show="engine==='tv'"></div>
+            <div class="chint" v-if="engine==='nc'&&drawTool&&drawTool!=='cursor'">{{ drawHint }} · Esc cancels</div>
+          </div>
+        </div>
+        <div class="cfoot" v-show="engine==='nc'">
+          <span>{{ chartSource }}</span>
+          <span v-if="showLevels&&chartLevels.length" class="clegend"><i v-for="l in chartLevels" :key="l.key" :style="{background:levelColor(l.key)}"></i>Entry, stop and targets from the desk's {{ d.direction||'' }} call</span>
+        </div>
       </div>
 
       <div class="duo">
@@ -912,7 +1053,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
   </div>
 
   <footer class="foot">15 instruments · Metals, Crypto, FX, Indices, Energy · hotkeys <kbd>1</kbd>–<kbd>9</kbd> · refresh 15s · TradingView + Yahoo<br>
-  Rule-based copilot (no LLM) · agent desk <kbd>Ctrl</kbd>+<kbd>K</kbd> · ChatGPT and Claude via Northchart Connect. All R figures net of estimated spread. <strong style="font-weight:600;color:var(--dim)">Educational only — not financial advice.</strong></footer>
+  Rule-based copilot (no LLM) · agent desk <kbd>Ctrl</kbd>+<kbd>K</kbd> · ChatGPT and Claude via Northcharts Connect. All R figures net of estimated spread. <strong style="font-weight:600;color:var(--dim)">Educational only — not financial advice.</strong></footer>
 
   <!-- auth modal -->
   <div class="overlay" v-if="authOpen" @click.self="closeAuth">
@@ -943,18 +1084,18 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
   </div>
 
 
-  <!-- agent desk: the human view of Northchart Connect -->
+  <!-- agent desk: the human view of Northcharts Connect -->
   <div class="ascrim" v-if="agentOpen" @click="toggleAgent(false)"></div>
   <aside class="adrawer" :class="{open:agentOpen,wide:agentWide}" aria-label="Agent desk" :aria-hidden="!agentOpen">
     <div class="ahead">
       <button v-if="agentTab!=='run'" class="hbtn" @click="setAgentTab('run')" title="Back to chat" aria-label="Back to chat">‹</button>
       <div v-else class="brand-mark" style="width:26px;height:26px;font-size:11px" aria-hidden="true">N</div>
       <h2>{{ agentTab==='run'?'Agent desk':agentTab==='activity'?'Activity':'Connect agents' }}</h2>
-      <button v-if="!isStandalone" class="dlbtn" @click.stop="installDesktop" title="Install Northchart as a desktop app">
+      <button v-if="!isStandalone" class="dlbtn" @click.stop="installDesktop" title="Install Northcharts as a desktop app">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
         Download desktop</button>
       <div v-if="installHelp" class="hpop dlhelp" @click.stop>
-        <b>Install Northchart</b>
+        <b>Install Northcharts</b>
         <p v-if="installHint==='chromium'">In Chrome or Edge, open the browser menu (⋮), choose <b>Cast, save and share</b>, then <b>Install page as app</b>. You can also use the install icon at the right of the address bar.</p>
         <p v-else-if="installHint==='safari'">In Safari on a Mac, choose <b>File</b>, then <b>Add to Dock</b>.</p>
         <p v-else-if="installHint==='ios'">Tap <b>Share</b>, then <b>Add to Home Screen</b>.</p>
@@ -966,8 +1107,8 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
     <div class="abody" v-if="agentTab==='run'" ref="arun" @scroll.passive="onChatScroll">
       <div v-if="!chat.length" class="hero">
         <div class="big">N</div>
-        <h3>What should we look at?</h3>
-        <p>Answers stream from the desk's live tools, with charts. Read-only: nothing here places an order.</p>
+        <h3>Ask the desk</h3>
+        <p>Every answer starts with the desk's plan, then the reasons, then a chart. Built from live data. It never places an order.</p>
         <div class="tiles">
           <button v-for="t in heroTiles" :key="t[0]" @click="ask(t[0])">{{ t[0] }}<small>{{ t[1] }}</small></button>
         </div>
@@ -978,28 +1119,42 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
           <div v-else class="turn-a">
             <div class="av">N</div>
             <div class="col">
-              <div class="modebadge" v-if="t.mode">{{ t.mode==='claude'?'Claude team':'Desk team' }} · <b>{{ t.symbol }}</b></div>
+              <div v-if="t.streaming" class="astage"><span class="spin-s"></span>{{ agentStage(t) }}<span class="anote" v-if="t.symbol"> · {{ t.symbol }}</span></div>
               <div v-if="t.notice" class="noticebar">{{ t.notice }}</div>
-              <details v-if="t.steps.length" class="trail" :open="t.streaming">
-                <summary><span v-if="t.streaming&&t.steps.some(x=>x.status==='running')" class="spin-s"></span><span v-else>✓</span>
-                  {{ t.streaming?'Working':'Used' }} {{ t.steps.length }} tool{{ t.steps.length>1?'s':'' }}<template v-if="!t.streaming"> · {{ t.steps.reduce((a,x)=>a+(x.ms||0),0) }} ms</template>
-                  <span class="chev">›</span></summary>
-                <div class="step" v-for="st in t.steps" :key="st.id">
-                  <span><span v-if="st.status==='running'" class="spin-s"></span><span v-else :class="st.ok?'dirL':'dirS'">{{ st.ok?'✓':'✕' }}</span></span>
-                  <span style="min-width:0"><span class="nm">{{ toolTitle(st.name) }}</span> <span class="sm">{{ st.summary || argText(st.args) }}</span></span>
-                  <span class="ms">{{ st.ms!=null?st.ms+' ms':'' }}</span>
-                </div>
-              </details>
               <template v-for="(bk,bi) in visibleBlocks(t)" :key="bi">
-                <div v-if="bk.type==='text'" class="md" v-html="mdCaret(bk.text,(t.streaming||t.revealing)&&bk.text.length<bk.full.length||t.streaming&&bi===t.blocks.length-1)"></div>
+                <div v-if="bk.type==='verdict'" class="vcard" :class="bk.v.direction">
+                  <div class="vtop">
+                    <span class="vname">{{ bk.v.name }} <small>{{ bk.v.symbol }}</small></span>
+                    <span class="vpx">{{ vfmt(bk.v,bk.v.price) }}<small v-if="bk.v.change_pct!=null" :class="bk.v.change_pct>=0?'dirL':'dirS'">{{ bk.v.change_pct>=0?'+':'' }}{{ Number(bk.v.change_pct).toFixed(2) }}%</small></span>
+                  </div>
+                  <div class="vmain">
+                    <span class="vdir">{{ bk.v.direction==='NEUTRAL'?'No clear bias':bk.v.direction }}</span>
+                    <span class="vchip" v-if="bk.v.grade">Grade <b>{{ bk.v.grade }}</b></span>
+                    <span class="vchip" v-if="bk.v.confidence!=null"><b>{{ bk.v.confidence }}%</b> confidence</span>
+                    <span class="vact" :class="bk.v.tradeable?'go':'wait'" :title="bk.v.action_title||''">{{ bk.v.tradeable?'Tradeable now':(bk.v.action==='CLOSED'?'Market closed':'Wait') }}</span>
+                  </div>
+                  <div class="vgrid" v-if="bk.v.entry!=null">
+                    <div><label>Entry</label><b>{{ vfmt(bk.v,bk.v.entry) }}</b><small v-if="bk.v.model">{{ String(bk.v.model).toLowerCase() }}</small></div>
+                    <div class="st"><label>Stop</label><b>{{ vfmt(bk.v,bk.v.stop) }}</b></div>
+                    <div v-for="(tp,ti) in bk.v.targets" :key="ti" class="tp"><label>Target {{ ti+1 }}</label><b>{{ vfmt(bk.v,tp) }}</b></div>
+                    <div v-if="bk.v.rr"><label>Reward : risk</label><b>{{ bk.v.rr }} : 1</b></div>
+                  </div>
+                  <div class="vfoot">{{ [bk.v.session,bk.v.regime&&(String(bk.v.regime).toLowerCase()+' regime'),bk.v.time&&('data '+bk.v.time)].filter(Boolean).join(' · ') }} · Research, not advice</div>
+                </div>
+                <div v-else-if="bk.type==='text'" class="md" v-html="mdCaret(bk.text,(t.streaming||t.revealing)&&bk.text.length<bk.full.length||t.streaming&&bi===visibleBlocks(t).length-1)"></div>
                 <nc-chart v-else-if="bk.type==='chart'" :chart="bk.chart" :dark="darkMode"></nc-chart>
-                <div v-else-if="bk.type==='team'" class="team" role="list" aria-label="Desk team">
-                  <button v-for="ag in bk.agents" :key="ag.id" class="agentt" role="listitem" @click="ag.open=!ag.open" :aria-expanded="!!ag.open">
-                    <div class="r1"><span class="ic">{{ ag.name[0] }}</span><span class="nm">{{ ag.name }}</span>
-                      <span v-if="ag.status==='running'" class="spin-s"></span><span v-else class="vpill" :class="ag.verdict.replace(' ','')">{{ ag.verdict }}</span></div>
-                    <div class="sm">{{ ag.status==='running'?ag.role:ag.summary }}</div>
-                    <ul v-if="ag.open&&ag.points&&ag.points.length"><li v-for="(pt,pi) in ag.points" :key="pi">{{ pt }}</li></ul>
-                  </button>
+                <div v-else-if="bk.type==='team'" class="team2" role="group" aria-label="Specialists">
+                  <div class="t2h"><span>Specialists</span><span class="anote">{{ teamLine(bk) }}</span></div>
+                  <div class="t2row">
+                    <button v-for="ag in bk.agents" :key="ag.id" type="button" class="t2chip" :class="[ag.status==='running'?'run':ag.verdict.replace(' ',''),{open:ag.open}]"
+                      @click="ag.open=!ag.open" :aria-expanded="!!ag.open" :title="ag.summary||ag.role">
+                      <span v-if="ag.status==='running'" class="spin-s"></span><i v-else></i>{{ ag.name.replace(' analyst','').replace(' manager','') }}
+                      <em>{{ ag.status==='running'?'working':ag.verdict }}</em></button>
+                  </div>
+                  <template v-for="ag in bk.agents" :key="'d'+ag.id">
+                    <div v-if="ag.open" class="t2det"><b>{{ ag.name }}</b> <span class="anote">{{ ag.summary }}</span>
+                      <ul v-if="ag.points&&ag.points.length"><li v-for="(pt,pi) in ag.points" :key="pi">{{ pt }}</li></ul></div>
+                  </template>
                 </div>
                 <div v-else-if="bk.type==='card'&&bk.card.kind==='route'" class="acard">
                   <div class="top"><span>Route preview · {{ bk.card.symbol }}</span><span>preview only</span></div>
@@ -1008,11 +1163,34 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
                       <div class="anote" v-if="ac.reasons.length">{{ ac.reasons.join(' · ') }}</div></td>
                       <td><span class="dec" :class="ac.decision">{{ ac.decision }}</span></td><td class="num">{{ ac.lots }} lots</td><td class="num">{{ ac.risk ?? '—' }}</td></tr>
                   </table></div></div>
+                <div v-else-if="bk.type==='card'&&bk.card.kind==='journal'" class="vcard">
+                  <div class="vtop"><span class="vname">Your journal</span><a class="anote" href="/journal">Open the journal ›</a></div>
+                  <div class="vgrid">
+                    <div><label>Trades</label><b>{{ bk.card.stats.trades??0 }}</b></div>
+                    <div><label>Win rate</label><b>{{ bk.card.stats.win_rate==null?'—':bk.card.stats.win_rate+'%' }}</b></div>
+                    <div :class="(bk.card.stats.total_r||0)>=0?'tp':'st'"><label>Total R</label><b>{{ bk.card.stats.total_r==null?'—':(bk.card.stats.total_r>0?'+':'')+bk.card.stats.total_r }}</b></div>
+                    <div><label>To review</label><b>{{ bk.card.stats.to_review??0 }}</b></div>
+                    <div :class="bk.card.stats.breaches?'st':''"><label>Breaches</label><b>{{ bk.card.stats.breaches??0 }}</b></div>
+                  </div></div>
                 <details v-else-if="bk.type==='card'" class="trail"><summary>{{ bk.card.title||'Data' }} <span class="chev">›</span></summary>
                   <pre style="padding:10px;margin:0;font:11px var(--mono);white-space:pre-wrap;max-height:320px;overflow:auto">{{ JSON.stringify(bk.card.data,null,2) }}</pre></details>
               </template>
-              <div v-if="t.streaming&&!t.blocks.length&&!t.steps.length" class="anote"><span class="spin-s"></span> Thinking…</div>
+              <div class="aacts" v-if="!t.streaming&&!t.revealing&&t.blocks.length">
+                <button type="button" @click="copyAnswer(t)" title="Copy the plan and the answer"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>Copy</button>
+                <button type="button" v-if="t.blocks.some(b=>b.type==='verdict'&&b.v.entry!=null)" @click="showOnChart(t)" title="Open the main chart with these levels"><svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 4 8-9"/><path d="M3 21h18"/></svg>Show on chart</button>
+                <details v-if="t.steps.length" class="srcs"><summary>Sources · {{ t.steps.length }} desk tool{{ t.steps.length>1?'s':'' }}</summary>
+                  <div class="step" v-for="st in t.steps" :key="st.id">
+                    <span :class="st.ok?'dirL':'dirS'">{{ st.ok?'✓':'✕' }}</span>
+                    <span style="min-width:0"><span class="nm">{{ toolTitle(st.name) }}</span> <span class="sm">{{ st.summary || argText(st.args) }}</span></span>
+                    <span class="ms">{{ st.ms?st.ms+' ms':'' }}</span>
+                  </div></details>
+              </div>
+
               <div v-if="t.error" class="noticebar" style="color:var(--r);background:var(--rt)">{{ t.error }}</div>
+              <div v-if="t.upgrade" class="upcard"><div class="upk">Northcharts {{ t.upgrade.plan_name }}</div>
+                <div class="upm">{{ t.upgrade.message }}</div>
+                <div class="upa"><a class="upb" :href="t.upgrade.href">See {{ t.upgrade.plan_name }}</a>
+                <span>Desk calls on the main screen stay free.</span></div></div>
               <div class="sugg" v-if="!t.streaming&&!t.revealing&&t.suggestions.length&&t===chat[chat.length-1]">
                 <button v-for="sg in t.suggestions" :key="sg" @click="ask(sg)">{{ sg }}</button>
               </div>
@@ -1027,7 +1205,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
       <div v-if="!agentFeed.length" class="aempty">No agent activity yet. Connect ChatGPT or Claude from the Connect tab.</div>
       <div class="afeed">
         <div class="row" v-for="(a,i) in agentFeed" :key="i">
-          <span class="who" :class="{ui:a.client==='Northchart UI'}">{{ a.client }}</span>
+          <span class="who" :class="{ui:a.client==='Northcharts UI'}">{{ a.client }}</span>
           <span class="what">{{ a.tool }}<template v-if="a.args&&a.args.symbol"> · {{ a.args.symbol }}</template><template v-if="a.args&&a.args.question"> · “{{ a.args.question }}”</template></span>
           <span class="when"><span :class="a.ok?'dirL':'dirS'">{{ a.ok?'✓':'✕' }}</span> {{ ago(a.ts) }} · {{ a.ms }}ms</span>
           <span v-if="!a.ok" class="err">{{ a.error }}</span>
@@ -1036,16 +1214,16 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
     </div>
 
     <div class="abody" v-else>
-      <div class="anote">Northchart Connect is a remote MCP server. Add it once and ChatGPT or Claude can read the desk with the same tools you use here.</div>
+      <div class="anote">Northcharts Connect is a remote MCP server. Add it once and ChatGPT or Claude can read the desk with the same tools you use here.</div>
       <div class="aurl"><span>{{ agentStatus.mcp_url || '…' }}</span><button class="tvlink" @click="copyMcp">Copy</button></div>
       <div class="acard"><div class="top"><span>Claude</span></div><div class="in"><ol class="asteps">
         <li>Open <b>Settings → Connectors</b> (claude.ai or the desktop app).</li>
         <li>Choose <b>Add custom connector</b> and paste the URL above.</li>
-        <li>Approve on the Northchart page with your desk password.</li></ol></div></div>
+        <li>Approve on the Northcharts page with your desk password.</li></ol></div></div>
       <div class="acard"><div class="top"><span>ChatGPT</span></div><div class="in"><ol class="asteps">
         <li>Open <b>Settings → Apps</b>, then <b>Create</b> (developer mode must be on for your plan).</li>
         <li>Paste the URL above and choose <b>OAuth</b> authentication.</li>
-        <li>Approve on the Northchart page with your desk password.</li></ol></div></div>
+        <li>Approve on the Northcharts page with your desk password.</li></ol></div></div>
       <div class="acard"><div class="top"><span>Claude Code and scripts</span></div><div class="in">
         <p class="anote">Set <code>NORTHCHART_MCP_TOKEN</code> on the server, then:</p>
         <pre>claude mcp add --transport http northchart {{ agentStatus.mcp_url }} --header "Authorization: Bearer $NORTHCHART_MCP_TOKEN"</pre>
@@ -1081,7 +1259,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
 const {createApp} = Vue;
 const app=createApp({
   data(){return{
-    sym:'XAUUSD', inboxN:0, me:null, hasUsers:true,
+    sym:'XAUUSD', inboxN:0, me:null, hasUsers:true, plan:null, billing:'off',
     symGroups:[
       ['Metals',[['XAUUSD','Gold · XAU/USD'],['XAGUSD','Silver · XAG/USD']]],
       ['Crypto',[['BTCUSD','Bitcoin · BTC'],['ETHUSD','Ethereum · ETH'],['SOLUSD','Solana · SOL'],['XRPUSD','XRP']]],
@@ -1095,15 +1273,46 @@ const app=createApp({
     cpQ:'', cpLog:[], quickQs:['Why this bias?','Should I wait?','How strong is this trend?','Is this a fake breakout?','Where are institutions positioned?','Safest entry?',"Summarize today's market"],
     tvu:'',tvp:'',tvsid:'',tvsign:'',tverrMsg:'',authOpen:false,authStep:'signin',authLoading:false,
     tvWidgetSym:null, curvePts:[], macroHelp:false,
+    engine:'nc', chartTfs:['1m','5m','15m','30m','1h','4h','1D','1W'], chartTf:'15m', chartType:'candle_solid', chartLog:false,
+    chartTypes:[['candle_solid','Candles'],['candle_stroke','Hollow candles'],['ohlc','Bars'],['area','Area']],
+    chartMenu:'', indQ:'', chartInds:['VOL'], showLevels:true, chartStatus:'', chartSource:'', chartLevels:[], chartFs:false,
+    indList:[{id:'MA',label:'Moving average',main:true},{id:'EMA',label:'Exponential moving average',main:true},
+      {id:'SMA',label:'Smoothed moving average',main:true},{id:'BOLL',label:'Bollinger Bands',main:true},
+      {id:'SAR',label:'Parabolic SAR',main:true},{id:'BBI',label:'Bull and bear index',main:true},
+      {id:'VOL',label:'Volume'},{id:'RSI',label:'Relative strength index'},{id:'MACD',label:'MACD'},
+      {id:'KDJ',label:'Stochastic (KDJ)'},{id:'CCI',label:'Commodity channel index'},{id:'DMI',label:'Directional movement'},
+      {id:'WR',label:'Williams %R'},{id:'OBV',label:'On-balance volume'},{id:'MTM',label:'Momentum'},{id:'ROC',label:'Rate of change'},
+      {id:'TRIX',label:'TRIX'},{id:'AO',label:'Awesome oscillator'}],
+    drawTool:'cursor', chartMagnet:true, drawLocked:false, drawHidden:false,
+    drawTools:[
+      {id:'cursor',label:'Cursor',icon:'<svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/></svg>'},
+      {id:'segment',label:'Trend line',sep:true,icon:'<svg viewBox="0 0 24 24"><path d="M5 19L19 5"/><circle cx="5" cy="19" r="1.8"/><circle cx="19" cy="5" r="1.8"/></svg>'},
+      {id:'rayLine',label:'Ray',icon:'<svg viewBox="0 0 24 24"><path d="M5 19L22 2"/><circle cx="5" cy="19" r="1.8"/><circle cx="12" cy="12" r="1.8"/></svg>'},
+      {id:'straightLine',label:'Extended line',icon:'<svg viewBox="0 0 24 24"><path d="M2 22L22 2"/><circle cx="8" cy="16" r="1.8"/><circle cx="16" cy="8" r="1.8"/></svg>'},
+      {id:'horizontalStraightLine',label:'Horizontal line',icon:'<svg viewBox="0 0 24 24"><path d="M2 12h20"/><circle cx="12" cy="12" r="1.8"/></svg>'},
+      {id:'horizontalRayLine',label:'Horizontal ray',icon:'<svg viewBox="0 0 24 24"><path d="M6 12h16"/><circle cx="6" cy="12" r="1.8"/></svg>'},
+      {id:'verticalStraightLine',label:'Vertical line',icon:'<svg viewBox="0 0 24 24"><path d="M12 2v20"/><circle cx="12" cy="12" r="1.8"/></svg>'},
+      {id:'parallelStraightLine',label:'Parallel channel',sep:true,icon:'<svg viewBox="0 0 24 24"><path d="M3 15L15 3M9 21L21 9"/></svg>'},
+      {id:'priceChannelLine',label:'Price channel',icon:'<svg viewBox="0 0 24 24"><path d="M3 17L17 3M7 21L21 7M3 11L11 3"/></svg>'},
+      {id:'fibonacciLine',label:'Fibonacci retracement',icon:'<svg viewBox="0 0 24 24"><path d="M3 4h18M3 9h18M3 13h18M3 20h18"/><path d="M6 20L18 4" stroke-dasharray="2 2"/></svg>'},
+      {id:'ncMeasure',label:'Measure: price change, % and bars',sep:true,icon:'<svg viewBox="0 0 24 24"><path d="M4 20V8M4 20h12"/><path d="M8 16l10-10M14 6h4v4"/></svg>'},
+      {id:'priceLine',label:'Price label',icon:'<svg viewBox="0 0 24 24"><path d="M3 12h11"/><path d="M14 8h6l2 4-2 4h-6z"/></svg>'},
+      {id:'simpleAnnotation',label:'Note',icon:'<svg viewBox="0 0 24 24"><path d="M5 4h14v11H10l-5 5z"/></svg>'}],
     darkMode:false, roster:[], refreshing:false,
     agentOpen:false, agentTab:'run', agentQ:'', agentFeed:[], agentStatus:{}, agentUnread:0, agentSeenTs:0, agentId:0,
     chat:[], streaming:false, abortCtl:null, agentWide:false, agentMode:'desk', stick:true, menuOpen:false, installPrompt:null, isStandalone:false, installHelp:false, installHint:'other',
     listening:false, speechOk:false, speed:'normal',
     speeds:{slow:{label:'Slow',cps:30,sentence:420,para:650},normal:{label:'Normal',cps:55,sentence:200,para:340},fast:{label:'Fast',cps:120,sentence:90,para:160}},
-    heroTiles:[['Why no trade on gold?','Levels, evidence and what would change the view'],['Scan all markets','Conviction across all 15 instruments'],
-      ['Chart USDJPY','15-minute candles with desk levels'],['Route XAUUSD','Sized for every account, preview only']],
   }},
   computed:{
+    heroTiles(){ const n=(this.d.sym_name||this.sym), s=this.sym;
+      return [['Analyse '+s,'The plan first: bias, entry, stop and targets, then the reasons'],
+        ['Scan all markets','Which of the 15 instruments has the strongest setup'],
+        ['Review my journal','Win rate, R, discipline flags and what to fix'],
+        ['What would change the view on '+s+'?','The levels and events that would flip it']] },
+    drawHint(){ const t=this.drawTools.find(x=>x.id===this.drawTool); if(!t) return '';
+      const two=['segment','rayLine','straightLine','ncMeasure','fibonacciLine'].includes(t.id), three=['parallelStraightLine','priceChannelLine'].includes(t.id);
+      return t.label+': '+(three?'click three points':two?'click two points':'click once') },
     initials(){ const m=this.me||{}; const src=(m.name||m.email||'?').trim();
       const p=src.split(/[\s@.]+/).filter(Boolean); return ((p[0]||'?')[0]+((m.name&&p[1])?p[1][0]:'')).toUpperCase() },
     perf(){ return this.d.perf||{} },
@@ -1191,7 +1400,7 @@ const app=createApp({
       setTimeout(()=>{this.toasts=this.toasts.filter(t=>t.id!==id)},4500) },
     chipDir(s){ const r=this.roster.find(x=>x.sym===s); return r&&r.direction==='LONG'?'dirL':r&&r.direction==='SHORT'?'dirS':'mut' },
     chipDirLabel(s){ const r=this.roster.find(x=>x.sym===s); if(!r||!r.direction)return '·'; return r.direction==='LONG'?'L':r.direction==='SHORT'?'S':'N' },
-    async fetchMe(){ try{ const j=await (await fetch('/api/auth/me')).json(); this.me=j.user; this.hasUsers=j.has_users }catch(e){} },
+    async fetchMe(){ try{ const j=await (await fetch('/api/auth/me')).json(); this.me=j.user; this.hasUsers=j.has_users; this.plan=j.plan; this.billing=j.billing }catch(e){} },
     async fetchInbox(){
       try{ const r=await fetch('/api/journal/queue'); if(!r.ok) return;
         const j=await r.json(); this.inboxN=j.count||0; }catch(e){}
@@ -1209,6 +1418,7 @@ const app=createApp({
       if(meta) meta.content=this.darkMode?'#0b0d10':'#ffffff';
       try{ localStorage.setItem('sd-theme-v2', this.darkMode?'dark':'light') }catch(e){}
       this.tvWidgetSym=null;
+      if(this._nc){ this._nc.setStyles(this.darkMode?'dark':'light'); this.$nextTick(()=>{ this._nc.setStyles(this.chartStyles()); this.drawLevels() }) }
       this.$nextTick(()=>this.mountChart());
     },
     toggleTheme(){ this.darkMode=!this.darkMode; this.applyTheme();
@@ -1237,6 +1447,149 @@ const app=createApp({
       }catch(e){ this.d={status:'error', error:'network'} }
     },
     mountChart(){
+      if(this.engine==='tv') return this.mountTv();
+      this.ncEnsure();
+    },
+
+    // ---------------- Northcharts chart (KLineChart engine) ----------------
+    savePrefs(){ try{ localStorage.setItem('nc-chart', JSON.stringify({engine:this.engine,tf:this.chartTf,type:this.chartType,
+      log:this.chartLog,inds:this.chartInds,levels:this.showLevels,magnet:this.chartMagnet})) }catch(e){} },
+    loadPrefs(){ try{ const p=JSON.parse(localStorage.getItem('nc-chart')||'{}');
+      if(p.engine) this.engine=p.engine; if(this.chartTfs.includes(p.tf)) this.chartTf=p.tf; if(p.type) this.chartType=p.type;
+      this.chartLog=!!p.log; if(Array.isArray(p.inds)) this.chartInds=p.inds; if(p.levels===false) this.showLevels=false;
+      if(p.magnet===false) this.chartMagnet=false }catch(e){} },
+    indMatch(x){ const q=this.indQ.trim().toLowerCase(); return !q||x.label.toLowerCase().includes(q)||x.id.toLowerCase().includes(q) },
+    levelColor(k){ return {entry:this.cssVar('--b')||'#2563eb',sl:this.cssVar('--r')||'#d04438',tp1:this.cssVar('--g')||'#0d9b6e',tp2:this.cssVar('--g')||'#0d9b6e'}[k] },
+    chartStyles(){
+      const g=this.cssVar('--g')||'#0d9b6e', r=this.cssVar('--r')||'#d04438', tx=this.cssVar('--dim')||'#6B7280', bd=this.cssVar('--bd')||'#E5E7EB';
+      return {grid:{horizontal:{color:bd},vertical:{color:bd}},
+        candle:{type:this.chartType,bar:{upColor:g,downColor:r,noChangeColor:tx,upBorderColor:g,downBorderColor:r,upWickColor:g,downWickColor:r},
+          area:{lineColor:this.cssVar('--b')||'#2563eb'},priceMark:{last:{upColor:g,downColor:r}},
+          tooltip:{text:{color:tx}}},
+        xAxis:{axisLine:{color:bd},tickText:{color:tx}},yAxis:{axisLine:{color:bd},tickText:{color:tx}},
+        separator:{color:bd},crosshair:{horizontal:{line:{color:tx}},vertical:{line:{color:tx}}}};
+    },
+    ncRegister(){
+      if(this._ncReg||typeof klinecharts==='undefined') return; this._ncReg=true;
+      const vm=this;
+      klinecharts.registerOverlay({name:'ncLevel',totalStep:2,needDefaultPointFigure:false,needDefaultXAxisFigure:false,needDefaultYAxisFigure:true,
+        createPointFigures:({coordinates,bounding,overlay})=>{ const y=coordinates[0].y, e=overlay.extendData||{};
+          return [{type:'line',attrs:{coordinates:[{x:0,y},{x:bounding.width,y}]},styles:{style:'dashed',dashedValue:[5,4],color:e.color,size:1}},
+            {type:'text',ignoreEvent:true,attrs:{x:bounding.width-8,y:y-3,text:e.label,align:'right',baseline:'bottom'},styles:{color:e.color,size:11,weight:600,backgroundColor:'transparent',paddingLeft:0,paddingRight:0}}] }});
+      klinecharts.registerOverlay({name:'ncMeasure',totalStep:3,needDefaultPointFigure:true,needDefaultXAxisFigure:true,needDefaultYAxisFigure:true,
+        createPointFigures:({coordinates,overlay})=>{
+          if(coordinates.length<2) return [];
+          const [a,b]=coordinates, [pa,pb]=overlay.points;
+          const up=(pb.value??0)>=(pa.value??0), col=up?(vm.cssVar('--g')||'#0d9b6e'):(vm.cssVar('--r')||'#d04438');
+          const diff=(pb.value-pa.value), pct=pa.value?diff/pa.value*100:0, bars=Math.abs((pb.dataIndex??0)-(pa.dataIndex??0));
+          const dp=Number.isInteger(vm.d.dp)?vm.d.dp:2;
+          const txt=(diff>=0?'+':'')+diff.toFixed(dp)+'  ('+(pct>=0?'+':'')+pct.toFixed(2)+'%)  '+bars+' bars';
+          return [{type:'rect',attrs:{x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),width:Math.abs(b.x-a.x),height:Math.abs(b.y-a.y)},
+              styles:{style:'fill',color:col+'22',borderColor:col}},
+            {type:'line',attrs:{coordinates:[{x:a.x,y:(a.y+b.y)/2},{x:b.x,y:(a.y+b.y)/2}]},styles:{color:col,style:'dashed',dashedValue:[3,3]}},
+            {type:'text',attrs:{x:(a.x+b.x)/2,y:Math.min(a.y,b.y)-6,text:txt,align:'center',baseline:'bottom'},
+              styles:{color:'#fff',backgroundColor:col,size:11,weight:600,paddingLeft:6,paddingRight:6,paddingTop:3,paddingBottom:3,borderRadius:4}}] }});
+    },
+    ncEnsure(){
+      if(this.d.status!=='ok'||typeof klinecharts==='undefined') return;
+      const el=document.getElementById('ncchart'); if(!el) return;
+      this.ncRegister();
+      if(!this._nc){
+        this._nc=klinecharts.init(el,{timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||'Etc/UTC'}); window.ncChart=this._nc;
+        this._nc.setStyles(this.darkMode?'dark':'light'); this._nc.setStyles(this.chartStyles());
+        const vm=this;
+        this._nc.setDataLoader({
+          getBars:async({type,symbol,period,callback})=>{
+            if(type!=='init'){ callback([],false); return }
+            vm.chartStatus='Loading…';
+            try{ const r=await fetch('/api/chart/bars?sym='+encodeURIComponent(symbol.ticker)+'&tf='+encodeURIComponent(vm.chartTf));
+              const j=await r.json(); if(!r.ok) throw new Error(j.error||'no data');
+              vm.chartSource=j.source+(j.bars.length?' · '+j.bars.length+' bars':''); vm.chartLevels=j.levels||[];
+              vm._ncLast=j.bars[j.bars.length-1]||null;
+              callback(j.bars,false); vm.chartStatus='';
+              vm.$nextTick(()=>{ vm.drawLevels(); vm.restoreDrawings() });
+            }catch(e){ vm.chartStatus='No price history: '+e.message; callback([],false) } },
+          subscribeBar:({callback})=>{ vm._ncPush=callback },
+          unsubscribeBar:()=>{ vm._ncPush=null }});
+        for(const id of this.chartInds) this.addInd(id);
+        if(this.chartLog) this._nc.overrideYAxis({paneId:'candle_pane',name:'logarithm'});
+        this._ncTimer=setInterval(()=>this.ncTick(),20000);
+        window.addEventListener('resize',()=>this._nc&&this._nc.resize());
+        document.addEventListener('fullscreenchange',()=>{ this.chartFs=!!document.fullscreenElement; this.$nextTick(()=>this._nc&&this._nc.resize()) });
+        document.addEventListener('click',()=>{ this.chartMenu='' });
+        document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&this.drawTool!=='cursor'){ this.pickTool('cursor') } });
+      }
+      const key=this.sym+'|'+this.chartTf;
+      if(this._ncKey!==key){
+        this._ncKey=key; this.saveDrawingsFor(this._ncSym);
+        this._ncSym=this.sym;
+        this._nc.removeOverlay({groupId:'user'}); this._nc.removeOverlay({groupId:'desk'});
+        const p={'1m':['minute',1],'5m':['minute',5],'15m':['minute',15],'30m':['minute',30],'1h':['hour',1],'4h':['hour',4],'1D':['day',1],'1W':['week',1]}[this.chartTf];
+        this._nc.setSymbol({ticker:this.sym,pricePrecision:Number.isInteger(this.d.dp)?this.d.dp:2,volumePrecision:0});
+        this._nc.setPeriod({type:p[0],span:p[1]});
+      } else this.drawLevels();
+    },
+    async ncTick(){
+      if(!this._nc||this.engine!=='nc'||!this._ncPush||document.hidden) return;
+      try{ const r=await fetch('/api/chart/bars?sym='+this.sym+'&tf='+this.chartTf); if(!r.ok) return; const j=await r.json();
+        const tail=j.bars.slice(-2); for(const b of tail){ if(!this._ncLast||b.timestamp>=this._ncLast.timestamp) this._ncPush&&this._ncPush(b) }
+        this._ncLast=j.bars[j.bars.length-1]; this.chartLevels=j.levels||[]; this.drawLevels() }catch(e){}
+    },
+    setTf(t){ this.chartTf=t; this.savePrefs(); this.ncEnsure() },
+    setChartType(t){ this.chartType=t; this.chartMenu=''; this.savePrefs(); this._nc&&this._nc.setStyles({candle:{type:t}}) },
+    toggleLog(){ this.chartLog=!this.chartLog; this.savePrefs(); this._nc&&this._nc.overrideYAxis({paneId:'candle_pane',name:this.chartLog?'logarithm':'normal'}) },
+    setEngine(e){ this.engine=e; this.savePrefs(); if(e==='tv'){ this.tvWidgetSym=null; this.$nextTick(()=>this.mountTv()) } else this.$nextTick(()=>{ this.ncEnsure(); this._nc&&this._nc.resize() }) },
+    addInd(id){ const i=this.indList.find(x=>x.id===id); if(!i||!this._nc) return;
+      if(i.main) this._nc.createIndicator({name:id,paneId:'candle_pane'},true); else this._nc.createIndicator({name:id}) },
+    toggleInd(id){ if(!this._nc) return;
+      if(this.chartInds.includes(id)){ this.chartInds=this.chartInds.filter(x=>x!==id); this._nc.removeIndicator({name:id}) }
+      else { this.chartInds=[...this.chartInds,id]; this.addInd(id) }
+      this.savePrefs() },
+    toggleLevels(){ this.showLevels=!this.showLevels; this.savePrefs(); this.drawLevels() },
+    drawLevels(){
+      if(!this._nc) return; this._nc.removeOverlay({groupId:'desk'});
+      if(!this.showLevels||!this._ncLast) return;
+      const dp=Number.isInteger(this.d.dp)?this.d.dp:2;
+      for(const l of this.chartLevels) this._nc.createOverlay({name:'ncLevel',groupId:'desk',lock:true,
+        points:[{timestamp:this._ncLast.timestamp,value:l.value}],
+        extendData:{label:l.label+'  '+Number(l.value).toLocaleString('en-GB',{minimumFractionDigits:dp,maximumFractionDigits:dp}),color:this.levelColor(l.key)}});
+    },
+    pickTool(id){
+      this.drawTool=id; if(!this._nc) return;
+      if(id==='cursor'){ if(this._ncDrawing){ this._nc.removeOverlay({id:this._ncDrawing}); this._ncDrawing=null } return }
+      const vm=this, save=()=>vm.saveDrawingsFor(vm.sym);
+      const o={name:id,groupId:'user',lock:this.drawLocked,mode:this.chartMagnet?'weak_magnet':'normal',
+        onDrawEnd:()=>{ vm._ncDrawing=null; vm.drawTool='cursor'; save(); return false },
+        onPressedMoveEnd:()=>{ save(); return false }, onRemoved:()=>{ save(); return false }};
+      if(id==='simpleAnnotation'){ const t=prompt('Note text'); if(!t){ this.drawTool='cursor'; return } o.extendData=t }
+      this._ncDrawing=this._nc.createOverlay(o);
+    },
+    saveDrawingsFor(sym){
+      if(!this._nc||!sym) return;
+      const list=this._nc.getOverlays({groupId:'user'}).filter(o=>o.points&&o.points.length&&o.id!==this._ncDrawing)
+        .map(o=>({name:o.name,points:o.points.map(p=>({timestamp:p.timestamp,value:p.value})),extendData:o.extendData??null}))
+        .filter(o=>o.points.every(p=>p.timestamp!=null&&p.value!=null));
+      try{ localStorage.setItem('nc-draw-'+sym, JSON.stringify(list)) }catch(e){}
+    },
+    restoreDrawings(){
+      if(!this._nc) return; this._nc.removeOverlay({groupId:'user'});
+      let list=[]; try{ list=JSON.parse(localStorage.getItem('nc-draw-'+this.sym)||'[]') }catch(e){}
+      const vm=this, save=()=>vm.saveDrawingsFor(vm.sym);
+      for(const o of list) this._nc.createOverlay({...o,groupId:'user',lock:this.drawLocked,visible:!this.drawHidden,
+        onPressedMoveEnd:()=>{ save(); return false },onRemoved:()=>{ save(); return false }});
+    },
+    lockDrawings(){ this.drawLocked=!this.drawLocked; if(!this._nc) return;
+      for(const o of this._nc.getOverlays({groupId:'user'})) this._nc.overrideOverlay({id:o.id,lock:this.drawLocked}) },
+    hideDrawings(){ this.drawHidden=!this.drawHidden; if(!this._nc) return;
+      for(const o of this._nc.getOverlays({groupId:'user'})) this._nc.overrideOverlay({id:o.id,visible:!this.drawHidden}) },
+    clearDrawings(){ if(!this._nc) return; if(!confirm('Remove all drawings on '+this.sym+'?')) return;
+      this._nc.removeOverlay({groupId:'user'}); try{ localStorage.removeItem('nc-draw-'+this.sym) }catch(e){} },
+    chartShot(){ if(!this._nc) return;
+      const url=this._nc.getConvertPictureUrl(true,'png',this.cssVar('--p1')||'#ffffff');
+      const a=document.createElement('a'); a.href=url; a.download='northchart-'+this.sym+'-'+this.chartTf+'.png'; a.click() },
+    chartFull(){ const el=this.$refs.chartPanel; if(!el) return;
+      if(document.fullscreenElement) document.exitFullscreen(); else if(el.requestFullscreen) el.requestFullscreen(); else { this.chartFs=!this.chartFs; this.$nextTick(()=>this._nc&&this._nc.resize()) } },
+    mountTv(){
       if(this.d.status!=='ok'||typeof TradingView==='undefined') return;
       const theme=this.darkMode?'dark':'light';
       const symKey=this.d.tv_chart+'|'+theme;
@@ -1343,7 +1696,7 @@ const app=createApp({
     async fetchAgentStatus(){ try{ const r=await fetch('/api/agent/status'); if(r.ok) this.agentStatus=await r.json() }catch(e){} },
     async fetchAgentFeed(){ try{ const r=await fetch('/api/agent/activity?limit=60'); if(!r.ok) return;
         const j=await r.json(); this.agentFeed=j.activity||[];
-        this.agentUnread=this.agentFeed.filter(a=>a.client!=='Northchart UI'&&a.ts>this.agentSeenTs).length;
+        this.agentUnread=this.agentFeed.filter(a=>a.client!=='Northcharts UI'&&a.ts>this.agentSeenTs).length;
         if(this.agentOpen&&this.agentTab==='activity') this.markAgentSeen();
       }catch(e){} },
     toolTitle(n){ return ({get_market_snapshot:'Snapshot',get_signal_detail:'Signal detail',get_candles:'Candles',
@@ -1375,7 +1728,7 @@ const app=createApp({
     newChat(){ this.stopStream(); this.chat=[]; this.agentTab='run'; this.$nextTick(()=>this.$refs.ainput&&this.$refs.ainput.focus()) },
     async installDesktop(){
       if(this.installPrompt){ const p=this.installPrompt; this.installPrompt=null; p.prompt();
-        try{ const r=await p.userChoice; if(r&&r.outcome==='accepted') this.toast('Installing Northchart') }catch(e){} return }
+        try{ const r=await p.userChoice; if(r&&r.outcome==='accepted') this.toast('Installing Northcharts') }catch(e){} return }
       const ua=navigator.userAgent;
       this.installHint=/iPhone|iPad/.test(ua)?'ios':/Edg\/|Chrome\//.test(ua)?'chromium':/Safari\//.test(ua)?'safari':'other';
       this.installHelp=!this.installHelp },
@@ -1388,7 +1741,7 @@ const app=createApp({
       const history=this.chat.filter(t=>!t.streaming).map(t=>t.role==='user'?{role:'user',content:t.text}
         :{role:'assistant',content:t.blocks.filter(b=>b.type==='text').map(b=>b.full).join('\n')}).slice(-10);
       this.chat.push({id:++this.agentId,role:'user',text:q});
-      this.chat.push({id:++this.agentId,role:'assistant',mode:null,symbol:this.sym,steps:[],blocks:[],suggestions:[],streaming:true,revealing:false,error:null,notice:null});
+      this.chat.push({id:++this.agentId,role:'assistant',mode:null,symbol:this.sym,steps:[],blocks:[],suggestions:[],streaming:true,revealing:false,error:null,notice:null,upgrade:null});
       const t=this.chat[this.chat.length-1];
       this.streaming=true; this.abortCtl=new AbortController(); this.scrollAgent(true);
       try{
@@ -1418,6 +1771,7 @@ const app=createApp({
         if(last&&last.type==='text') last.full+=ev.delta; else t.blocks.push({type:'text',full:ev.delta,text:''});
         this.pace(t) }
       else if(ev.type==='chart') t.blocks.push({type:'chart',chart:ev.chart});
+      else if(ev.type==='verdict') t.blocks.push({type:'verdict',v:ev});
       else if(ev.type==='team') t.blocks.push({type:'team',agents:ev.agents.map(a=>({...a,status:'running',verdict:'',summary:'',points:[],open:false}))});
       else if(ev.type==='agent'){ const tb=[...t.blocks].reverse().find(b=>b.type==='team'); const ag=tb&&tb.agents.find(a=>a.id===ev.id);
         if(ag) Object.assign(ag,ev) }
@@ -1425,6 +1779,7 @@ const app=createApp({
       else if(ev.type==='suggestions') t.suggestions=ev.items||[];
       else if(ev.type==='notice') t.notice=ev.message;
       else if(ev.type==='error') t.error=ev.message;
+      else if(ev.type==='upgrade') t.upgrade=ev;
       this.scrollAgent();
     },
     // Reveal streamed text at a human reading pace. Speed is the user's choice (Slow, Normal, Fast);
@@ -1461,7 +1816,33 @@ const app=createApp({
         else if(e.error!=='no-speech'&&e.error!=='aborted') this.toast('Voice input stopped: '+e.error) };
       r.onend=()=>{ this.listening=false; this._rec=null; if(fin.trim()&&!this.streaming) this.ask() };
       try{ r.start(); this.listening=true; this._rec=r }catch(e){ this.toast('Voice input is not available here') } },
-    visibleBlocks(t){ const out=[]; for(const b of t.blocks){ out.push(b); if(b.type==='text'&&b.text.length<b.full.length) break } return out },
+    // Reading order: the plan, the specialists, the explanation, then cards and the chart.
+    visibleBlocks(t){ const rank={verdict:0,team:1,text:2,card:3,chart:4};
+      const r=b=>b.type==='card'&&b.card.kind==='journal'?0:(rank[b.type]??5);
+      const ordered=t.blocks.map((b,i)=>[b,i]).sort((a,b)=>r(a[0])-r(b[0])||a[1]-b[1]).map(x=>x[0]);
+      const out=[]; for(const b of ordered){ out.push(b); if(b.type==='text'&&b.text.length<b.full.length) break } return out },
+    agentStage(t){ if(!t.streaming) return '';
+      const tb=t.blocks.find(b=>b.type==='team'), txt=t.blocks.some(b=>b.type==='text');
+      if(txt) return 'Writing the answer';
+      if(tb){ const d=tb.agents.filter(a=>a.status!=='running').length; return 'Specialists reporting ('+d+' of '+tb.agents.length+')' }
+      if(t.steps.some(x=>x.status==='running')) return 'Reading live desk data';
+      return 'Thinking' },
+    teamLine(tb){ const v=tb.agents.filter(a=>['market','macro','news'].includes(a.id)&&a.verdict&&a.verdict!=='no read');
+      const dir=(this.chat.find(c=>c.blocks&&c.blocks.includes(tb))||{}).blocks?.find(b=>b.type==='verdict')?.v?.direction;
+      const want=dir==='LONG'?'bullish':dir==='SHORT'?'bearish':null;
+      if(!want||!v.length) return tb.agents.every(a=>a.status!=='running')?'':'Working';
+      return v.filter(a=>a.verdict===want).length+' of '+v.length+' back the view' },
+    vfmt(v,x){ if(x==null||x==='') return '—'; const dp=Number.isInteger(v.dp)?v.dp:(Math.abs(x)<10?4:2);
+      return Number(x).toLocaleString('en-GB',{minimumFractionDigits:dp,maximumFractionDigits:dp}) },
+    answerText(t){ return t.blocks.filter(b=>b.type==='text').map(b=>b.full).join('\n').replace(/\*\*|####\s?|_/g,'') },
+    async copyAnswer(t){ const v=(t.blocks.find(b=>b.type==='verdict')||{}).v; let head='';
+      if(v) head=v.name+' ('+v.symbol+') '+this.vfmt(v,v.price)+': '+v.direction+(v.grade?' grade '+v.grade:'')+(v.confidence!=null?', '+v.confidence+'% confidence':'')
+        +(v.entry!=null?'. Entry '+this.vfmt(v,v.entry)+', stop '+this.vfmt(v,v.stop)+(v.targets.length?', targets '+v.targets.map(x=>this.vfmt(v,x)).join(', '):''):'')+'.\n\n';
+      try{ await navigator.clipboard.writeText(head+this.answerText(t)); this.toast('Answer copied') }catch(e){ this.toast('Could not copy') } },
+    showOnChart(t){ const v=(t.blocks.find(b=>b.type==='verdict')||{}).v; if(!v) return;
+      if(this.sym!==v.symbol) this.switchSym(v.symbol);
+      this.engine='nc'; this.showLevels=true; this.savePrefs(); this.toggleAgent(false);
+      this.$nextTick(()=>{ const el=this.$refs.chartPanel; if(el) el.scrollIntoView({behavior:'smooth',block:'center'}); this.ncEnsure(); this.drawLevels() }) },
     onChatScroll(){ const el=this.$refs.arun; if(!el||this._autoScrolling) return;
       this.stick=(el.scrollHeight-el.scrollTop-el.clientHeight)<80 },
     scrollAgent(force){ if(force) this.stick=true; this.$nextTick(()=>{ const el=this.$refs.arun; if(!el||!this.stick) return;
@@ -1488,6 +1869,7 @@ const app=createApp({
       this.toast('TV disconnected'); this.tick() },
   },
   mounted(){
+    this.loadPrefs();
     try{
       // White is the default. Dark only when chosen with the toggle (saved under a new key,
       // so an older dark preference or the system setting no longer applies).
@@ -1504,7 +1886,7 @@ const app=createApp({
     this.speechOk=!!(window.SpeechRecognition||window.webkitSpeechRecognition);
     try{ const sp=localStorage.getItem('nc-speed'); if(sp&&this.speeds[sp]) this.speed=sp }catch(e){}
     window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); this.installPrompt=e });
-    window.addEventListener('appinstalled',()=>{ this.isStandalone=true; this.installPrompt=null; this.installHelp=false; this.toast('Northchart installed') });
+    window.addEventListener('appinstalled',()=>{ this.isStandalone=true; this.installPrompt=null; this.installHelp=false; this.toast('Northcharts installed') });
     if('serviceWorker' in navigator){ navigator.serviceWorker.register('/sw.js').catch(()=>{}) }
     if(location.hash==='#agents-activity'||location.hash==='#agents-connect'){ this.toggleAgent(true); this.setAgentTab(location.hash.slice(8)) }
     setInterval(()=>this.fetchInbox(),60000);
@@ -1524,7 +1906,9 @@ const app=createApp({
       if(e.key==='Escape')this.closeAuth();
     });
     const s=document.createElement('script'); s.src='https://s3.tradingview.com/tv.js';
-    s.onload=()=>this.mountChart(); document.head.appendChild(s);
+    s.onload=()=>{ if(this.engine==='tv') this.mountTv() }; document.head.appendChild(s);
+    const k=document.createElement('script'); k.src='/static/klinecharts.min.js';
+    k.onload=()=>this.mountChart(); document.head.appendChild(k);
   },
 });
 

@@ -327,9 +327,10 @@ class GoogleSignIn(Accounts):
             self.assertEqual(r.getheader("Location"), "/")
             self.assertEqual(g.req("GET", "/api/auth/me")[1]["user"]["role"], "owner")   # same verified email: linked
             # a stranger without an invite is turned away
-            st, page, _ = self.google(s, Client(s.port), {"sub": "g-x", "email": "x@gmail.com"})
-            self.assertEqual(st, 400)
-            self.assertIn(b"invite", page)
+            st, page, r = self.google(s, Client(s.port), {"sub": "g-x", "email": "x@gmail.com"})
+            self.assertEqual(st, 302)
+            self.assertTrue(r.getheader("Location").startswith("/signup?gerr="))      # shown in place, on sign-up
+            self.assertIn("invite", urllib.parse.unquote(r.getheader("Location")))
             # with an invite they get a member account, no password needed
             code = owner.req("POST", "/api/auth/invites", {})[1]["code"]
             m = Client(s.port)
@@ -351,7 +352,7 @@ class GoogleSignIn(Accounts):
             a = Client(s.port)
             st, _, r = a.req("GET", "/auth/google/start", headers={"Accept": "text/html"})
             state = urllib.parse.parse_qs(urllib.parse.urlsplit(r.getheader("Location")).query)["state"][0]
-            st, page, _ = Client(s.port).req("GET", "/auth/google/callback?code=good-code&state=" + state,
+            st, page, r = Client(s.port).req("GET", "/auth/google/callback?code=good-code&state=" + state,
                                              headers={"Accept": "text/html"})
-            self.assertEqual(st, 400)
-            self.assertIn(b"another browser", page)
+            self.assertEqual(st, 302)
+            self.assertIn("another browser", urllib.parse.unquote(r.getheader("Location")))

@@ -1,11 +1,11 @@
-# Northchart
+# Northcharts
 
 Multi-asset charts, confluence signals and an agent desk. XAU/USD first; metals, crypto, FX majors, indices and WTI also covered. Stdlib Python backend, single-file Vue dashboard. This repository was called Signal Desk; the code, service names and data paths keep the old names so existing deployments update in place.
 
 | Name | What it is |
 |---|---|
-| Northchart | The platform: dashboard, tracker and router |
-| Northchart Connect | The agent-facing interface: a remote MCP server for ChatGPT, Claude and other MCP clients |
+| Northcharts | The platform: dashboard, tracker and router |
+| Northcharts Connect | The agent-facing interface: a remote MCP server for ChatGPT, Claude and other MCP clients |
 | Agent desk | The panel in the dashboard (Ctrl+K or `/`) that runs the same tools and shows what agents are doing |
 
 Strategy and competitive notes: `docs/TRADINGVIEW_TEARDOWN.md`.
@@ -47,7 +47,7 @@ The Tracker and Router pages were removed in favour of the journal; `/tracker` a
 
 Sign in at `/signin`. The first account is the owner, created at `/setup` with the current desk password (`SIGNALDESK_PASS`), or from the computer running the desk when none is set. The owner keeps the existing journal and invites other traders from **Account**; sign-up is invite-only unless `NORTHCHART_SIGNUP=open` (or `closed`). Every member gets an empty journal of their own under `DATA_DIR/users/<id>/`; market data and desk signals are shared.
 
-Passwords are stored as scrypt hashes; sessions are HttpOnly, SameSite=Lax cookies (Secure over HTTPS) and the server keeps only their SHA-256; every cookie-authenticated write must come from the same origin; five failed sign-ins lock an email or address for 15 minutes. Verification and reset emails go out over SMTP when `SMTP_HOST` is set, otherwise they are written to `DATA_DIR/accounts/outbox.log`. The account page covers profile, password, active sessions, sync tokens, invites, data export (zip of CSVs) and deleting the account. ChatGPT and Claude now sign in with a Northchart email and password when connecting, and see only that user's journal; routing and portfolio tools stay owner-only.
+Passwords are stored as scrypt hashes; sessions are HttpOnly, SameSite=Lax cookies (Secure over HTTPS) and the server keeps only their SHA-256; every cookie-authenticated write must come from the same origin; five failed sign-ins lock an email or address for 15 minutes. Verification and reset emails go out over SMTP when `SMTP_HOST` is set, otherwise they are written to `DATA_DIR/accounts/outbox.log`. The account page covers profile, password, active sessions, sync tokens, invites, data export (zip of CSVs) and deleting the account. ChatGPT and Claude now sign in with a Northcharts email and password when connecting, and see only that user's journal; routing and portfolio tools stay owner-only.
 
 **Sign in with Google.** Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from a "Web application" OAuth client in Google Cloud whose authorised redirect URI is `<desk address>/auth/google/callback`. "Continue with Google" then appears on the sign-in and sign-up pages. It uses the authorisation code flow with PKCE, a state bound to the browser and a nonce; issuer, audience, expiry, nonce and verified email are checked. A Google address that matches an existing account connects to it; a new address needs an invite unless sign-up is open. Google-only accounts can set a password later on the account page, and any account can connect or disconnect Google there.
 
@@ -57,12 +57,58 @@ Scripts use a **sync token** (`Bearer nci_...`, made on the account page) that c
 
 **Account > Brokers and data**: search for your broker (CMA-licensed brokers are marked) and pick a route. All of them are read-only and feed the same journal pipeline.
 
-- **Northchart Bridge** (MetaTrader 4 and 5, free): `tools/northchart_bridge/NorthchartBridge.mq5` and `.mq4`, downloadable from the account page with the desk address filled in. It reads closed trades from the terminal's history and posts them to `/api/ingest/bridge` with a sync token. It contains no trading calls and the password never leaves the terminal. MT5 sends the stop at entry and the stop at the close, so a widened stop is flagged.
+- **Northcharts Bridge** (MetaTrader 4 and 5, free): `tools/northchart_bridge/NorthchartBridge.mq5` and `.mq4`, downloadable from the account page with the desk address filled in. It reads closed trades from the terminal's history and posts them to `/api/ingest/bridge` with a sync token. It contains no trading calls and the password never leaves the terminal. MT5 sends the stop at entry and the stop at the close, so a widened stop is flagged.
 - **Investor password via MetaApi** (paid, owner's choice): set `NORTHCHART_METAAPI_TOKEN`. The trader enters account number, server and the investor password once; the desk creates the MetaApi account, refuses a master password using MetaApi's `investorMode` flag, keeps only the sealed MetaApi account id and pulls new trades every ten minutes.
 - **Statement import**: MT5 and MT4 HTML reports, cTrader and prop-firm CSVs, and any CSV whose columns are detected by name or picked by hand. Duplicates are skipped.
 - **TradingView trade sync**: `tools/start_tradingview_sync.ps1` with `DESK_TOKEN` set to a sync token.
 
 Planned: cTrader Open API, Interactive Brokers Flex, Binance read-only keys; OANDA and the Deriv API wait for a read-only option. Secrets are sealed with an HMAC-SHA256 stream cipher plus tag, keyed by `NORTHCHART_SECRET_KEY` (set it in production) or a generated `DATA_DIR/accounts/secret.key`.
+
+## Plans and billing
+
+Desk calls stay free. Members pay for the tools (`northchart_billing.py`, pages in `northchart_billing_pages.py`):
+
+| Plan | Price | Adds |
+|---|---|---|
+| Free | $0 | Desk calls, chart, manual journal, statement import, 3 agent questions a day |
+| Plus | $25 a month | Automatic broker sync (2 accounts), Bridge and TradingView sync, agent desk (60 a day), Claude journal notes |
+| Pro | $200 a month | 20 broker accounts, MetaApi, agent desk (1,000 a day), Northcharts Connect for ChatGPT and Claude |
+
+* **M-Pesa** through Paystack by default (`MPESA_PROVIDER=paystack`): an STK push from the same Paystack account
+  that takes cards, so one account, one dashboard and one payout. Every result is re-checked with
+  `/transaction/verify`. Paystack cannot repeat an M-Pesa payment on its own, so renewal is a prompt on the due date
+  (three tries, a day apart). Turn on Mobile Money in the Paystack dashboard (Settings, Preferences).
+  With a Paybill or Till of your own, `MPESA_PROVIDER=daraja` sends the prompt through Safaricom Daraja instead:
+  callbacks are unsigned, so each one only triggers an `stkpushquery`, and the query decides. Daraja also enables
+  M-Pesa Ratiba standing orders; Ratiba debits arrive as C2B confirmations, accepted only from Safaricom's addresses
+  for the member's account reference and the right amount. Plans are monthly only.
+* **Cards** through Paystack's hosted page (no card data touches the desk). The first payment saves a reusable
+  authorisation, sealed in the vault; renewals use `charge_authorization`. Webhooks are checked with HMAC-SHA512 and
+  every success is re-verified with `/transaction/verify`.
+* Prices are in USD and charged in KES at the day's USDKES rate (rounded up to KES 50), or a fixed KES price.
+* Upgrades start at once with credit for unused time; downgrades wait for the renewal date.
+  Three days' grace, then Free. The owner always has every feature and can give members a plan from `/billing`.
+
+Switching it on (sandbox first):
+
+1. Safaricom: create an app at developer.safaricom.co.ke with **M-Pesa Express** and **M-Pesa Ratiba**; set
+   `DARAJA_CONSUMER_KEY` and `DARAJA_CONSUMER_SECRET`. The sandbox shortcode and passkey are filled in for you.
+2. Paystack: sign up as a Kenyan business and copy the test secret key into `PAYSTACK_SECRET_KEY`. Set the webhook URL in
+   the Paystack dashboard to `https://<desk>/api/billing/paystack/webhook`.
+3. Set `NORTHCHART_BILLING=test`, `NORTHCHART_PUBLIC_URL` and `NORTHCHART_SIGNUP=open`, restart, and pay a plan from a
+   member account. Then press **Register M-Pesa confirmation address** on `/billing` (needed for Ratiba).
+4. Go live: Safaricom Go Live with your Paybill or Till (`DARAJA_ENV=production`, `DARAJA_SHORTCODE`, `DARAJA_PASSKEY`,
+   and `DARAJA_TILL` for a Till), Paystack live key, `NORTHCHART_BILLING=live`.
+
+| Variable | Meaning |
+|---|---|
+| `NORTHCHART_BILLING` | `off` (default, nothing locked), `test` or `live` |
+| `NORTHCHART_PRICE_PLUS_MONTH`, `NORTHCHART_PRICE_PRO_MONTH` | USD monthly price; add `_KES` to fix the shilling price |
+| `NORTHCHART_KES_PER_USD` | Fixed rate instead of the live USDKES quote |
+| `PAYSTACK_SECRET_KEY`, `PAYSTACK_CURRENCY` | Card payments; currency `KES` (default) or `USD` once Paystack approves it |
+| `DARAJA_ENV`, `DARAJA_CONSUMER_KEY`, `DARAJA_CONSUMER_SECRET` | M-Pesa API app (`sandbox` or `production`) |
+| `DARAJA_SHORTCODE`, `DARAJA_PASSKEY`, `DARAJA_TILL` | Paybill shortcode and Lipa na M-Pesa passkey; Till number for Buy Goods |
+| `NORTHCHART_LEGAL_NAME`, `NORTHCHART_KRA_PIN` | Shown on receipts |
 
 ## Trading tracker and Trading OS
 
@@ -113,13 +159,13 @@ Accounts live in `DATA_DIR/trading_os_data/router/accounts.json` on the server (
 
 Neither can place, modify or cancel an order. MCP servers that drive TradingView Desktop through its debug port were left out: they need a paid plan for the Desktop app, and their general click tools can reach the order panel. Details: `tools/README_TRADINGVIEW.md`.
 
-## Northchart Connect (MCP for ChatGPT and Claude)
+## Northcharts Connect (MCP for ChatGPT and Claude)
 
 The server exposes a remote MCP endpoint at `/mcp` (Streamable HTTP, protocol versions 2025-11-25, 2025-06-18 and 2025-03-26). It is part of the same process as the dashboard, so agents and people read the same engine state.
 
 **Tools (all read-only, `readOnlyHint: true`):** `list_instruments`, `get_market_overview`, `get_market_snapshot`, `get_signal_detail`, `get_price_history`, `get_desk_brief`, `ask_desk`, `preview_signal_routing` (nothing is logged, no order is placed) and `get_portfolio_summary`. Nothing in Connect can place, change or cancel an order, edit the journal or change an account (decision D-011).
 
-**Sign-in.** Connect runs its own small OAuth 2.1 server: discovery at `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server`, Dynamic Client Registration at `/oauth/register`, PKCE S256 required, one-hour access tokens and 30-day refresh tokens rotated on every use, all stored hashed in `DATA_DIR/northchart_connect/oauth.json`. A client is approved on a Northchart consent page with the desk password (`SIGNALDESK_PASS`, or `NORTHCHART_OWNER_PASS` if you want a separate one). Five wrong passwords lock the page for 15 minutes per address. Redirects are limited to Claude's and ChatGPT's callbacks and loopback addresses; add others with `NORTHCHART_REDIRECT_ALLOW` (comma-separated prefixes). Tokens are never accepted in a URL.
+**Sign-in.** Connect runs its own small OAuth 2.1 server: discovery at `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server`, Dynamic Client Registration at `/oauth/register`, PKCE S256 required, one-hour access tokens and 30-day refresh tokens rotated on every use, all stored hashed in `DATA_DIR/northchart_connect/oauth.json`. A client is approved on a Northcharts consent page with the desk password (`SIGNALDESK_PASS`, or `NORTHCHART_OWNER_PASS` if you want a separate one). Five wrong passwords lock the page for 15 minutes per address. Redirects are limited to Claude's and ChatGPT's callbacks and loopback addresses; add others with `NORTHCHART_REDIRECT_ALLOW` (comma-separated prefixes). Tokens are never accepted in a URL.
 
 **Connect Claude:** Settings, Connectors, Add custom connector, paste `https://<your-host>/mcp`, approve with the desk password.
 
@@ -152,7 +198,7 @@ Tests: `python -m unittest tests.test_connect` runs the full OAuth flow and MCP 
 | `/api/desk/brief?sym=XAUUSD` | Precifarm analyst brief (plain text; `format=json`) |
 | `/api/ask?sym=..&q=..` | rule-based copilot from live state |
 | `/api/health` | unauthenticated health probe |
-| `/mcp` | Northchart Connect MCP endpoint (OAuth or bearer token) |
+| `/mcp` | Northcharts Connect MCP endpoint (OAuth or bearer token) |
 | `/api/agent/*` | agent desk: streaming chat (`/stream`), run a tool, activity feed, status, sign out agents |
 | `/tracker` | trading tracker page |
 | `/api/tracker/summary` | journal metrics, prop status, prop economics, capital (syncs paper tickets) |
