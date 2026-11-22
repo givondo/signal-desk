@@ -450,9 +450,10 @@ async function loadBrokers(){
 }
 function showBrokers(q){
   q=q.trim().toLowerCase();
-  const list=(BK.brokers||[]).filter(b=>!q||b.name.toLowerCase().includes(q)||b.platform_names.join(" ").toLowerCase().includes(q));
+  const list=(BK.brokers||[]).filter(b=>!q||(b.search||b.name.toLowerCase()).includes(q));
   $("bres").innerHTML=list.slice(0,q?12:8).map(b=>`<button class="chip2${$("bpanel").dataset.b===b.id?" on":""}" data-b="${b.id}">${escH(b.name)}</button>`).join("")
-    +(q&&!list.length?'<p class="lead" style="margin:4px 0 0">Not listed? Pick "Any other MetaTrader broker", or upload a statement.</p>':"");
+    +(q&&!list.length?'<p class="lead" style="margin:4px 0 0">Not listed? Pick "Any other MetaTrader broker", or upload a statement.</p>':"")
+    +(!q?`<p class="lead" style="margin:6px 0 0">Showing the 8 most used in Kenya. Search to see all ${(BK.brokers||[]).length}.</p>`:"");
 }
 function brokerPanel(id){
   const b=BK.brokers.find(x=>x.id===id); const mt=b.platforms.some(p=>p==="mt5"||p==="mt4");
@@ -480,7 +481,8 @@ function brokerPanel(id){
     <div class="f"><label>Account name</label><input id="stLabel" autocomplete="off" placeholder="${escH(b.name.toUpperCase().replace(/[^A-Z0-9]+/g,"-"))}-01"></div></div>
     <div id="stMap"></div><button class="btn2 pri" id="stGo" style="margin-top:10px">Import trades</button></div>`);
   let h=`<div class="bhead"><div style="flex:1;min-width:0"><div class="t1">${escH(b.name)}${b.cma?' <span class="badge ok">CMA licensed</span>':""}</div>
-    <div class="t2">${escH(b.platform_names.join(", "))}${b.note?" · "+escH(b.note):""}</div></div><button class="btn2" id="bClose">Close</button></div>`+routes[0];
+    <div class="t2">${escH(b.platform_names.join(", "))}${b.note?" · "+escH(b.note):""}</div></div><button class="btn2" id="bClose">Close</button></div>`
+    +(!b.cma&&!b.prop&&b.id!=="other_mt"?`<div class="note warn" style="margin-top:12px">${escH(b.name)} is not on the CMA register of brokers licensed in Kenya. Northchart can still journal its trades; check where your money is held before you deposit.</div>`:"")+routes[0];
   if(routes.length>1) h+=`<details class="more"><summary>Other ways to connect (${routes.length-1})</summary>${routes.slice(1).join("")}</details>`;
   $("bpanel").innerHTML=h; $("bpanel").dataset.b=id; showBrokers($("bq").value);
   $("bClose").onclick=()=>{ $("bpanel").innerHTML=""; delete $("bpanel").dataset.b; showBrokers($("bq").value) };

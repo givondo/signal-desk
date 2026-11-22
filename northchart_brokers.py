@@ -42,25 +42,41 @@ from datetime import datetime, timedelta, timezone
 
 # ------------------------------------------------------------------ catalogue
 # Platforms are the ones each broker usually offers; "Any MetaTrader broker" covers the rest.
-CMA_NOTE = "Licensed in Kenya by the CMA (check licensees.cma.or.ke before you deposit)"
+# Order = roughly how common each is among Kenyan traders, so the first chips are the likely ones.
+# "cma" holds the licence number on the CMA register (licensees.cma.or.ke), checked 22 Nov 2026:
+# 14 non-dealing brokers plus two dealing brokers (Empire FX 203, Capital.com 244).
+# "aka" lists the company and old names people search by.
+CMA_REGISTER = "licensees.cma.or.ke"
 BROKERS = [
-    {"id": "exness", "name": "Exness", "platforms": ["mt5", "mt4"], "cma": True},
-    {"id": "hfm", "name": "HFM", "platforms": ["mt5", "mt4"], "cma": True},
-    {"id": "fxpesa", "name": "FXPesa (EGM Securities)", "platforms": ["mt5", "mt4"], "cma": True},
-    {"id": "pepperstone", "name": "Pepperstone", "platforms": ["mt5", "mt4", "ctrader", "tradingview"], "cma": True},
-    {"id": "xm", "name": "XM", "platforms": ["mt5", "mt4"], "cma": True},
-    {"id": "scope", "name": "Scope Markets", "platforms": ["mt5", "mt4"], "cma": True},
-    {"id": "windsor", "name": "Windsor Markets", "platforms": ["mt4", "mt5"], "cma": True},
-    {"id": "fxtm", "name": "FXTM (Exinity)", "platforms": ["mt5", "mt4"], "cma": True},
-    {"id": "fpmarkets", "name": "FP Markets", "platforms": ["mt5", "mt4", "ctrader"], "cma": True},
-    {"id": "avatrade", "name": "AvaTrade", "platforms": ["mt5", "mt4"], "cma": True},
-    {"id": "capitalcom", "name": "Capital.com", "platforms": ["mt4", "tradingview"], "cma": True},
-    {"id": "anzo", "name": "Anzo Capital", "platforms": ["mt5", "mt4"], "cma": True},
-    {"id": "icmarkets", "name": "IC Markets", "platforms": ["mt5", "mt4", "ctrader", "tradingview"], "cma": False},
-    {"id": "deriv", "name": "Deriv", "platforms": ["mt5", "ctrader"], "cma": False},
-    {"id": "ftmo", "name": "FTMO (prop firm)", "platforms": ["mt5", "mt4", "ctrader", "dxtrade"], "cma": False},
-    {"id": "fundednext", "name": "FundedNext (prop firm)", "platforms": ["mt5", "mt4", "ctrader"], "cma": False},
-    {"id": "other_mt", "name": "Any other MetaTrader broker", "platforms": ["mt5", "mt4"], "cma": False},
+    {"id": "exness", "name": "Exness", "platforms": ["mt5", "mt4"], "cma": 162, "aka": ["Exness KE"]},
+    {"id": "hfm", "name": "HFM", "platforms": ["mt5", "mt4"], "cma": 155, "aka": ["HF Markets", "HotForex", "HFM Investments"]},
+    {"id": "xm", "name": "XM", "platforms": ["mt5", "mt4"], "cma": 233, "aka": ["TPXM Global", "Trading Point"]},
+    {"id": "deriv", "name": "Deriv", "platforms": ["mt5", "ctrader"], "cma": None,
+     "aka": ["Binary.com", "synthetic indices", "Volatility 75"]},
+    {"id": "pepperstone", "name": "Pepperstone", "platforms": ["mt5", "mt4", "ctrader", "tradingview"], "cma": 128, "aka": []},
+    {"id": "fxpesa", "name": "FXPesa (EGM Securities)", "platforms": ["mt5", "mt4"], "cma": 107, "aka": ["EGM Securities", "FX Pesa"]},
+    {"id": "fxtm", "name": "FXTM (Exinity)", "platforms": ["mt5", "mt4"], "cma": 135, "aka": ["Exinity", "ForexTime"]},
+    {"id": "scope", "name": "Scope Markets", "platforms": ["mt5", "mt4"], "cma": 123, "aka": ["SCFM"]},
+    {"id": "icmarkets", "name": "IC Markets", "platforms": ["mt5", "mt4", "ctrader", "tradingview"], "cma": 199, "aka": ["IC Markets KE"]},
+    {"id": "fpmarkets", "name": "FP Markets", "platforms": ["mt5", "mt4", "ctrader"], "cma": 193, "aka": ["First Prudential Markets"]},
+    {"id": "windsor", "name": "Windsor Markets", "platforms": ["mt4", "mt5"], "cma": 156, "aka": ["Windsor Brokers"]},
+    {"id": "avatrade", "name": "AvaTrade", "platforms": ["mt5", "mt4"], "cma": 262, "aka": ["Ava Trade"]},
+    {"id": "admirals", "name": "Admirals", "platforms": ["mt5", "mt4"], "cma": 178, "aka": ["Admiral Markets"]},
+    {"id": "ingot", "name": "Ingot Brokers", "platforms": ["mt5", "mt4"], "cma": 173, "aka": ["Ingot Africa", "Ingot KE"]},
+    {"id": "anzo", "name": "Anzo Capital", "platforms": ["mt5", "mt4"], "cma": 219, "aka": []},
+    {"id": "empirefx", "name": "Empire FX", "platforms": ["mt5"], "cma": 203, "aka": ["EFX"]},
+    {"id": "capitalcom", "name": "Capital.com", "platforms": ["mt4", "tradingview"], "cma": 244, "aka": ["CC Kenya Securities"]},
+    {"id": "octa", "name": "Octa", "platforms": ["mt5", "mt4"], "cma": None, "aka": ["OctaFX"]},
+    {"id": "justmarkets", "name": "JustMarkets", "platforms": ["mt5", "mt4"], "cma": None, "aka": ["JustForex"]},
+    {"id": "fbs", "name": "FBS", "platforms": ["mt5", "mt4"], "cma": None, "aka": []},
+    {"id": "the5ers", "name": "The5ers (prop firm)", "platforms": ["mt5", "ctrader"], "cma": None, "prop": True,
+     "aka": ["5ers", "Fivers", "High Stakes"]},
+    {"id": "ftmo", "name": "FTMO (prop firm)", "platforms": ["mt5", "mt4", "ctrader", "dxtrade"], "cma": None, "prop": True, "aka": []},
+    {"id": "fundednext", "name": "FundedNext (prop firm)", "platforms": ["mt5", "mt4", "ctrader", "matchtrader"], "cma": None,
+     "prop": True, "aka": ["Funded Next"]},
+    {"id": "fundingpips", "name": "FundingPips (prop firm)", "platforms": ["mt5", "ctrader", "matchtrader"], "cma": None,
+     "prop": True, "aka": ["Funding Pips"]},
+    {"id": "other_mt", "name": "Any other MetaTrader broker", "platforms": ["mt5", "mt4"], "cma": None, "aka": ["MT4", "MT5", "MetaTrader"]},
 ]
 PLANNED = [
     {"id": "ctrader", "name": "cTrader Open API", "why": "Official read access with your cTrader ID. Next on the list."},
@@ -72,12 +88,27 @@ PLANNED = [
     {"id": "binance", "name": "Binance", "why": "Read-only API keys, checked for trading permission. Planned."},
 ]
 PLATFORM_NAMES = {"mt5": "MetaTrader 5", "mt4": "MetaTrader 4", "ctrader": "cTrader", "tradingview": "TradingView",
-                  "dxtrade": "DXtrade"}
+                  "dxtrade": "DXtrade", "matchtrader": "Match-Trader"}
+
+
+def _note(b):
+    if b.get("cma"):
+        return f"CMA licence {b['cma']}. Check {CMA_REGISTER} before you deposit"
+    if b.get("prop"):
+        return "Prop firm: connect the account they give you"
+    if b["id"] == "other_mt":
+        return ""
+    return "Not licensed in Kenya by the CMA"
 
 
 def catalogue(metaapi_enabled: bool):
-    return {"brokers": [{**b, "platform_names": [PLATFORM_NAMES[p] for p in b["platforms"]],
-                         "note": CMA_NOTE if b["cma"] else ""} for b in BROKERS],
+    out = []
+    for b in BROKERS:
+        names = [PLATFORM_NAMES[p] for p in b["platforms"]]
+        out.append({**b, "cma": bool(b.get("cma")), "cma_no": b.get("cma"), "prop": bool(b.get("prop")),
+                    "platform_names": names, "note": _note(b),
+                    "search": " ".join([b["name"], *b.get("aka", []), *names]).lower()})
+    return {"brokers": out,
             "routes": {"bridge": True, "metaapi": metaapi_enabled, "statement": True, "tradingview": True},
             "planned": PLANNED}
 
