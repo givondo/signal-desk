@@ -217,7 +217,19 @@ table{width:100%;border-collapse:collapse}
 .sc .v{width:36px;text-align:right;font-size:11px;font-weight:700}
 
 /* ---------- center ---------- */
-#tvchart{height:460px;width:100%}
+#tvchart{height:clamp(540px,70vh,1100px);width:100%}
+.cbtns{display:flex;gap:4px;margin-left:auto}
+.cbtn{background:var(--p1);border:1px solid var(--bd2);color:var(--dim);font:600 10.5px var(--font,inherit);letter-spacing:.3px;text-transform:none;
+padding:4px 9px;border-radius:var(--radius-sm);cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.cbtn:hover{color:var(--tx);border-color:var(--b)}
+.grip{height:12px;cursor:ns-resize;display:flex;align-items:center;justify-content:center;background:var(--p2);border-top:1px solid var(--bd);touch-action:none}
+.grip:before{content:"";width:42px;height:4px;border-radius:99px;background:var(--bd2)}
+.grip:hover:before{background:var(--b)}
+.panel-chart.drag #tvchart{pointer-events:none}
+.panel-chart.max{position:fixed;inset:0;z-index:300;border-radius:0;border:0;display:flex;flex-direction:column}
+.panel-chart.max #tvchart{flex:1;height:auto!important}
+.panel-chart.max .grip{display:none}
+body.chartmax{overflow:hidden}
 .qrow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
 .qbtn{background:var(--p2);border:1px solid var(--bd2);color:var(--dim);font-size:10.5px;padding:5px 10px;cursor:pointer;
 border-radius:var(--radius-sm);transition:all .15s;font-weight:500}
@@ -351,7 +363,7 @@ color:var(--r);font-size:12px;text-align:center}
   .factors{padding:6px 10px}
   .main{grid-template-columns:1fr;padding:8px;gap:8px}
   .colR{grid-column:auto;display:flex!important}
-  #tvchart{height:280px}
+  #tvchart{height:clamp(380px,60vh,640px)}
   .bigpx{font-size:26px}
   .recdir{font-size:22px}
   .duo{grid-template-columns:1fr}
@@ -459,6 +471,10 @@ display:grid;place-items:center;flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(20
 .ncchart .hd b{font-size:13px}.ncchart .hd .sub{font-size:11px;color:var(--dim)}
 .ncchart .hd .px{margin-left:auto;font-family:var(--mono);font-weight:700;font-size:13px}
 .ncchart svg{display:block;width:100%;height:auto;touch-action:none;user-select:none}
+.ncchart .xbtn{background:none;border:1px solid var(--bd2);color:var(--dim);border-radius:6px;font-size:11px;padding:2px 8px;cursor:pointer;margin-left:8px}
+.ncchart .xbtn:hover{color:var(--tx);border-color:var(--b)}
+.ncchart.big{position:fixed;inset:24px;z-index:320;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;overflow:auto}
+.ncback{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:315}
 .ncchart .ft{font-size:10px;color:var(--dim2);padding:0 12px 8px;display:flex;gap:12px;flex-wrap:wrap}
 .ncchart .tip{position:absolute;pointer-events:none;background:var(--p1);border:1px solid var(--bd2);border-radius:8px;
 padding:6px 8px;font:11px/1.45 var(--mono);box-shadow:var(--shadow);white-space:nowrap;z-index:2}
@@ -691,9 +707,14 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
 
     <!-- ============ CENTER ============ -->
     <div class="col">
-      <div class="panel-chart">
-        <div class="ph">Price chart · 15m · {{ d.sym_name||sym }} <span class="mono mut">{{ d.tv_chart }}</span></div>
-        <div id="tvchart"></div>
+      <div class="panel-chart" :class="{max:chartMax,drag:chartDrag}" ref="chartPanel">
+        <div class="ph"><span>Price chart · 15m · {{ d.sym_name||sym }} <span class="mono mut">{{ d.tv_chart }}</span></span>
+          <span class="cbtns">
+            <button v-if="!chartMax&&chartH" class="cbtn" @click="resetChartH" title="Back to the default height">Reset size</button>
+            <button class="cbtn" @click="toggleChartMax" :title="chartMax?'Exit full screen (Esc)':'Full screen (F)'">{{ chartMax?'✕ Exit full screen':'⤢ Full screen' }}</button>
+          </span></div>
+        <div id="tvchart" :style="!chartMax&&chartH?{height:chartH+'px'}:null"></div>
+        <div class="grip" title="Drag to resize the chart · double-click to reset" @pointerdown="startChartDrag" @dblclick="resetChartH"></div>
       </div>
 
       <div class="duo">
@@ -1094,7 +1115,7 @@ const app=createApp({
     now:Date.now(), toasts:[], tid:0,
     cpQ:'', cpLog:[], quickQs:['Why this bias?','Should I wait?','How strong is this trend?','Is this a fake breakout?','Where are institutions positioned?','Safest entry?',"Summarize today's market"],
     tvu:'',tvp:'',tvsid:'',tvsign:'',tverrMsg:'',authOpen:false,authStep:'signin',authLoading:false,
-    tvWidgetSym:null, curvePts:[], macroHelp:false,
+    tvWidgetSym:null, curvePts:[], macroHelp:false, chartMax:false, chartH:0, chartDrag:false,
     darkMode:false, roster:[], refreshing:false,
     agentOpen:false, agentTab:'run', agentQ:'', agentFeed:[], agentStatus:{}, agentUnread:0, agentSeenTs:0, agentId:0,
     chat:[], streaming:false, abortCtl:null, agentWide:false, agentMode:'desk', stick:true, menuOpen:false, installPrompt:null, isStandalone:false, installHelp:false, installHint:'other',
@@ -1235,6 +1256,19 @@ const app=createApp({
         this.d=d;
         this.$nextTick(()=>{ this.mountChart(); this.drawSpark(); this.drawEquity(); this.drawDaily(); });
       }catch(e){ this.d={status:'error', error:'network'} }
+    },
+    toggleChartMax(){
+      this.chartMax=!this.chartMax; document.body.classList.toggle('chartmax',this.chartMax);
+      this.$nextTick(()=>window.dispatchEvent(new Event('resize')));
+    },
+    resetChartH(){ this.chartH=0; try{ localStorage.removeItem('nc-chart-h') }catch(e){} this.$nextTick(()=>window.dispatchEvent(new Event('resize'))) },
+    startChartDrag(e){
+      const el=document.getElementById('tvchart'); if(!el) return;
+      e.preventDefault(); const y0=e.clientY, h0=el.getBoundingClientRect().height; this.chartDrag=true;
+      const mv=ev=>{ this.chartH=Math.round(Math.max(300,Math.min(window.innerHeight*1.5,h0+ev.clientY-y0))) };
+      const up=()=>{ this.chartDrag=false; window.removeEventListener('pointermove',mv); window.removeEventListener('pointerup',up);
+        try{ if(this.chartH) localStorage.setItem('nc-chart-h',String(this.chartH)) }catch(err){} window.dispatchEvent(new Event('resize')) };
+      window.addEventListener('pointermove',mv); window.addEventListener('pointerup',up);
     },
     mountChart(){
       if(this.d.status!=='ok'||typeof TradingView==='undefined') return;
@@ -1495,6 +1529,7 @@ const app=createApp({
     }catch(e){}
     this.applyTheme();
     try{ this.agentSeenTs=+(localStorage.getItem('nc-agent-seen')||0) }catch(e){}
+    try{ this.chartH=+(localStorage.getItem('nc-chart-h')||0) }catch(e){}
     this.tick(); this.fetchRoster(); this.fetchInbox(); this.fetchAgentFeed(); this.fetchMe();
     if(location.hash==='#tradingview') this.openAuth();
     setInterval(()=>this.fetchAgentFeed(),10000);
@@ -1515,10 +1550,12 @@ const app=createApp({
     window.addEventListener('keydown',e=>{
       if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key.toLowerCase()==='o'){ e.preventDefault(); this.toggleAgent(true); this.newChat(); return }
       if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){ e.preventDefault(); this.agentTab='run'; this.toggleAgent(true); return }
+      if(e.key==='Escape'&&this.chartMax){ this.toggleChartMax(); return }
       if(e.key==='Escape'&&(this.menuOpen||this.installHelp)){ this.menuOpen=false; this.installHelp=false; return }
       if(e.key==='Escape'&&this.agentOpen){ this.toggleAgent(false); return }
       if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
       if(e.key==='/'){ e.preventDefault(); this.agentTab='run'; this.toggleAgent(true); return }
+      if((e.key==='f'||e.key==='F')&&!e.ctrlKey&&!e.metaKey&&e.target.tagName!=='TEXTAREA'&&!e.target.isContentEditable){ this.toggleChartMax(); return }
       const i='123456789'.indexOf(e.key);
       if(i>=0&&this.flatSyms[i])this.switchSym(this.flatSyms[i][0]);
       if(e.key==='Escape')this.closeAuth();
@@ -1531,7 +1568,7 @@ const app=createApp({
 // ---------------- nc-chart: inline charts for agent answers ----------------
 app.component('nc-chart',{
   props:{chart:Object,dark:Boolean},
-  data(){return{hover:null,W:640,H:290}},
+  data(){return{hover:null,W:640,H:360,big:false}},
   computed:{
     c(){return this.chart||{}},
     dp(){ if(Number.isInteger(this.c.dp)) return this.c.dp; const p=this.c.price??(this.c.bars&&this.c.bars.length?this.c.bars[this.c.bars.length-1].c:1);
@@ -1576,14 +1613,22 @@ app.component('nc-chart',{
       const i=Math.floor((x-this.pad.l)/this.step); this.hover=(i>=0&&i<this.bars.length)?i:null;
       this.hy=(e.clientY-r.top)*this.H/r.height; this.tipX=(e.clientX-r.left); this.tipW=r.width },
     tipStyle(){ const left=this.tipX>this.tipW*0.6?this.tipX-170:this.tipX+14; return {left:left+'px',top:'38px'} },
+    fit(){ if(!this.big) return; this.W=Math.max(480,window.innerWidth-50); this.H=Math.max(300,window.innerHeight-48-74) },
+    open(){ this.big=true; this.hover=null; this.fit(); this._k=e=>{ if(e.key==='Escape') this.close() }; this._r=()=>this.fit();
+      window.addEventListener('keydown',this._k); window.addEventListener('resize',this._r) },
+    close(){ this.big=false; this.hover=null; this.W=640; this.H=360; window.removeEventListener('keydown',this._k); window.removeEventListener('resize',this._r) },
     when(t){ const d=new Date(t*1000); return d.toLocaleDateString([], {weekday:'short'})+' '+d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) },
   },
+  beforeUnmount(){ if(this.big) this.close() },
   template:`
-  <div class="ncchart">
+  <div>
+  <div v-if="big" class="ncback" @click="close"></div>
+  <div class="ncchart" :class="{big}">
     <div class="hd"><b>{{ c.title }}</b>
       <span v-if="c.direction" class="dirbadge" :class="c.direction">{{ c.direction }}</span>
       <span class="sub" v-if="c.subtitle">{{ c.subtitle }}</span>
-      <span class="px" v-if="c.kind==='candles'&&last">{{ f(c.price??last.v) }}</span></div>
+      <span class="px" v-if="c.kind==='candles'&&last">{{ f(c.price??last.v) }}</span>
+      <button v-if="c.kind==='candles'" class="xbtn" @click="big?close():open()" :title="big?'Close (Esc)':'Expand'">{{ big?'✕ Close':'⤢ Expand' }}</button></div>
     <template v-if="c.kind==='candles'">
       <svg ref="svg" :viewBox="'0 0 '+W+' '+H" @pointermove="move" @pointerleave="hover=null" role="img" :aria-label="c.title+' candlestick chart'">
         <g v-for="g in grid" :key="'g'+g.y">
@@ -1624,6 +1669,7 @@ app.component('nc-chart',{
         </g>
       </svg>
     </template>
+  </div>
   </div>`
 });
 app.mount('#app');
