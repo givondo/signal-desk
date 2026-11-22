@@ -41,6 +41,7 @@ import hashlib
 import hmac
 import ipaddress
 import json
+import sys
 import math
 import os
 import re
@@ -195,6 +196,9 @@ def http_json(method, url, headers=None, body=None, timeout=30):
             st = r.status
     except urllib.error.HTTPError as e:
         raw, st = e.read(), e.code
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        print(f"payment provider unreachable: {url.split('?')[0]}: {e}", file=sys.stderr, flush=True)
+        raise PaymentError("The payment service could not be reached. Nothing was charged. Try again in a minute.")
     try:
         return st, json.loads(raw or b"{}")
     except ValueError:
@@ -491,6 +495,16 @@ class Billing:
             rec["agent"] += 1
             self._save()
             return cap - rec["agent"]
+
+    def agent_left(self, u):
+        """(questions left today, daily allowance) for a member; (None, None) when there is no limit."""
+        if not u or mode() == "off" or self._owner(u):
+            return None, None
+        day = time.strftime("%Y-%m-%d", time.gmtime(time.time() + 3 * 3600))
+        cap = self.limit(u, "agent_day")
+        rec = self.data["usage"].get(u["uid"]) or {}
+        used = rec.get("agent", 0) if rec.get("day") == day else 0
+        return max(0, cap - used), cap
 
     # ---------------------------------------------------------- views
     def status(self, u):

@@ -563,3 +563,11 @@ class PaystackMpesa(Base):
         self.assertIn((self.m["uid"], "stk_sent"), done)
         self.assertEqual(len(MockPay.mm), 2)
         self.assertEqual(MockPay.mm[-1]["mobile_money"]["phone"], "+254712345678")
+
+    def test_unreachable_provider_is_a_clear_error(self):
+        os.environ["PAYSTACK_API_URL"] = "http://127.0.0.1:9"          # nothing listens here
+        self.bl.paystack = nbl.Paystack()
+        with self.assertRaises(nbl.PaymentError) as e:
+            self.bl.checkout(self.m, "plus", "month", "mpesa", "https://desk.test", "0712345678")
+        self.assertIn("could not be reached", str(e.exception))
+        self.assertEqual([p["status"] for p in self.bl.data["payments"].values()], ["failed"])

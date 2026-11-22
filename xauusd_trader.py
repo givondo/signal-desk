@@ -19,6 +19,7 @@ Educational tool - NOT financial advice.  Stdlib only.
 """
 
 import base64
+import gzip
 import hmac
 import json
 import os
@@ -2272,11 +2273,72 @@ def poller():
 
 # ---------------------------------------------------------------- http
 
+SECURITY_HEADERS = {"X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin",
+                    "X-Frame-Options": "SAMEORIGIN", "Permissions-Policy": "camera=(), geolocation=(), payment=()"}
+GZIP_TYPES = ("text/", "application/json", "application/javascript", "image/svg+xml", "application/manifest+json")
+NOT_FOUND_PAGE = (b'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" '
+                  b'content="width=device-width,initial-scale=1"><title>Page not found - Northcharts</title><style>'
+                  b'body{font:15px system-ui,sans-serif;background:#f9fafb;color:#111827;display:grid;place-items:center;'
+                  b'min-height:100vh;margin:0}main{text-align:center;padding:24px}h1{font-size:22px;margin:0 0 8px}'
+                  b'p{color:#6b7280;margin:0 0 18px}a{display:inline-block;padding:10px 16px;border-radius:8px;'
+                  b'background:#111827;color:#fff;text-decoration:none;margin:0 4px}a.s{background:#fff;color:#111827;'
+                  b'border:1px solid #d1d5db}</style></head><body><main><h1>That page does not exist</h1><p>The link may be '
+                  b'old or mistyped.</p><a href="/">Go to the desk</a><a class="s" href="/journal">Open your journal</a>'
+                  b'</main></body></html>')
+
+
 class Handler(BaseHTTPRequestHandler):
     user = via = deny_reason = None
 
     def log_message(self, *a):
         pass
+
+    # ------------------------------------------------------------ response plumbing
+    def send_response(self, code, message=None):
+        self._started, self._sent_headers = True, set()
+        super().send_response(code, message)
+
+    def send_header(self, keyword, value):
+        getattr(self, "_sent_headers", set()).add(keyword.lower())
+        super().send_header(keyword, value)
+
+    def end_headers(self):
+        sent = getattr(self, "_sent_headers", set())
+        for k, v in SECURITY_HEADERS.items():
+            if k.lower() not in sent:
+                super().send_header(k, v)
+        super().end_headers()
+
+    def _safe(self, fn):
+        """Run one request. A bug answers with a clear 500 instead of dropping the connection."""
+        self._started = False
+        try:
+            return fn()
+        except (BrokenPipeError, ConnectionResetError):
+            return None
+        except Exception:
+            import traceback
+            path = urllib.parse.urlparse(self.path).path
+            print(f"request failed: {self.command} {path}\n{traceback.format_exc()}", file=sys.stderr, flush=True)
+            if getattr(self, "_started", False):
+                return None
+            try:
+                if path.startswith("/api/"):
+                    self._send_full(500, "application/json",
+                                    b'{"ok": false, "error": "Something went wrong on our side. Try again in a moment."}')
+                else:
+                    self._send_full(500, "text/html; charset=utf-8", b'<!doctype html><meta charset="utf-8"><title>'
+                                    b'Northcharts</title><p style="font:15px system-ui;padding:24px">Something went wrong '
+                                    b'on our side. <a href="">Try again</a>.</p>')
+            except Exception:
+                pass
+            return None
+
+    def do_GET(self):
+        return self._safe(self._do_GET)
+
+    def do_POST(self):
+        return self._safe(self._do_POST)
 
     def _auth_creds(self):
         user = os.environ.get("SIGNALDESK_USER") or AUTH_USER
@@ -2563,19 +2625,21 @@ class Handler(BaseHTTPRequestHandler):
         return js({"ok": False, "error": "not found"}, 404) or True
 
     def _send(self, body, ctype):
-        self.send_response(200)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        self.wfile.write(body)
+        return self._send_full(200, ctype, body)
 
     def _send_full(self, status, ctype, body, headers=None):
+        hdr = {"Content-Type": ctype, "Cache-Control": "no-store"}
+        for k, v in (headers or {}).items():       # caller's headers win over the defaults
+            hdr = {key: val for key, val in hdr.items() if key.lower() != k.lower()}
+            hdr[k] = v
+        if len(body) > 1400 and ctype.startswith(GZIP_TYPES) and "content-encoding" not in {k.lower() for k in hdr} \
+                and "gzip" in (self.headers.get("Accept-Encoding") or ""):
+            body = gzip.compress(body, 6)
+            hdr["Content-Encoding"] = "gzip"
+            hdr["Vary"] = "Accept-Encoding"
+        hdr["Content-Length"] = str(len(body))
         self.send_response(status)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        for k, v in (headers or {}).items():
+        for k, v in hdr.items():
             self.send_header(k, v)
         self.end_headers()
         self.wfile.write(body)
@@ -2781,6 +2845,20 @@ class Handler(BaseHTTPRequestHandler):
                                    broker=broker, platform=b("platform", "mt5"),
                                    currency=b("currency"), label=f"{broker} {login}")
                 return js({"ok": True, **res}) or True
+            if path == "/api/brokers/manual":      # a trade typed in by hand: part of every plan
+                fill = nb.manual_fill(body)
+                res = conns.ingest({"kind": "manual", "account_label": "MANUAL"}, "manual", "Added by hand", "MANUAL",
+                                   acct_type(body.get("account_type")), [fill], broker="Added by hand",
+                                   label="Trades added by hand")
+                if res.get("errors"):
+                    return js({"ok": False, "error": res["errors"][0]}, 400) or True
+                if res.get("duplicates"):
+                    return js({"ok": False, "error": "This trade is already in your journal."}, 409) or True
+                try:
+                    res["journal"] = journal_service(u).auto_pass(force=True)
+                except Exception as e:
+                    res["journal"] = {"errors": [str(e)[:120]]}
+                return js({"ok": True, "id": fill["broker_trade_id"], **res}) or True
             if path == "/api/brokers/import":
                 raw = base64.b64decode(b("content_b64") or "")
                 offset = float(body.get("offset_hours") or 0)
@@ -2979,7 +3057,7 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             print(f"brokers: first sync {cid}: {e}", file=sys.stderr)
 
-    def do_POST(self):
+    def _do_POST(self):
         if self._is_connect():
             return self._connect_http("POST")
         if self._billing_public("POST", urllib.parse.urlparse(self.path)):
@@ -3048,9 +3126,7 @@ class Handler(BaseHTTPRequestHandler):
                 body = {}
             return self._tracker("POST", parsed, body)
         if self.path != "/api/tv_login":
-            self.send_response(404)
-            self.end_headers()
-            return
+            return self._send_full(404, "application/json", b'{"ok": false, "error": "not found"}')
         try:
             ln = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(ln) or b"{}")
@@ -3089,7 +3165,7 @@ class Handler(BaseHTTPRequestHandler):
             resp = {"ok": False, "error": "bad request"}
         self._send(json.dumps(resp).encode(), "application/json")
 
-    def do_GET(self):
+    def _do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         if self._is_connect():
             return self._connect_http("GET")
@@ -3137,8 +3213,9 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as e:
                 return self._send_full(400, "application/json", json.dumps({"ok": False, "error": str(e)}).encode())
             except Exception as e:
-                return self._send_full(502, "application/json",
-                                       json.dumps({"ok": False, "error": f"price history unavailable: {e}"}).encode())
+                print(f"chart bars failed: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+                return self._send_full(502, "application/json", json.dumps(
+                    {"ok": False, "error": "Price history is not available right now."}).encode())
         qs = urllib.parse.parse_qs(parsed.query)
         sym = (qs.get("sym") or ["XAUUSD"])[0]
         if sym not in SYMBOLS:
@@ -3174,8 +3251,9 @@ class Handler(BaseHTTPRequestHandler):
         elif parsed.path == "/api/roster":
             self._send(json.dumps(roster_payload()).encode(), "application/json")
         elif parsed.path == "/api/agent/status":
-            self._send(json.dumps(connect_service().status(self._base_url())).encode(),
-                       "application/json")
+            left, cap = billing_service().agent_left(self.user)
+            self._send(json.dumps({**connect_service().status(self._base_url()), "agent_left": left,
+                                   "agent_cap": cap}).encode(), "application/json")
         elif parsed.path == "/api/agent/activity":
             try:
                 n = int((qs.get("limit") or ["50"])[0] or 50)
@@ -3217,8 +3295,9 @@ class Handler(BaseHTTPRequestHandler):
                 body = b"<h3>dashboard.html missing</h3>"
             self._send(body, "text/html; charset=utf-8")
         else:
-            self.send_response(404)
-            self.end_headers()
+            wants_json = parsed.path.startswith("/api/")
+            self._send_full(404, "application/json" if wants_json else "text/html; charset=utf-8",
+                            b'{"ok": false, "error": "not found"}' if wants_json else NOT_FOUND_PAGE)
 
 
 def main():

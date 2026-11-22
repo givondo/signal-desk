@@ -289,7 +289,8 @@ class Journal:
             if e.get("stop") is None or not e.get("risk"):
                 continue
             try:
-                self._journal(tt, f, e, "Desk" if e["stop_source"] == "desk stop at entry" else "Broker", m)
+                self._journal(tt, f, e, "Desk" if e["stop_source"] == "desk stop at entry"
+                              else "You" if f.get("source") == "manual" else "Broker", m)
                 done += 1
             except Exception as ex:  # one bad fill must not stop the rest
                 errors.append(f"{f.get('fill_id')}: {ex}")

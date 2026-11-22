@@ -237,3 +237,33 @@ class Routes(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ManualTrades(Routes):
+    def test_add_a_trade_by_hand(self):
+        with DeskServer() as s:
+            owner, m = self.member(s)
+            trade = {"instrument": "xauusd", "direction": "SELL", "entry_price": "2650.5", "exit_price": "2640.5",
+                     "stop_loss": "2655.5", "volume": "0.10", "open_time_utc": "2026-11-20T08:00:00Z",
+                     "close_time_utc": "2026-11-20T09:30:00Z", "net_pl": "100", "account_type": "PERSONAL"}
+            st, out, _ = m.req("POST", "/api/brokers/manual", trade)
+            self.assertEqual(st, 200, out)
+            self.assertEqual(out["added"], 1)
+            st, out, _ = m.req("POST", "/api/brokers/manual", trade)
+            self.assertEqual(st, 409, out)                      # the same trade twice is refused
+            st, sheet, _ = m.req("GET", "/api/journal/sheet")
+            rows = [r for r in sheet["rows"] if r.get("instrument") == "XAUUSD"]
+            self.assertEqual(len(rows), 1, sheet)
+            self.assertEqual(rows[0]["stop_by"], "You")
+            st, mine, _ = owner.req("GET", "/api/journal/sheet")
+            self.assertFalse([r for r in mine["rows"] if r.get("entry") == 2650.5])   # never in someone else's journal
+
+    def test_bad_trades_get_plain_reasons(self):
+        base = {"instrument": "EURUSD", "direction": "BUY", "entry_price": "1.1", "exit_price": "1.2", "volume": "1",
+                "open_time_utc": "2026-11-20T08:00:00Z", "close_time_utc": "2026-11-20T09:00:00Z"}
+        for change, words in [({"direction": ""}, "buy or sell"), ({"stop_loss": "1.15"}, "below the entry"),
+                              ({"close_time_utc": "2026-11-20T07:00:00Z"}, "closes before"),
+                              ({"close_time_utc": "2099-01-01T00:00:00Z"}, "future"), ({"volume": "0"}, "lots")]:
+            with self.assertRaises(ValueError) as e:
+                nb.manual_fill({**base, **change})
+            self.assertIn(words, str(e.exception))

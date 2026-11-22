@@ -218,7 +218,13 @@ table{width:100%;border-collapse:collapse}
 .sc .v{width:36px;text-align:right;font-size:11px;font-weight:700}
 
 /* ---------- center ---------- */
-#tvchart,#ncchart{height:480px;width:100%}
+#tvchart,#ncchart{height:clamp(480px,64vh,920px);width:100%}
+.cempty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+text-align:center;padding:20px;background:color-mix(in srgb,var(--p1) 88%,transparent);z-index:3}
+.cempty b{font:700 14px var(--font)}.cempty span{color:var(--dim);font-size:12px;max-width:380px}
+.cempty div{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;justify-content:center}
+.cempty button{font:600 12px var(--font);padding:7px 12px;border-radius:7px;border:1px solid var(--bd2);background:var(--p2);color:var(--tx);cursor:pointer}
+.cempty button.pri{background:var(--tx);color:var(--bg);border-color:var(--tx)}
 .ncp{display:flex;flex-direction:column;container-type:inline-size}
 @container (max-width:1000px){.ctool .lbl{display:none}.ctool .cbtn{padding:5px 6px}}
 .ctool{display:flex;align-items:center;gap:6px;padding:7px 10px;border-bottom:1px solid var(--bd);background:var(--p1);flex-wrap:wrap}
@@ -389,12 +395,17 @@ color:var(--r);font-size:12px;text-align:center}
   body{font-size:12.5px}
   .appbar{padding:8px 10px}
   .instr{max-width:none;flex:1 1 100%;order:3}
+  /* the header scrolls away on phones instead of covering half the screen */
+  .apphead{position:relative}
+  .head-actions{flex-wrap:nowrap;overflow-x:auto;width:100%;margin-left:0;scrollbar-width:none;padding-bottom:2px}
+  .head-actions::-webkit-scrollbar{display:none}
+  .head-actions>*{flex-shrink:0}
   .strip>div{padding:6px 12px;min-height:52px}
   .strip .big{font-size:18px}
   .factors{padding:6px 10px}
   .main{grid-template-columns:1fr;padding:8px;gap:8px}
   .colR{grid-column:auto;display:flex!important}
-  #tvchart,#ncchart{height:340px}
+  #tvchart,#ncchart{height:clamp(320px,52vh,520px)}
   .crail{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--bd)}
   .cbody{flex-direction:column}
   .bigpx{font-size:26px}
@@ -403,6 +414,10 @@ color:var(--r);font-size:12px;text-align:center}
   .qbtn{padding:8px 12px;font-size:11.5px}
   .mtx .hc{height:24px;line-height:24px}
   .foot{padding-bottom:max(20px,env(safe-area-inset-bottom))}
+}
+@media(max-width:900px){
+  .main>.col,.main>.colR{display:contents!important}
+  .main>.panel,.main>*>.panel,.main>*>.panel-chart,.main>*>.duo{order:var(--mo,40)}
 }
 /* ---------- agent desk (agentic UI) ---------- */
 .agentbtn{display:inline-flex;align-items:center;gap:6px}
@@ -413,6 +428,10 @@ color:var(--r);font-size:12px;text-align:center}
 border-left:1px solid var(--bd2);box-shadow:var(--shadow-lg);display:flex;flex-direction:column;transform:translateX(102%);
 transition:transform .22s ease}
 .adrawer.open{transform:none}
+.aclose{margin-left:6px;font-size:14px}
+@media(max-width:520px){.adrawer .dlbtn{font-size:0;gap:0;padding:8px 9px}.adrawer .ahead h2{white-space:nowrap}}
+.aleft{font:600 10.5px var(--mono);color:var(--dim);border:1px solid var(--bd2);border-radius:999px;padding:3px 8px;white-space:nowrap}
+.aleft.low{color:var(--r);border-color:rgba(208,68,56,.35);background:var(--rt)}
 .adrawer.wide{width:min(1120px,100vw)}
 .ahead{display:flex;align-items:center;gap:6px;padding:9px 10px 9px 14px;border-bottom:1px solid var(--bd);min-height:50px}
 .ahead h2{font-size:14px;font-weight:700;letter-spacing:.2px;flex:1;margin-left:4px}
@@ -675,7 +694,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
   </div>
 
   <div v-if="d.status==='ok'" class="main">
-    <div class="panel wide" v-if="roster.length">
+    <div class="panel wide" style="--mo:7" v-if="roster.length">
       <div class="ph">Desk pulse · all instruments <span class="mut">{{ rosterOk }}/{{ roster.length }} live</span></div>
       <div class="pb">
         <div class="pulse num">
@@ -689,7 +708,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
     </div>
     <!-- ============ LEFT ============ -->
     <div class="col">
-      <div class="panel">
+      <div class="panel" style="--mo:6">
         <div class="ph">Market Overview
         <span><span class="rtbadge" :class="d.rt?'rtlive':'rtdelay'">{{ d.rt?'● LIVE':'● DELAYED' }}</span>
         <span class="mono" style="margin-left:5px">{{ d.symbol }}</span></span></div>
@@ -776,7 +795,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
 
     <!-- ============ CENTER ============ -->
     <div class="col">
-      <div class="panel-chart ncp" ref="chartPanel" :class="{fs:chartFs}">
+      <div style="--mo:2" class="panel-chart ncp" ref="chartPanel" :class="{fs:chartFs}">
         <div class="ctool" role="toolbar" aria-label="Chart tools">
           <span class="csym">{{ d.sym_name||sym }}</span>
           <div class="cseg" role="group" aria-label="Timeframe" v-show="engine==='nc'">
@@ -829,6 +848,12 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
             <div id="ncchart" v-show="engine==='nc'"></div>
             <div id="tvchart" v-show="engine==='tv'"></div>
             <div class="chint" v-if="engine==='nc'&&drawTool&&drawTool!=='cursor'">{{ drawHint }} · Esc cancels</div>
+            <div class="cempty" v-if="engine==='nc'&&chartErr" role="status">
+              <b>No price history for {{ d.sym_name||sym }} right now</b>
+              <span>The data feed did not answer. The desk tries again every minute.</span>
+              <div><button type="button" class="pri" @click="chartRetry()">Try again</button>
+                <button type="button" @click="setEngine('tv')">Use TradingView's chart</button></div>
+            </div>
           </div>
         </div>
         <div class="cfoot" v-show="engine==='nc'">
@@ -852,7 +877,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
         <div class="ph">Desk Copilot<span style="font-size:8.5px;letter-spacing:.5px">RULE-BASED · LIVE STATE ONLY</span></div>
         <div class="pb">
           <div class="qrow">
-            <button class="qbtn" v-for="q in quickQs" :key="q" @click="ask(q)">{{ q }}</button>
+            <button class="qbtn" v-for="q in quickQs" :key="q" @click="cpAsk(q)">{{ q }}</button>
           </div>
           <div class="cplog" ref="cplog">
             <template v-for="(m,i) in cpLog" :key="i">
@@ -861,8 +886,8 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
             </template>
           </div>
           <div class="cpin">
-            <input v-model="cpQ" placeholder="ask the desk…" @keyup.enter="ask(cpQ)">
-            <button @click="ask(cpQ)">ASK</button>
+            <input v-model="cpQ" placeholder="ask the desk…" @keyup.enter="cpAsk(cpQ)" aria-label="Ask the desk copilot">
+            <button @click="cpAsk(cpQ)">ASK</button>
           </div>
         </div>
       </div>
@@ -911,7 +936,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
 
     <!-- ============ RIGHT ============ -->
     <div class="col colR">
-      <div class="panel rec-panel">
+      <div style="--mo:1" class="panel rec-panel">
         <div class="ph">Trade Recommendation</div>
         <div class="pb">
           <div class="recbig">
@@ -935,7 +960,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
         </div>
       </div>
 
-      <div class="panel">
+      <div class="panel" style="--mo:4">
         <div class="ph">Entry Models</div>
         <div class="pb" style="padding:4px 6px;overflow-x:auto">
           <table class="mdl num" v-if="(d.models||[]).length"><thead><tr>
@@ -949,7 +974,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
         </div>
       </div>
 
-      <div class="panel">
+      <div class="panel" style="--mo:3">
         <div class="ph">{{ d.reasons.headline }}<span class="num">{{ d.confidence }}%</span></div>
         <div class="pb">
           <div class="chk" v-for="(it,i) in d.reasons.items" :key="i">
@@ -968,7 +993,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
         </div>
       </div>
 
-      <div class="panel">
+      <div class="panel" style="--mo:5">
         <div class="ph">Risk Engine</div>
         <div class="pb">
           <div class="rin">ACCT $<input type="number" v-model.number="acct" class="num"> RISK %<input type="number" v-model.number="riskpct" step="0.25" class="num"></div>
@@ -1091,6 +1116,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
       <button v-if="agentTab!=='run'" class="hbtn" @click="setAgentTab('run')" title="Back to chat" aria-label="Back to chat">‹</button>
       <div v-else class="brand-mark" style="width:26px;height:26px;font-size:11px" aria-hidden="true">N</div>
       <h2>{{ agentTab==='run'?'Agent desk':agentTab==='activity'?'Activity':'Connect agents' }}</h2>
+      <span v-if="agentLeft!==null" class="aleft" :class="{low:agentLeft<=1}" :title="'Questions left today on your plan'">{{ agentLeft }} left today</span>
       <button v-if="!isStandalone" class="dlbtn" @click.stop="installDesktop" title="Install Northcharts as a desktop app">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
         Download desktop</button>
@@ -1102,6 +1128,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
         <p v-else>Open this page in Chrome or Edge and choose <b>Install page as app</b> from the browser menu.</p>
         <p class="anote">It opens in its own window from your Start menu, dock or taskbar and updates itself.</p>
       </div>
+      <button type="button" class="hbtn aclose" @click="toggleAgent()" title="Close (Esc)" aria-label="Close the agent desk">✕</button>
     </div>
 
     <div class="abody" v-if="agentTab==='run'" ref="arun" @scroll.passive="onChatScroll">
@@ -1275,7 +1302,7 @@ const app=createApp({
     tvWidgetSym:null, curvePts:[], macroHelp:false,
     engine:'nc', chartTfs:['1m','5m','15m','30m','1h','4h','1D','1W'], chartTf:'15m', chartType:'candle_solid', chartLog:false,
     chartTypes:[['candle_solid','Candles'],['candle_stroke','Hollow candles'],['ohlc','Bars'],['area','Area']],
-    chartMenu:'', indQ:'', chartInds:['VOL'], showLevels:true, chartStatus:'', chartSource:'', chartLevels:[], chartFs:false,
+    chartMenu:'', indQ:'', chartInds:['VOL'], showLevels:true, chartStatus:'', chartErr:'', chartSource:'', chartLevels:[], chartFs:false,
     indList:[{id:'MA',label:'Moving average',main:true},{id:'EMA',label:'Exponential moving average',main:true},
       {id:'SMA',label:'Smoothed moving average',main:true},{id:'BOLL',label:'Bollinger Bands',main:true},
       {id:'SAR',label:'Parabolic SAR',main:true},{id:'BBI',label:'Bull and bear index',main:true},
@@ -1299,7 +1326,7 @@ const app=createApp({
       {id:'priceLine',label:'Price label',icon:'<svg viewBox="0 0 24 24"><path d="M3 12h11"/><path d="M14 8h6l2 4-2 4h-6z"/></svg>'},
       {id:'simpleAnnotation',label:'Note',icon:'<svg viewBox="0 0 24 24"><path d="M5 4h14v11H10l-5 5z"/></svg>'}],
     darkMode:false, roster:[], refreshing:false,
-    agentOpen:false, agentTab:'run', agentQ:'', agentFeed:[], agentStatus:{}, agentUnread:0, agentSeenTs:0, agentId:0,
+    agentOpen:false, agentTab:'run', agentQ:'', agentFeed:[], agentStatus:{}, agentLeft:null, agentUnread:0, agentSeenTs:0, agentId:0,
     chat:[], streaming:false, abortCtl:null, agentWide:false, agentMode:'desk', stick:true, menuOpen:false, installPrompt:null, isStandalone:false, installHelp:false, installHint:'other',
     listening:false, speechOk:false, speed:'normal',
     speeds:{slow:{label:'Slow',cps:30,sentence:420,para:650},normal:{label:'Normal',cps:55,sentence:200,para:340},fast:{label:'Fast',cps:120,sentence:90,para:160}},
@@ -1506,9 +1533,10 @@ const app=createApp({
               const j=await r.json(); if(!r.ok) throw new Error(j.error||'no data');
               vm.chartSource=j.source+(j.bars.length?' · '+j.bars.length+' bars':''); vm.chartLevels=j.levels||[];
               vm._ncLast=j.bars[j.bars.length-1]||null;
-              callback(j.bars,false); vm.chartStatus='';
+              callback(j.bars,false); vm.chartStatus=''; vm.chartErr=''; clearTimeout(vm._ncRetry);
               vm.$nextTick(()=>{ vm.drawLevels(); vm.restoreDrawings() });
-            }catch(e){ vm.chartStatus='No price history: '+e.message; callback([],false) } },
+            }catch(e){ vm.chartStatus=''; vm.chartErr=/fetch|network/i.test(e.message)?'The connection dropped.':e.message;
+              callback([],false); clearTimeout(vm._ncRetry); vm._ncRetry=setTimeout(()=>vm.chartRetry(),60000) } },
           subscribeBar:({callback})=>{ vm._ncPush=callback },
           unsubscribeBar:()=>{ vm._ncPush=null }});
         for(const id of this.chartInds) this.addInd(id);
@@ -1536,6 +1564,8 @@ const app=createApp({
         this._ncLast=j.bars[j.bars.length-1]; this.chartLevels=j.levels||[]; this.drawLevels() }catch(e){}
     },
     setTf(t){ this.chartTf=t; this.savePrefs(); this.ncEnsure() },
+    chartRetry(){ clearTimeout(this._ncRetry); if(!this._nc) return this.ncEnsure();
+      this.chartErr=''; this._ncKey=null; this.ncEnsure() },
     setChartType(t){ this.chartType=t; this.chartMenu=''; this.savePrefs(); this._nc&&this._nc.setStyles({candle:{type:t}}) },
     toggleLog(){ this.chartLog=!this.chartLog; this.savePrefs(); this._nc&&this._nc.overrideYAxis({paneId:'candle_pane',name:this.chartLog?'logarithm':'normal'}) },
     setEngine(e){ this.engine=e; this.savePrefs(); if(e==='tv'){ this.tvWidgetSym=null; this.$nextTick(()=>this.mountTv()) } else this.$nextTick(()=>{ this.ncEnsure(); this._nc&&this._nc.resize() }) },
@@ -1606,7 +1636,7 @@ const app=createApp({
         studies:[],
       });
     },
-    async ask(q){
+    async cpAsk(q){
       q=(q||'').trim(); if(!q) return; this.cpQ='';
       const r=await fetch('/api/ask?sym='+this.sym+'&q='+encodeURIComponent(q));
       const j=await r.json();
@@ -1693,7 +1723,8 @@ const app=createApp({
       if(t==='run') this.$nextTick(()=>this.$refs.ainput&&this.$refs.ainput.focus()) },
     markAgentSeen(){ this.agentUnread=0; this.agentSeenTs=Math.max(this.agentSeenTs,...this.agentFeed.map(a=>a.ts),0);
       try{localStorage.setItem('nc-agent-seen',String(this.agentSeenTs))}catch(e){} },
-    async fetchAgentStatus(){ try{ const r=await fetch('/api/agent/status'); if(r.ok) this.agentStatus=await r.json() }catch(e){} },
+    async fetchAgentStatus(){ try{ const r=await fetch('/api/agent/status'); if(r.ok){ const j=await r.json(); this.agentStatus=j;
+      this.agentLeft=j.agent_left!=null&&j.agent_cap!=null&&j.agent_cap<=60?j.agent_left:null } }catch(e){} },
     async fetchAgentFeed(){ try{ const r=await fetch('/api/agent/activity?limit=60'); if(!r.ok) return;
         const j=await r.json(); this.agentFeed=j.activity||[];
         this.agentUnread=this.agentFeed.filter(a=>a.client!=='Northcharts UI'&&a.ts>this.agentSeenTs).length;
@@ -1744,6 +1775,7 @@ const app=createApp({
       this.chat.push({id:++this.agentId,role:'assistant',mode:null,symbol:this.sym,steps:[],blocks:[],suggestions:[],streaming:true,revealing:false,error:null,notice:null,upgrade:null});
       const t=this.chat[this.chat.length-1];
       this.streaming=true; this.abortCtl=new AbortController(); this.scrollAgent(true);
+      if(this.agentLeft>0) this.agentLeft--;
       try{
         const r=await fetch('/api/agent/stream',{method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({question:q,symbol:this.sym,history}),signal:this.abortCtl.signal});
@@ -1779,7 +1811,7 @@ const app=createApp({
       else if(ev.type==='suggestions') t.suggestions=ev.items||[];
       else if(ev.type==='notice') t.notice=ev.message;
       else if(ev.type==='error') t.error=ev.message;
-      else if(ev.type==='upgrade') t.upgrade=ev;
+      else if(ev.type==='upgrade'){ t.upgrade=ev; if(this.agentLeft!==null) this.agentLeft=0 }
       this.scrollAgent();
     },
     // Reveal streamed text at a human reading pace. Speed is the user's choice (Slow, Normal, Fast);

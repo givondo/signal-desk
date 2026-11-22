@@ -166,6 +166,7 @@ async function load(){
   const r=await fetch("/api/billing/state"); if(r.status===401){ location.href="/signin?next=/billing"; return }
   ST=await r.json(); CAT=ST.catalogue;
   $("test").hidden=!(CAT.test&&CAT.mode!=="off");
+  if(CAT.mpesa_via==="paystack") $("test").textContent="Test mode: use Paystack's test M-Pesa numbers and test cards. No real money moves.";
   drawCurrent(); drawHist(); redraw();
   if(ST.owner) loadOwner();
   if(!PICK&&!load.once&&qs.get("plan")&&qs.get("plan")!=="free"&&!ST.owner&&qs.get("plan")!==ST.plan) choose(qs.get("plan"));
