@@ -2,12 +2,12 @@
 <html lang="en" data-theme="light"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="Northchart: multi-asset charts, live confluence signals and an agent desk that works with ChatGPT and Claude.">
+<meta name="description" content="Northcharts: multi-asset charts, live confluence signals and an agent desk that works with ChatGPT and Claude.">
 <meta name="theme-color" content="#ffffff" id="meta-theme">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Northchart</title>
+<title>Northcharts</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230b0d10'/%3E%3Ctext x='32' y='44' font-size='30' font-weight='bold' text-anchor='middle' fill='%23c9a227' font-family='Consolas'%3ESD%3C/text%3E%3C/svg%3E">
@@ -521,7 +521,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
       <div class="brand">
         <div class="brand-mark" aria-hidden="true">N</div>
         <div class="brand-txt">
-          <div class="name">Northchart</div>
+          <div class="name">Northcharts</div>
           <div class="sub">Charts · signals · agents</div>
         </div>
       </div>
@@ -912,7 +912,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
   </div>
 
   <footer class="foot">15 instruments · Metals, Crypto, FX, Indices, Energy · hotkeys <kbd>1</kbd>–<kbd>9</kbd> · refresh 15s · TradingView + Yahoo<br>
-  Rule-based copilot (no LLM) · agent desk <kbd>Ctrl</kbd>+<kbd>K</kbd> · ChatGPT and Claude via Northchart Connect. All R figures net of estimated spread. <strong style="font-weight:600;color:var(--dim)">Educational only — not financial advice.</strong></footer>
+  Rule-based copilot (no LLM) · agent desk <kbd>Ctrl</kbd>+<kbd>K</kbd> · ChatGPT and Claude via Northcharts Connect. All R figures net of estimated spread. <strong style="font-weight:600;color:var(--dim)">Educational only — not financial advice.</strong></footer>
 
   <!-- auth modal -->
   <div class="overlay" v-if="authOpen" @click.self="closeAuth">
@@ -943,18 +943,18 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
   </div>
 
 
-  <!-- agent desk: the human view of Northchart Connect -->
+  <!-- agent desk: the human view of Northcharts Connect -->
   <div class="ascrim" v-if="agentOpen" @click="toggleAgent(false)"></div>
   <aside class="adrawer" :class="{open:agentOpen,wide:agentWide}" aria-label="Agent desk" :aria-hidden="!agentOpen">
     <div class="ahead">
       <button v-if="agentTab!=='run'" class="hbtn" @click="setAgentTab('run')" title="Back to chat" aria-label="Back to chat">‹</button>
       <div v-else class="brand-mark" style="width:26px;height:26px;font-size:11px" aria-hidden="true">N</div>
       <h2>{{ agentTab==='run'?'Agent desk':agentTab==='activity'?'Activity':'Connect agents' }}</h2>
-      <button v-if="!isStandalone" class="dlbtn" @click.stop="installDesktop" title="Install Northchart as a desktop app">
+      <button v-if="!isStandalone" class="dlbtn" @click.stop="installDesktop" title="Install Northcharts as a desktop app">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
         Download desktop</button>
       <div v-if="installHelp" class="hpop dlhelp" @click.stop>
-        <b>Install Northchart</b>
+        <b>Install Northcharts</b>
         <p v-if="installHint==='chromium'">In Chrome or Edge, open the browser menu (⋮), choose <b>Cast, save and share</b>, then <b>Install page as app</b>. You can also use the install icon at the right of the address bar.</p>
         <p v-else-if="installHint==='safari'">In Safari on a Mac, choose <b>File</b>, then <b>Add to Dock</b>.</p>
         <p v-else-if="installHint==='ios'">Tap <b>Share</b>, then <b>Add to Home Screen</b>.</p>
@@ -1027,7 +1027,7 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
       <div v-if="!agentFeed.length" class="aempty">No agent activity yet. Connect ChatGPT or Claude from the Connect tab.</div>
       <div class="afeed">
         <div class="row" v-for="(a,i) in agentFeed" :key="i">
-          <span class="who" :class="{ui:a.client==='Northchart UI'}">{{ a.client }}</span>
+          <span class="who" :class="{ui:a.client==='Northcharts UI'}">{{ a.client }}</span>
           <span class="what">{{ a.tool }}<template v-if="a.args&&a.args.symbol"> · {{ a.args.symbol }}</template><template v-if="a.args&&a.args.question"> · “{{ a.args.question }}”</template></span>
           <span class="when"><span :class="a.ok?'dirL':'dirS'">{{ a.ok?'✓':'✕' }}</span> {{ ago(a.ts) }} · {{ a.ms }}ms</span>
           <span v-if="!a.ok" class="err">{{ a.error }}</span>
@@ -1036,16 +1036,16 @@ kbd{background:var(--p2);border:1px solid var(--bd2);padding:1px 6px;font-size:1
     </div>
 
     <div class="abody" v-else>
-      <div class="anote">Northchart Connect is a remote MCP server. Add it once and ChatGPT or Claude can read the desk with the same tools you use here.</div>
+      <div class="anote">Northcharts Connect is a remote MCP server. Add it once and ChatGPT or Claude can read the desk with the same tools you use here.</div>
       <div class="aurl"><span>{{ agentStatus.mcp_url || '…' }}</span><button class="tvlink" @click="copyMcp">Copy</button></div>
       <div class="acard"><div class="top"><span>Claude</span></div><div class="in"><ol class="asteps">
         <li>Open <b>Settings → Connectors</b> (claude.ai or the desktop app).</li>
         <li>Choose <b>Add custom connector</b> and paste the URL above.</li>
-        <li>Approve on the Northchart page with your desk password.</li></ol></div></div>
+        <li>Approve on the Northcharts page with your desk password.</li></ol></div></div>
       <div class="acard"><div class="top"><span>ChatGPT</span></div><div class="in"><ol class="asteps">
         <li>Open <b>Settings → Apps</b>, then <b>Create</b> (developer mode must be on for your plan).</li>
         <li>Paste the URL above and choose <b>OAuth</b> authentication.</li>
-        <li>Approve on the Northchart page with your desk password.</li></ol></div></div>
+        <li>Approve on the Northcharts page with your desk password.</li></ol></div></div>
       <div class="acard"><div class="top"><span>Claude Code and scripts</span></div><div class="in">
         <p class="anote">Set <code>NORTHCHART_MCP_TOKEN</code> on the server, then:</p>
         <pre>claude mcp add --transport http northchart {{ agentStatus.mcp_url }} --header "Authorization: Bearer $NORTHCHART_MCP_TOKEN"</pre>
@@ -1343,7 +1343,7 @@ const app=createApp({
     async fetchAgentStatus(){ try{ const r=await fetch('/api/agent/status'); if(r.ok) this.agentStatus=await r.json() }catch(e){} },
     async fetchAgentFeed(){ try{ const r=await fetch('/api/agent/activity?limit=60'); if(!r.ok) return;
         const j=await r.json(); this.agentFeed=j.activity||[];
-        this.agentUnread=this.agentFeed.filter(a=>a.client!=='Northchart UI'&&a.ts>this.agentSeenTs).length;
+        this.agentUnread=this.agentFeed.filter(a=>a.client!=='Northcharts UI'&&a.ts>this.agentSeenTs).length;
         if(this.agentOpen&&this.agentTab==='activity') this.markAgentSeen();
       }catch(e){} },
     toolTitle(n){ return ({get_market_snapshot:'Snapshot',get_signal_detail:'Signal detail',get_candles:'Candles',
@@ -1375,7 +1375,7 @@ const app=createApp({
     newChat(){ this.stopStream(); this.chat=[]; this.agentTab='run'; this.$nextTick(()=>this.$refs.ainput&&this.$refs.ainput.focus()) },
     async installDesktop(){
       if(this.installPrompt){ const p=this.installPrompt; this.installPrompt=null; p.prompt();
-        try{ const r=await p.userChoice; if(r&&r.outcome==='accepted') this.toast('Installing Northchart') }catch(e){} return }
+        try{ const r=await p.userChoice; if(r&&r.outcome==='accepted') this.toast('Installing Northcharts') }catch(e){} return }
       const ua=navigator.userAgent;
       this.installHint=/iPhone|iPad/.test(ua)?'ios':/Edg\/|Chrome\//.test(ua)?'chromium':/Safari\//.test(ua)?'safari':'other';
       this.installHelp=!this.installHelp },
@@ -1504,7 +1504,7 @@ const app=createApp({
     this.speechOk=!!(window.SpeechRecognition||window.webkitSpeechRecognition);
     try{ const sp=localStorage.getItem('nc-speed'); if(sp&&this.speeds[sp]) this.speed=sp }catch(e){}
     window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); this.installPrompt=e });
-    window.addEventListener('appinstalled',()=>{ this.isStandalone=true; this.installPrompt=null; this.installHelp=false; this.toast('Northchart installed') });
+    window.addEventListener('appinstalled',()=>{ this.isStandalone=true; this.installPrompt=null; this.installHelp=false; this.toast('Northcharts installed') });
     if('serviceWorker' in navigator){ navigator.serviceWorker.register('/sw.js').catch(()=>{}) }
     if(location.hash==='#agents-activity'||location.hash==='#agents-connect'){ this.toggleAgent(true); this.setAgentTab(location.hash.slice(8)) }
     setInterval(()=>this.fetchInbox(),60000);

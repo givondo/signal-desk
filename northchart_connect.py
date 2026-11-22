@@ -1,4 +1,4 @@
-"""Northchart Connect: the agent-facing interface of Northchart.
+"""Northcharts Connect: the agent-facing interface of Northcharts.
 
 A remote Model Context Protocol (MCP) server that lets ChatGPT, Claude and
 any other MCP client use the desk's read-only tools over Streamable HTTP,
@@ -37,7 +37,7 @@ import time
 import urllib.parse
 
 SERVER_NAME = "northchart-connect"
-SERVER_TITLE = "Northchart Connect"
+SERVER_TITLE = "Northcharts Connect"
 SERVER_VERSION = "1.0.0"
 PROTOCOL_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26")
 SCOPE = "northchart.read"
@@ -269,7 +269,7 @@ def build_tools(ctx) -> dict:
         out["macro"] = {"score": macro.get("score"), "ts": macro.get("ts"), "rows": macro.get("rows")}
         out["headlines"] = [{"title": n.get("title"), "ts": n.get("ts") or n.get("t")}
                             for n in (st.get("news") or [])[:8] if isinstance(n, dict)]
-        out["data_note"] = "Analysis output of the Northchart engine, not personalised advice."
+        out["data_note"] = "Analysis output of the Northcharts engine, not personalised advice."
         return out
 
     def history(args):
@@ -327,7 +327,7 @@ def build_tools(ctx) -> dict:
 
     tools = [
         Tool("list_instruments", "List instruments",
-             "List every instrument Northchart covers, with its group (Metals, FX, Crypto, Indices, Energy).",
+             "List every instrument Northcharts covers, with its group (Metals, FX, Crypto, Indices, Energy).",
              {"type": "object", "properties": {}, "additionalProperties": False}, list_instruments),
         Tool("get_market_overview", "Market overview",
              "One row per instrument: price, direction, grade, confidence, tradeable flag and desk mode, "
@@ -400,7 +400,7 @@ class Connect:
         self.who = threading.local()                 # uid of the account behind the current bearer token
 
     # ---------------------------------------------------------- shared tool runner
-    def run_tool(self, name: str, args: dict | None, client: str = "Northchart UI"):
+    def run_tool(self, name: str, args: dict | None, client: str = "Northcharts UI"):
         t = self.tools.get(name)
         started = time.time()
         entry = {"ts": _now(), "client": client, "tool": name,
@@ -583,7 +583,7 @@ code{{background:#0b0d10;padding:1px 5px;border-radius:5px}}</style></head><body
         with self.store.lock:
             client, err = self._validate_auth_request(q)
         if err:
-            return self._page(400, "Northchart Connect", f"<h1>Cannot connect</h1><p class='mut'>{html.escape(err)}</p>")
+            return self._page(400, "Northcharts Connect", f"<h1>Cannot connect</h1><p class='mut'>{html.escape(err)}</p>")
         g = lambda k: (q.get(k) or [""])[0]
         host = urllib.parse.urlsplit(g("redirect_uri")).hostname or "?"
         loopback = host in ("localhost", "127.0.0.1", "::1")
@@ -592,7 +592,7 @@ code{{background:#0b0d10;padding:1px 5px;border-radius:5px}}</style></head><body
                                    "code_challenge_method", "scope", "resource", "response_type"))
         need_pw = bool(self.ctx["owner_password"]())
         accounts = self.ctx.get("accounts_enabled", lambda: False)()
-        pw = ('<label class="mut" for="em">Northchart email</label>'
+        pw = ('<label class="mut" for="em">Northcharts email</label>'
               '<input id="em" name="email" type="email" autocomplete="email" autofocus required>'
               '<label class="mut" for="pw">Password</label>'
               '<input id="pw" name="password" type="password" autocomplete="current-password" required>'
@@ -606,7 +606,7 @@ code{{background:#0b0d10;padding:1px 5px;border-radius:5px}}</style></head><body
                 f'(<code>{html.escape(host)}</code>). Only approve if you started this connection.</p>'
                 if loopback else "")
         inner = (f"<h1>Connect {html.escape(client['client_name'])}</h1>"
-                 f"<p class='mut'>wants read-only access to your Northchart desk. "
+                 f"<p class='mut'>wants read-only access to your Northcharts desk. "
                  f"You will be returned to <b>{html.escape(host)}</b>.</p>"
                  "<ul><li>Read market snapshots, signal detail, briefs and price history</li>"
                  "<li>Read your trade journal</li>"
@@ -615,7 +615,7 @@ code{{background:#0b0d10;padding:1px 5px;border-radius:5px}}</style></head><body
                  + (f"<div class='err'>{html.escape(error)}</div>" if error else "") + warn +
                  f'<form method="post" action="/oauth/authorize">{hidden}{pw}'
                  '<button type="submit">Approve read-only access</button></form>')
-        return self._page(200 if not error else 401, "Connect to Northchart", inner)
+        return self._page(200 if not error else 401, "Connect to Northcharts", inner)
 
     def authorize_submit(self, form, base, ip):
         g = lambda k: (form.get(k) or [""])[0]
@@ -623,12 +623,12 @@ code{{background:#0b0d10;padding:1px 5px;border-radius:5px}}</style></head><body
         with self.lock:
             self.fail[ip] = [t for t in self.fail[ip] if now - t < 900]
             if len(self.fail[ip]) >= 5:
-                return self._page(429, "Northchart Connect",
+                return self._page(429, "Northcharts Connect",
                                   "<h1>Too many attempts</h1><p class='mut'>Wait 15 minutes and try again.</p>")
         with self.store.lock:
             client, err = self._validate_auth_request(form)
         if err:
-            return self._page(400, "Northchart Connect", f"<h1>Cannot connect</h1><p class='mut'>{html.escape(err)}</p>")
+            return self._page(400, "Northcharts Connect", f"<h1>Cannot connect</h1><p class='mut'>{html.escape(err)}</p>")
         uid = None
         if self.ctx.get("accounts_enabled", lambda: False)():
             uid = self.ctx["account_login"](g("email"), g("password"))
@@ -754,7 +754,7 @@ code{{background:#0b0d10;padding:1px 5px;border-radius:5px}}</style></head><body
 
     def _unauthorized(self, base):
         meta = base + "/.well-known/oauth-protected-resource/mcp"
-        return self._cors_json(401, {"error": "invalid_token", "error_description": "sign in to Northchart"},
+        return self._cors_json(401, {"error": "invalid_token", "error_description": "sign in to Northcharts"},
                                {"WWW-Authenticate": f'Bearer resource_metadata="{meta}", scope="{SCOPE}"'})
 
     @staticmethod
@@ -778,7 +778,7 @@ code{{background:#0b0d10;padding:1px 5px;border-radius:5px}}</style></head><body
                 "capabilities": {"tools": {"listChanged": False}},
                 "serverInfo": {"name": SERVER_NAME, "title": SERVER_TITLE, "version": SERVER_VERSION},
                 "instructions": (
-                    "Northchart is a multi-asset trading research desk (gold first, plus FX, crypto, indices and "
+                    "Northcharts is a multi-asset trading research desk (gold first, plus FX, crypto, indices and "
                     "oil). Start with get_market_overview, then get_market_snapshot or get_signal_detail for one "
                     "symbol. All tools are read-only and nothing can place an order. Always state the data "
                     "timestamp, treat output as research rather than personalised advice, and never invent "

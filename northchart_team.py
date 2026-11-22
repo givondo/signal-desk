@@ -215,14 +215,14 @@ def lead_report(sym, s, d, reports, question=None, copilot=None):
 
 # ------------------------------------------------------------------ Claude-backed team
 
-SPECIALIST_PROMPT = """You are the {name} on the Northchart trading desk. Your remit: {role}.
+SPECIALIST_PROMPT = """You are the {name} on the Northcharts trading desk. Your remit: {role}.
 You get the desk's live data for one instrument as JSON. Judge it only from your remit and only from the
 numbers given; never invent a level or figure. Reply with JSON only, no prose around it:
 {{"verdict": one of {verdicts}, "confidence": 0-100, "summary": "one line, max 14 words",
 "points": ["2 to 4 short evidence points with the numbers"]}}
 Use British English and no em or en dashes."""
 
-LEAD_PROMPT = """You are the lead analyst on the Northchart trading desk. Four specialists (market, macro, news,
+LEAD_PROMPT = """You are the lead analyst on the Northcharts trading desk. Four specialists (market, macro, news,
 risk) have each reported on one instrument. Write the answer to the user's question from their reports and the
 live data only. Never invent a number.
 Structure: one bold line with instrument, price and data time. Then the desk's view in one or two sentences,
