@@ -71,18 +71,18 @@ Desk calls stay free. Members pay for the tools (`northchart_billing.py`, pages 
 | Plan | Price | Adds |
 |---|---|---|
 | Free | $0 | Desk calls, chart, manual journal, statement import, 3 agent questions a day |
-| Plus | $25 a month or $250 a year | Automatic broker sync (2 accounts), Bridge and TradingView sync, agent desk (60 a day), Claude journal notes |
-| Pro | $200 a month or $2,000 a year | 20 broker accounts, MetaApi, agent desk (1,000 a day), Northchart Connect for ChatGPT and Claude |
+| Plus | $25 a month | Automatic broker sync (2 accounts), Bridge and TradingView sync, agent desk (60 a day), Claude journal notes |
+| Pro | $200 a month | 20 broker accounts, MetaApi, agent desk (1,000 a day), Northchart Connect for ChatGPT and Claude |
 
 * **M-Pesa** through Safaricom Daraja: STK push to your Paybill or Till. Callbacks are unsigned, so each one only
   triggers an `stkpushquery`, and the query decides. Renewal is a prompt on the due date (three tries, a day apart) or an
   M-Pesa Ratiba standing order; Ratiba debits arrive as C2B confirmations, accepted only from Safaricom's addresses for
-  the member's account reference and the right amount. One M-Pesa payment is capped at KES 250,000, so Pro yearly is card only.
+  the member's account reference and the right amount. Plans are monthly only.
 * **Cards** through Paystack's hosted page (no card data touches the desk). The first payment saves a reusable
   authorisation, sealed in the vault; renewals use `charge_authorization`. Webhooks are checked with HMAC-SHA512 and
   every success is re-verified with `/transaction/verify`.
 * Prices are in USD and charged in KES at the day's USDKES rate (rounded up to KES 50), or a fixed KES price.
-* Upgrades start at once with credit for unused time; downgrades and yearly-to-monthly changes wait for the renewal date.
+* Upgrades start at once with credit for unused time; downgrades wait for the renewal date.
   Three days' grace, then Free. The owner always has every feature and can give members a plan from `/billing`.
 
 Switching it on (sandbox first):
@@ -99,7 +99,7 @@ Switching it on (sandbox first):
 | Variable | Meaning |
 |---|---|
 | `NORTHCHART_BILLING` | `off` (default, nothing locked), `test` or `live` |
-| `NORTHCHART_PRICE_PLUS_MONTH` (and `_YEAR`, `PRO_`) | USD list price; `..._KES` fixes the shilling price |
+| `NORTHCHART_PRICE_PLUS_MONTH`, `NORTHCHART_PRICE_PRO_MONTH` | USD monthly price; add `_KES` to fix the shilling price |
 | `NORTHCHART_KES_PER_USD` | Fixed rate instead of the live USDKES quote |
 | `PAYSTACK_SECRET_KEY`, `PAYSTACK_CURRENCY` | Card payments; currency `KES` (default) or `USD` once Paystack approves it |
 | `DARAJA_ENV`, `DARAJA_CONSUMER_KEY`, `DARAJA_CONSUMER_SECRET` | M-Pesa API app (`sandbox` or `production`) |

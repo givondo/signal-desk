@@ -4,10 +4,10 @@ Standard library only.
 
 Plans (USD list prices; change them with environment variables, see PRICE_ENV):
     Free   desk view, live chart, desk signals, manual journal and statement import
-    Plus   $25 a month or $250 a year: automatic broker sync, agent (fair use),
-           Claude journal drafts
-    Pro    $200 a month or $2,000 a year: everything in Plus, more brokers, a much
-           larger agent allowance, and Northchart Connect (ChatGPT and Claude)
+    Plus   $25 a month: automatic broker sync, agent (fair use), Claude journal drafts
+    Pro    $200 a month: everything in Plus, more brokers, a much larger agent
+           allowance, and Northchart Connect (ChatGPT and Claude)
+    Plans are monthly only.
 
 Payments
     Card     Paystack (hosted checkout, so card numbers never touch Northchart).
@@ -52,7 +52,7 @@ import urllib.parse
 import urllib.request
 
 PLAN_ORDER = ("free", "plus", "pro")
-INTERVALS = ("month", "year")
+INTERVALS = ("month",)
 GRACE_DAYS = 3
 REMIND_DAYS = 3
 STK_RETRY_HOURS = 24
@@ -61,17 +61,17 @@ PENDING_TTL = 30 * 60
 MPESA_MAX_KES = 250_000      # Safaricom's limit for one M-Pesa payment (and for a Ratiba order)
 
 PLANS = {
-    "free": {"name": "Free", "usd": {"month": 0, "year": 0},
+    "free": {"name": "Free", "usd": {"month": 0},
              "tagline": "The desk, free for every trader.",
              "features": ["Live desk calls and grades on every instrument", "Northchart chart with drawing tools",
                           "Manual trade journal with statistics", "Import MT4 and MT5 statements",
                           "3 agent questions a day"]},
-    "plus": {"name": "Plus", "usd": {"month": 25, "year": 250},
+    "plus": {"name": "Plus", "usd": {"month": 25},
              "tagline": "Your journal fills itself.",
              "features": ["Everything in Free", "Automatic broker sync (2 accounts)",
                           "Northchart Bridge and TradingView sync", "Agent desk, 60 questions a day",
                           "Claude-written journal notes", "Discipline flags and review queue"]},
-    "pro": {"name": "Pro", "usd": {"month": 200, "year": 2000},
+    "pro": {"name": "Pro", "usd": {"month": 200},
             "tagline": "For full-time and funded traders.",
             "features": ["Everything in Plus", "Automatic broker sync (20 accounts)",
                          "Agent desk with the specialist team, 1,000 questions a day",
@@ -490,7 +490,7 @@ class Billing:
     def quote(self, u, plan, interval):
         """What the person pays now, after credit for unused time on a lower plan."""
         if plan not in ("plus", "pro") or interval not in INTERVALS:
-            raise PaymentError("Pick Plus or Pro, monthly or yearly.")
+            raise PaymentError("Pick Plus or Pro.")
         kes = self.kes(plan, interval)
         usd = self.usd(plan, interval)
         credit = 0

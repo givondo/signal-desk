@@ -435,8 +435,8 @@ owner straight away if you think someone else has used it.</p>
 <h2>Broker connections</h2><p>You connect a broker with read-only credentials (an investor password, a read-only key or a
 statement file). Northchart only reads closed trades and account history. You can disconnect at any time, which deletes
 the stored credentials.</p>
-<h2>Plans and payments</h2><p>Desk calls, the chart and the manual journal are free. Plus and Pro are paid by the month
-or the year, in advance, through M-Pesa (Safaricom) or a card (Paystack). Prices are listed in US dollars and charged in
+<h2>Plans and payments</h2><p>Desk calls, the chart and the manual journal are free. Plus and Pro are paid monthly,
+in advance, through M-Pesa (Safaricom) or a card (Paystack). Prices are listed in US dollars and charged in
 Kenyan shillings at the rate shown before you pay. Cards renew automatically; M-Pesa renews by a payment prompt or a
 Ratiba standing order you approve. We email you before every renewal. You can cancel at any time and keep the plan until
 the end of the period you paid for. Upgrades start at once with credit for unused time; downgrades start at the next

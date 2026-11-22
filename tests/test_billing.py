@@ -152,13 +152,15 @@ class Prices(Base):
     def test_prices_and_rounding(self):
         self.assertEqual(self.bl.usd("plus", "month"), 25)
         self.assertEqual(self.bl.usd("pro", "month"), 200)
-        self.assertEqual(self.bl.usd("plus", "year"), 250)
         self.assertEqual(self.bl.kes("plus", "month"), 3250)      # 25 x 129.4 = 3235 -> next 50
         self.assertEqual(self.bl.kes("pro", "month"), 25900)
         os.environ["NORTHCHART_PRICE_PLUS_MONTH_KES"] = "2999"
         self.assertEqual(self.bl.kes("plus", "month"), 2999)
         cat = self.bl.catalogue()
         self.assertEqual([p["id"] for p in cat["plans"]], ["free", "plus", "pro"])
+        self.assertEqual(list(cat["plans"][1]["usd"]), ["month"])
+        with self.assertRaises(nbl.PaymentError):
+            self.bl.quote(self.m, "plus", "year")         # monthly only
         self.assertTrue(cat["methods"]["mpesa"] and cat["methods"]["card"] and cat["test"])
 
     def test_periods_and_phones(self):
@@ -254,10 +256,12 @@ class MpesaCheckout(Base):
         self.assertEqual(MockPay.stk[-1]["Amount"], 25900)
 
     def test_mpesa_limit(self):
-        with self.assertRaises(nbl.PaymentError) as e:     # Pro yearly is KES 258,800
-            self.bl.checkout(self.m, "pro", "year", "mpesa", "https://desk.test", "0712345678")
+        os.environ["NORTHCHART_PRICE_PRO_MONTH_KES"] = "260000"
+        with self.assertRaises(nbl.PaymentError) as e:
+            self.bl.checkout(self.m, "pro", "month", "mpesa", "https://desk.test", "0712345678")
         self.assertIn("by card", str(e.exception))
         self.assertEqual(MockPay.stk, [])
+        os.environ.pop("NORTHCHART_PRICE_PRO_MONTH_KES")
 
 
 class CardCheckout(Base):

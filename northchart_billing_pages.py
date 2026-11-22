@@ -66,14 +66,14 @@ const escH=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"
 const fmtUsd=v=>"$"+(+v).toLocaleString("en-US",{maximumFractionDigits:2});
 const fmtKes=v=>"KES "+(+v).toLocaleString("en-GB");
 const day=t=>t?new Date(t*1000).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"";
-let CAT=null, IV=(new URLSearchParams(location.search).get("interval")==="year")?"year":"month";
+let CAT=null; const IV="month";
 function drawPlans(current, onPick){
   const el=$("plans"); if(!el||!CAT) return;
   el.innerHTML=CAT.plans.map(p=>{
-    const per=IV==="year"?"/year":"/month", usd=p.usd[IV], kes=p.kes[IV];
+    const per="/month", usd=p.usd[IV], kes=p.kes[IV];
     const mine=current&&current===p.id;
     const label=p.id==="free"?(mine?"Your plan":current?"Included in every plan":"Start free"):(mine?"Your plan":"Choose "+p.name);
-    const note=p.id==="free"?"No card needed":(IV==="year"?`${fmtUsd(usd/12)} a month, billed yearly · about ${fmtKes(kes)}`:`About ${fmtKes(kes)} by M-Pesa`);
+    const note=p.id==="free"?"No card needed":`About ${fmtKes(kes)} by M-Pesa`;
     return `<div class="plan${p.id==="plus"?" hi":""}">${p.id==="plus"?'<span class="flag">Most traders pick this</span>':""}
       <h3>${escH(p.name)}</h3><div class="tag">${escH(p.tagline)}</div>
       <div class="price"><b>${usd?fmtUsd(usd):"$0"}</b><span>${usd?per:"forever"}</span></div><div class="kes">${note}</div>
@@ -81,12 +81,9 @@ function drawPlans(current, onPick){
       <button class="go" data-plan="${p.id}" ${mine||(p.id==="free"&&current)?"disabled":""}>${label}</button></div>`}).join("");
   el.querySelectorAll("button[data-plan]").forEach(b=>b.onclick=()=>onPick(b.dataset.plan));
 }
-function drawSeg(redraw){ const s=$("seg"); if(!s) return;
-  s.querySelectorAll("button").forEach(b=>{ b.classList.toggle("on",b.dataset.iv===IV); b.onclick=()=>{ IV=b.dataset.iv; drawSeg(redraw); redraw() } }) }
 </script>"""
 
-SEG = ('<div class="seg" id="seg"><button data-iv="month">Monthly</button>'
-       '<button data-iv="year">Yearly<span class="save">2 months free</span></button></div>')
+SEG = '<p class="lead" style="margin-top:12px">Monthly plans. Cancel any time.</p>'
 
 FAQ = """<div class="faq">
 <details><summary>How do I pay with M-Pesa?</summary><p>Enter your Safaricom number and press Send payment request.
@@ -117,8 +114,8 @@ itself from your broker, the agent desk, and Northchart inside ChatGPT and Claud
 CAT={json.dumps(catalogue)};
 const SIGNED={json.dumps(bool(signed_in))};
 function pick(p){{ if(p==="free"){{ location.href=SIGNED?"/":"/signup"; return }}
-  const to="/billing?plan="+p+"&interval="+IV; location.href=SIGNED?to:"/signup?next="+encodeURIComponent(to) }}
-const redraw=()=>drawPlans(null,pick); drawSeg(redraw); redraw();
+  const to="/billing?plan="+p; location.href=SIGNED?to:"/signup?next="+encodeURIComponent(to) }}
+const redraw=()=>drawPlans(null,pick); redraw();
 </script>"""
     return ap.page("Pricing", inner, script, nav="billing" if signed_in else None)
 
@@ -132,7 +129,7 @@ def billing():
   <div id="auto" style="margin-top:14px" hidden></div></section>
 
 <section class="sec" id="pickSec"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
-  <div><h2>Plans</h2><p class="lead" style="margin:0">Desk calls stay free on every plan. Prices in US dollars; M-Pesa charges the shilling amount shown.</p></div>{SEG}</div>
+  <div><h2>Plans</h2><p class="lead" style="margin:0">Desk calls stay free on every plan. Monthly prices in US dollars; M-Pesa charges the shilling amount shown.</p></div></div>
   <div class="plans" id="plans" style="margin-top:18px"></div></section>
 
 <section class="sec" id="coSec" hidden><h2 id="coTitle">Checkout</h2>
@@ -186,7 +183,7 @@ function drawCurrent(){
     meta=s.comp?`Given by the desk until ${ends}.`:
       s.status==="past_due"?`<span style="color:var(--r)">Renewal due since ${ends}.</span> Pay within ${CAT.grace_days} days to keep ${pn}.`:
       s.cancel_at_period_end?`Ends on ${ends}. It will not renew.`:
-      `${s.interval==="year"?"Yearly":"Monthly"} · renews on ${ends}`;
+      `Monthly · renews on ${ends}`;
     if(s.next_plan) meta+=` · moves to ${({plus:"Plus",pro:"Pro"})[s.next_plan]} on ${ends}`;
     const how=s.card&&s.method==="card"?`${escH(s.card.brand)} ending ${escH(s.card.last4)}`:
       s.ratiba&&s.ratiba.state==="active"?`M-Pesa Ratiba from ${escH(s.phone_masked)}`:
@@ -207,7 +204,7 @@ function drawCurrent(){
   on("cancel",async()=>{ if(!confirm("Stop the renewal? You keep "+pn+" until "+day(s.period_end)+".")) return;
     await post("/api/billing/cancel"); flash("Renewal cancelled. You keep the plan until "+day(s.period_end)+".",true); load() });
   on("resume",async()=>{ await post("/api/billing/resume"); flash("Your plan will renew.",true); load() });
-  on("payNow",async()=>{ IV=s.interval||"month"; choose(s.plan) });
+  on("payNow",async()=>{ choose(s.plan) });
   on("autoBtn",async()=>{ drawAuto() });
   $("pickSec").hidden=!!ST.owner; $("histSec").hidden=!!ST.owner;
 }
@@ -230,21 +227,20 @@ function drawAuto(){
 function drawHist(){
   const h=ST.payments||[];
   $("hist").innerHTML=h.length?"<tr><th>Date</th><th>Plan</th><th>Method</th><th>Amount</th><th>Status</th><th></th></tr>"+h.map(p=>
-    `<tr><td>${day(p.created)}</td><td>${escH(({plus:"Plus",pro:"Pro"})[p.plan]||p.plan)} · ${p.interval==="year"?"yearly":"monthly"}</td>
+    `<tr><td>${day(p.created)}</td><td>${escH(({plus:"Plus",pro:"Pro"})[p.plan]||p.plan)} · monthly</td>
     <td>${escH(method(p.method))}</td><td>${escH(p.currency)} ${(+p.amount).toLocaleString("en-GB")}</td>
     <td><span class="badge ${p.status==="paid"?"ok":p.status==="pending"?"warn":"mut"}">${escH(p.status)}</span>${p.note&&p.status!=="paid"?` <span class="lead" style="font-size:11.5px">${escH(p.note)}</span>`:""}</td>
     <td>${p.status==="paid"?`<a class="btn2" style="text-decoration:none" href="/billing/receipt?ref=${encodeURIComponent(p.ref)}" target="_blank">Receipt</a>`:""}</td></tr>`).join("")
     :'<tr><td class="lead">No payments yet.</td></tr>';
 }
 const redraw=()=>drawPlans(ST&&!ST.owner?ST.plan:null,p=>{ if(p!=="free") choose(p) });
-drawSeg(()=>{ redraw(); if(PICK) choose(PICK) });
 async function choose(plan){
   PICK=plan; $("coSec").hidden=false;
   let q; try{ q=await (await fetch(`/api/billing/quote?plan=${plan}&interval=${IV}`)).json() }catch(e){ return flash("Could not price that plan.") }
   if(q.ok===false) return flash(q.error);
   const pn=({plus:"Plus",pro:"Pro"})[plan];
-  $("coTitle").textContent=`Northchart ${pn}, ${IV==="year"?"yearly":"monthly"}`;
-  $("coSum").innerHTML=`<div>${fmtUsd(q.usd)} ${IV==="year"?"a year":"a month"}${q.credit?`<br><span class="lead" style="font-size:12px">Less ${fmtKes(q.credit)} for unused time on your current plan</span>`:""}</div>
+  $("coTitle").textContent=`Northchart ${pn}, monthly`;
+  $("coSum").innerHTML=`<div>${fmtUsd(q.usd)} a month${q.credit?`<br><span class="lead" style="font-size:12px">Less ${fmtKes(q.credit)} for unused time on your current plan</span>`:""}</div>
     <div style="text-align:right">To pay now<br><b>${fmtKes(q.amount)}</b></div>`;
   $("tMpesa").disabled=!CAT.methods.mpesa; $("tCard").disabled=!CAT.methods.card;
   if(!CAT.methods[METHOD]) METHOD=CAT.methods.mpesa?"mpesa":"card";
@@ -294,7 +290,7 @@ async function loadOwner(){
     <div class="kpi"><span>Collected this month</span><b>${fmtKes(r.KES||0)}${r.USD?" + "+fmtUsd(r.USD):""}</b></div>
     <div class="kpi"><span>Mode</span><b style="text-transform:capitalize">${escH(CAT.mode)}</b></div>`;
   $("subs").innerHTML=o.subs.length?"<tr><th>Member</th><th>Plan</th><th>Status</th><th>Until</th><th>Pays by</th></tr>"+o.subs.map(x=>
-    `<tr><td>${escH(x.name||x.email)}<br><span class="lead" style="font-size:11px">${escH(x.email)}</span></td><td>${escH(({plus:"Plus",pro:"Pro"})[x.plan]||x.plan)} ${x.interval==="year"?"yearly":"monthly"}</td>
+    `<tr><td>${escH(x.name||x.email)}<br><span class="lead" style="font-size:11px">${escH(x.email)}</span></td><td>${escH(({plus:"Plus",pro:"Pro"})[x.plan]||x.plan)} monthly</td>
     <td><span class="badge ${x.status==="active"?"ok":x.status==="past_due"?"warn":"mut"}">${escH(x.comp?"given":x.cancelling&&x.status==="active"?"ending":x.status)}</span></td><td>${day(x.period_end)}</td><td>${escH(method(x.method))}</td></tr>`).join("")
     :'<tr><td class="lead">No subscribers yet.</td></tr>';
   $("gUid").innerHTML=o.members.length?o.members.map(m=>`<option value="${escH(m.uid)}">${escH(m.email)}</option>`).join(""):'<option value="">No members yet</option>';
@@ -322,7 +318,7 @@ def receipt(p: dict, u: dict):
     when = time.strftime("%d %B %Y, %H:%M", time.gmtime((p.get("paid_at") or p["created"]) + 3 * 3600)) + " EAT"
     e = html.escape
     rows = [("Receipt number", p["ref"]), ("Date", when), ("Billed to", (u.get("name") + ", " if u.get("name") else "") + u["email"]),
-            ("Item", f"Northchart {names.get(p['plan'], p['plan'])}, {'one year' if p['interval'] == 'year' else 'one month'}"),
+            ("Item", f"Northchart {names.get(p['plan'], p['plan'])}, one month"),
             ("Paid by", meth)]
     if p.get("receipt") and p["receipt"] != p["ref"]:
         rows.append(("M-Pesa receipt" if p["method"] == "mpesa" else "Payment reference", p["receipt"]))
