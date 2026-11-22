@@ -144,6 +144,13 @@ def mode() -> str:
     return m if m in ("off", "test", "live") else "off"
 
 
+def mpesa_via() -> str:
+    """Who sends the M-Pesa prompt: "paystack" (default, the Precifarm AI Paystack account) or "daraja"
+    (a Paybill or Till of our own on Safaricom Daraja; also the only route for Ratiba standing orders)."""
+    v = (os.environ.get("MPESA_PROVIDER") or "paystack").strip().lower()
+    return v if v in ("paystack", "daraja") else "paystack"
+
+
 def _rank(plan):
     return PLAN_ORDER.index(plan) if plan in PLAN_ORDER else 0
 
@@ -210,13 +217,19 @@ class Paystack:
     def _call(self, method, path, body=None):
         st, j = http_json(method, self.base + path, {"Authorization": "Bearer " + self.secret}, body)
         if st >= 400 or not j.get("status"):
-            raise PaymentError("Card payment could not start: " + str(j.get("message") or f"HTTP {st}"))
+            raise PaymentError("Payment could not start: " + str(j.get("message") or f"HTTP {st}"))
         return j.get("data") or {}
 
     def initialize(self, email, amount_minor, reference, callback_url, metadata):
         return self._call("POST", "/transaction/initialize", {
             "email": email, "amount": int(amount_minor), "currency": self.currency, "reference": reference,
             "callback_url": callback_url, "channels": ["card"], "metadata": metadata})
+
+    def charge_mpesa(self, email, amount_kes, reference, phone_254_, metadata):
+        """M-Pesa STK push through Paystack. Always KES. Paystack settles to the payout account on its dashboard."""
+        return self._call("POST", "/charge", {
+            "email": email, "amount": int(amount_kes) * 100, "currency": "KES", "reference": reference,
+            "mobile_money": {"phone": "+" + phone_254_, "provider": "mpesa"}, "metadata": metadata})
 
     def verify(self, reference):
         return self._call("GET", "/transaction/verify/" + urllib.parse.quote(reference, safe=""))
@@ -408,9 +421,29 @@ class Billing:
                           "usd": {i: self.usd(p, i) for i in INTERVALS},
                           "kes": {i: self.kes(p, i) for i in INTERVALS}})
         return {"plans": plans, "rate": round(rate, 2), "mode": mode(),
-                "methods": {"mpesa": self.daraja.ready(), "card": self.paystack.ready()},
-                "card_currency": self.paystack.currency, "grace_days": GRACE_DAYS,
-                "test": mode() == "test" or self.paystack.test_mode() or self.daraja.env != "production"}
+                "methods": {"mpesa": self.mpesa_ready(), "card": self.paystack.ready(),
+                            "ratiba": mpesa_via() == "daraja" and self.daraja.ready()},
+                "mpesa_via": mpesa_via(), "card_currency": self.paystack.currency, "grace_days": GRACE_DAYS,
+                "test": mode() == "test" or self.paystack.test_mode()
+                        or (mpesa_via() == "daraja" and self.daraja.env != "production")}
+
+    def mpesa_ready(self):
+        return self.paystack.ready() if mpesa_via() == "paystack" else self.daraja.ready()
+
+    def _prompt(self, pay, phone, email, base):
+        """Send the M-Pesa prompt for a pending payment through the configured provider."""
+        uid, amount = pay["uid"], int(pay["amount"])
+        if mpesa_via() == "paystack":
+            pay["via"] = "paystack"
+            d = self.paystack.charge_mpesa(email, amount, pay["ref"], phone,
+                                           {"uid": uid, "plan": pay["plan"], "interval": pay["interval"]})
+            if str(d.get("status") or "") in ("failed", "abandoned"):
+                raise PaymentError(d.get("gateway_response") or d.get("message") or "M-Pesa prompt failed.")
+            return
+        pay["via"] = "daraja"
+        r = self.daraja.stk_push(phone, amount, self._account_ref(uid), "Northchart",
+                                 base + "/api/billing/mpesa/callback")
+        pay["checkout_id"] = r.get("CheckoutRequestID")
 
     # ---------------------------------------------------------- entitlements
     def _owner(self, u):
@@ -560,7 +593,7 @@ class Billing:
                                                              "value": f"Northchart {PLANS[plan]['name']} ({interval}ly)"}]})
             return {"ref": ref, "redirect": d.get("authorization_url")}
         if method == "mpesa":
-            if not self.daraja.ready():
+            if not self.mpesa_ready():
                 raise PaymentError("M-Pesa is not switched on yet. Use a card.")
             if q["amount"] > MPESA_MAX_KES:
                 raise PaymentError(f"M-Pesa takes up to KES {MPESA_MAX_KES:,} in one payment. Pay this plan by card, "
@@ -569,12 +602,14 @@ class Billing:
             pay["phone_masked"] = mask_phone(p)
             with self.lock:
                 self.data["payments"][ref] = pay
-                self._save()
-            r = self.daraja.stk_push(p, q["amount"], self._account_ref(u["uid"]), "Northchart",
-                                     base + "/api/billing/mpesa/callback")
-            with self.lock:
-                pay["checkout_id"] = r.get("CheckoutRequestID")
                 pay["phone"] = self._seal(p)
+                self._save()
+            try:
+                self._prompt(pay, p, u["email"], base)
+            except PaymentError as e:
+                self._failed(ref, str(e))
+                raise
+            with self.lock:
                 self._save()
             return {"ref": ref, "status": "pending",
                     "message": "Check your phone and enter your M-Pesa PIN to pay KES "
@@ -591,6 +626,10 @@ class Billing:
         if p["method"] == "card":
             d = self.paystack.verify(ref)
             self._card_result(ref, d)
+        elif p["method"] == "mpesa" and p.get("via") == "paystack" and _now() - p["created"] >= 8:
+            d = self.paystack.verify(ref)
+            if d.get("status") in ("success", "failed", "reversed"):     # "ongoing"/"pending": still waiting
+                self._card_result(ref, d)
         elif p["method"] == "mpesa" and p.get("checkout_id") and _now() - p["created"] >= 8:
             st, desc = self.daraja.stk_query(p["checkout_id"])
             if st == "paid":
@@ -626,6 +665,9 @@ class Billing:
                 return self._failed(ref, f"Amount mismatch: {paid_minor / 100:.2f} {d.get('currency')}")
             a = d.get("authorization") or {}
             card = None
+            if p["method"] == "mpesa":
+                return self._paid(ref, str(d.get("receipt_number") or (d.get("metadata") or {}).get("receipt")
+                                           or d.get("id") or ""), phone=self._open(p.get("phone")))
             if a.get("reusable") and a.get("authorization_code"):
                 card = {"brand": (a.get("brand") or a.get("card_type") or "card").title(),
                         "last4": a.get("last4") or "", "exp": f"{a.get('exp_month', '')}/{str(a.get('exp_year', ''))[-2:]}",
@@ -813,8 +855,8 @@ class Billing:
                 p = phone_254(phone) if phone else self._open(s.get("phone"))
                 if not p:
                     raise PaymentError("Enter the M-Pesa number for the standing order.")
-                if not self.daraja.ready():
-                    raise PaymentError("M-Pesa is not switched on yet.")
+                if mpesa_via() != "daraja" or not self.daraja.ready():
+                    raise PaymentError("M-Pesa standing orders are not available yet. Pick the M-Pesa prompt or a card.")
                 amount = self.kes(s["plan"], s.get("interval") or "month")
                 if amount > MPESA_MAX_KES:
                     raise PaymentError(f"A standing order can be at most KES {MPESA_MAX_KES:,}. Use a card for this plan.")
@@ -980,7 +1022,7 @@ class Billing:
                                f"to pay with M-Pesa or another card at {base}/billing before the account moves to Free.")
             out.append((uid, "card_failed"))
         elif s.get("phone") and s.get("stk_tries", 0) < STK_MAX_TRIES and self.kes(plan, interval) <= MPESA_MAX_KES \
-                and now - s.get("last_stk", 0) >= STK_RETRY_HOURS * 3600 and self.daraja.ready():
+                and now - s.get("last_stk", 0) >= STK_RETRY_HOURS * 3600 and self.mpesa_ready():
             phone = self._open(s["phone"])
             ref = self._new_ref()
             amount = self.kes(plan, interval)
@@ -993,11 +1035,10 @@ class Billing:
                 s["last_stk"] = now
                 self._save()
             try:
-                r = self.daraja.stk_push(phone, amount, self._account_ref(uid), "Northchart",
-                                         base + "/api/billing/mpesa/callback")
                 with self.lock:
-                    self.data["payments"][ref]["checkout_id"] = r.get("CheckoutRequestID")
                     self.data["payments"][ref]["phone"] = self._seal(phone)
+                self._prompt(self.data["payments"][ref], phone, u["email"], base)
+                with self.lock:
                     self._save()
                 out.append((uid, "stk_sent"))
             except PaymentError as e:

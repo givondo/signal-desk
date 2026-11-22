@@ -213,7 +213,7 @@ function drawAuto(){
   a.innerHTML=`<div class="co"><p class="lead" style="margin:0 0 10px">Pick how the next renewal is paid.</p>
    <div class="tabs"><button data-a="card" ${s.card?"":"disabled"}>Saved card<small>${s.card?escH(s.card.brand)+" ending "+escH(s.card.last4):"Pay once by card to save one"}</small></button>
    <button data-a="mpesa">M-Pesa prompt<small>We send a payment request on the day</small></button>
-   <button data-a="ratiba">M-Pesa Ratiba<small>Standing order you approve once</small></button></div>
+   ${CAT.methods.ratiba?'<button data-a="ratiba">M-Pesa Ratiba<small>Standing order you approve once</small></button>':""}</div>
    <div class="row"><div class="f"><label>M-Pesa number</label><input id="aPhone" inputmode="tel" placeholder="${escH(s.phone_masked||"0712 345 678")}"></div>
    <button class="btn2" id="aSave">Save</button></div><p class="lead" style="margin:8px 0 0" id="aNote"></p></div>`;
   let pickA=s.ratiba&&s.ratiba.state==="active"?"ratiba":(s.method==="card"&&s.card?"card":"mpesa");
@@ -297,7 +297,9 @@ async function loadOwner(){
   const s=o.setup;
   const tick=(ok,t)=>`<div>${ok?'<span class="badge ok">Ready</span>':'<span class="badge warn">Missing</span>'} ${t}</div>`;
   $("setup").innerHTML=tick(CAT.mode!=="off",`Billing switched on (NORTHCHART_BILLING=${escH(CAT.mode)})`)+
-    tick(s.daraja,`M-Pesa through Daraja (${escH(s.daraja_env)}, ${s.till?"Till "+escH(s.till):"Paybill "+escH(s.shortcode||"not set")})`)+
+    (s.mpesa_via==="daraja"
+      ? tick(s.daraja,`M-Pesa through Daraja (${escH(s.daraja_env)}, ${s.till?"Till "+escH(s.till):"Paybill "+escH(s.shortcode||"not set")})`)
+      : tick(s.paystack,`M-Pesa through Paystack${s.paystack_test?" (test keys)":""}. Tick Mobile Money in Paystack, Settings, Preferences`))+
     tick(s.paystack,`Cards through Paystack${s.paystack_test?" (test keys)":""}, charged in ${escH(CAT.card_currency)}`)+
     tick(s.public_url,"Public address for payment callbacks (NORTHCHART_PUBLIC_URL)")+
     tick(s.signup_open,"Open sign-up so anyone can buy (NORTHCHART_SIGNUP=open)")+

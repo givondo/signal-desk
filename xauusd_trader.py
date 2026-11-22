@@ -2933,6 +2933,7 @@ class Handler(BaseHTTPRequestHandler):
                     d = bl.daraja
                     return js({**bl.overview(), "setup": {
                         "daraja": d.ready(), "daraja_env": d.env, "shortcode": d.shortcode, "till": d.till,
+                        "mpesa_via": nbl.mpesa_via(),
                         "paystack": bl.paystack.ready(), "paystack_test": bl.paystack.test_mode(),
                         "public_url": bool(os.environ.get("NORTHCHART_PUBLIC_URL")),
                         "signup_open": accounts_service().signup_mode() == "open"}})
