@@ -92,7 +92,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 
 PAGES = {
     "journal": ("Journal", "Every trade you take, journalled automatically"),
-    "account": ("Account", "Profile, brokers, sync tokens and your data"),
+    "account": ("Account", "Settings"),
 }
 
 
