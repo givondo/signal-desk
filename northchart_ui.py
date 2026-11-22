@@ -93,6 +93,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 PAGES = {
     "journal": ("Journal", "Every trade you take, journalled automatically"),
     "account": ("Account", "Profile, brokers, sync tokens and your data"),
+    "billing": ("Plan", "Plans, payments and receipts"),
 }
 
 
@@ -107,7 +108,7 @@ def head() -> str:
 def nav(page: str) -> str:
     title, sub = PAGES.get(page, ("", ""))
     links = [("/", "Desk", "home"), ("/journal", "Journal", "journal"), ("/#agents", "Agents", "agents"),
-             ("/account", "Account", "account")]
+             ("/billing", "Plan", "billing"), ("/account", "Account", "account")]
     current = ' aria-current="page"'
     pills = "".join(
         f'<a class="nc-pill{" on" if key == page else ""}" href="{href}"'

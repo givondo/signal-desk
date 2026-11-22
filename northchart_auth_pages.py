@@ -83,7 +83,9 @@ async function post(path,body){
   if(!r.ok||j.ok===false){ const e=new Error(j.error||"Something went wrong. Try again."); e.data=j; throw e }
   return j;
 }
-function show(el,text,ok){ el.textContent=text; el.className="msg "+(ok?"ok":"err") }
+function show(el,text,ok){ el.innerHTML=String(text).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))
+  .replace(/(?:at )?(\\/billing(?:\\?plan=\\w+)?)/,'<a href="$1" style="color:inherit;font-weight:700">on the Plan page</a>');
+  el.className="msg "+(ok?"ok":"err") }
 function nextUrl(){ const n=new URLSearchParams(location.search).get("next")||"/";
   return n.startsWith("/")&&!n.startsWith("//")?n:"/" }
 function wire(formId,fn){ const f=$(formId); f.addEventListener("submit",async e=>{ e.preventDefault();
@@ -252,6 +254,10 @@ def account():
   <a class="btn2" id="gLink" href="/auth/google/start?mode=link" style="text-decoration:none">Connect Google</a>
   <button class="btn2" id="gUnlink" hidden>Disconnect Google</button></div></section>
 
+<section class="sec" id="planSec"><div class="row" style="align-items:center"><div style="flex:1">
+  <h2>Plan</h2><p class="lead" style="margin:0" id="planText">Loading…</p></div>
+  <a class="btn2" href="/billing" style="text-decoration:none" id="planBtn">Plans and billing</a></div></section>
+
 <section class="sec" id="brokers"><h2>Brokers and data</h2>
   <p class="lead">Connect the accounts you trade from and every closed trade lands in your journal by itself.
   Northchart only ever reads: it cannot place, change or cancel orders.</p>
@@ -302,6 +308,10 @@ async function load(){
   $("who").innerHTML=`${escH(u.email)} · <span class="badge ${u.role==="owner"?"ok":"mut"}">${u.role==="owner"?"Owner":"Member"}</span> `+
     (u.verified?'<span class="badge ok">Email confirmed</span>':'<span class="badge warn">Email not confirmed</span>');
   $("name").value=u.name||""; $("resend").hidden=!!u.verified;
+  const pn={free:"Free",plus:"Plus",pro:"Pro"}[me.plan]||"Free";
+  $("planText").textContent=u.role==="owner"?"You own this desk, so every feature is on.":me.billing==="off"?"Every feature is open on this desk for now.":
+    me.plan==="free"?"Free: desk calls, the chart and your manual journal. Plus adds automatic broker sync and the agent desk.":`Northchart ${pn}.`;
+  $("planBtn").textContent=me.plan==="free"&&u.role!=="owner"&&me.billing!=="off"?"Upgrade":"Plans and billing";
   $("gRow").hidden=!me.google&&!u.google;
   $("gText").innerHTML=u.google?`Signs in with Google as <b>${escH(u.google_email)}</b>`:"Sign in faster with your Google account.";
   $("gLink").hidden=!!u.google; $("gUnlink").hidden=!u.google;
@@ -425,6 +435,13 @@ owner straight away if you think someone else has used it.</p>
 <h2>Broker connections</h2><p>You connect a broker with read-only credentials (an investor password, a read-only key or a
 statement file). Northchart only reads closed trades and account history. You can disconnect at any time, which deletes
 the stored credentials.</p>
+<h2>Plans and payments</h2><p>Desk calls, the chart and the manual journal are free. Plus and Pro are paid monthly,
+in advance, through M-Pesa (Safaricom) or a card (Paystack). Prices are listed in US dollars and charged in
+Kenyan shillings at the rate shown before you pay. Cards renew automatically; M-Pesa renews by a payment prompt or a
+Ratiba standing order you approve. We email you before every renewal. You can cancel at any time and keep the plan until
+the end of the period you paid for. Upgrades start at once with credit for unused time; downgrades start at the next
+renewal. If a renewal is not paid within three days the account moves to Free and your data is kept. Payments are not
+refunded for part of a period, except where the law requires it or a charge was made in error.</p>
 <h2>Acceptable use</h2><p>Do not try to break into other accounts, overload the service, or resell the desk's data.</p>
 <h2>No warranty</h2><p>Data can be late, wrong or missing. The service is provided as it is, without any promise that it
 will be uninterrupted or error free.</p>

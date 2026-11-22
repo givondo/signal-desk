@@ -636,6 +636,9 @@ code{{background:#0b0d10;padding:1px 5px;border-radius:5px}}</style></head><body
                 with self.lock:
                     self.fail[ip].append(now)
                 return self.authorize_page(form, error="Wrong email or password.")
+            if not self.ctx.get("plan_allows_connect", lambda uid: True)(uid):
+                return self.authorize_page(form, error="Northchart Connect is part of the Pro plan. "
+                                                       f"Upgrade at {base}/billing, then connect again.")
         else:
             owner = self.ctx["owner_password"]()
             if owner and not hmac.compare_digest(g("password").encode(), owner.encode()):
@@ -736,6 +739,9 @@ code{{background:#0b0d10;padding:1px 5px;border-radius:5px}}</style></head><body
         if not client:
             return self._unauthorized(base)
         self.ctx.get("enter_user", lambda uid: None)(self.who.uid)
+        if self.who.uid and not self.ctx.get("plan_allows_connect", lambda uid: True)(self.who.uid):
+            return self._cors_json(200, self._err(None, -32001, "Northchart Connect is part of the Pro plan. "
+                                                               f"Upgrade at {base}/billing to keep using it here."))
         if len(body) > MAX_BODY:
             return self._cors_json(413, self._err(None, -32600, "request too large"))
         try:

@@ -64,6 +64,48 @@ Scripts use a **sync token** (`Bearer nci_...`, made on the account page) that c
 
 Planned: cTrader Open API, Interactive Brokers Flex, Binance read-only keys; OANDA and the Deriv API wait for a read-only option. Secrets are sealed with an HMAC-SHA256 stream cipher plus tag, keyed by `NORTHCHART_SECRET_KEY` (set it in production) or a generated `DATA_DIR/accounts/secret.key`.
 
+## Plans and billing
+
+Desk calls stay free. Members pay for the tools (`northchart_billing.py`, pages in `northchart_billing_pages.py`):
+
+| Plan | Price | Adds |
+|---|---|---|
+| Free | $0 | Desk calls, chart, manual journal, statement import, 3 agent questions a day |
+| Plus | $25 a month | Automatic broker sync (2 accounts), Bridge and TradingView sync, agent desk (60 a day), Claude journal notes |
+| Pro | $200 a month | 20 broker accounts, MetaApi, agent desk (1,000 a day), Northchart Connect for ChatGPT and Claude |
+
+* **M-Pesa** through Safaricom Daraja: STK push to your Paybill or Till. Callbacks are unsigned, so each one only
+  triggers an `stkpushquery`, and the query decides. Renewal is a prompt on the due date (three tries, a day apart) or an
+  M-Pesa Ratiba standing order; Ratiba debits arrive as C2B confirmations, accepted only from Safaricom's addresses for
+  the member's account reference and the right amount. Plans are monthly only.
+* **Cards** through Paystack's hosted page (no card data touches the desk). The first payment saves a reusable
+  authorisation, sealed in the vault; renewals use `charge_authorization`. Webhooks are checked with HMAC-SHA512 and
+  every success is re-verified with `/transaction/verify`.
+* Prices are in USD and charged in KES at the day's USDKES rate (rounded up to KES 50), or a fixed KES price.
+* Upgrades start at once with credit for unused time; downgrades wait for the renewal date.
+  Three days' grace, then Free. The owner always has every feature and can give members a plan from `/billing`.
+
+Switching it on (sandbox first):
+
+1. Safaricom: create an app at developer.safaricom.co.ke with **M-Pesa Express** and **M-Pesa Ratiba**; set
+   `DARAJA_CONSUMER_KEY` and `DARAJA_CONSUMER_SECRET`. The sandbox shortcode and passkey are filled in for you.
+2. Paystack: sign up as a Kenyan business and copy the test secret key into `PAYSTACK_SECRET_KEY`. Set the webhook URL in
+   the Paystack dashboard to `https://<desk>/api/billing/paystack/webhook`.
+3. Set `NORTHCHART_BILLING=test`, `NORTHCHART_PUBLIC_URL` and `NORTHCHART_SIGNUP=open`, restart, and pay a plan from a
+   member account. Then press **Register M-Pesa confirmation address** on `/billing` (needed for Ratiba).
+4. Go live: Safaricom Go Live with your Paybill or Till (`DARAJA_ENV=production`, `DARAJA_SHORTCODE`, `DARAJA_PASSKEY`,
+   and `DARAJA_TILL` for a Till), Paystack live key, `NORTHCHART_BILLING=live`.
+
+| Variable | Meaning |
+|---|---|
+| `NORTHCHART_BILLING` | `off` (default, nothing locked), `test` or `live` |
+| `NORTHCHART_PRICE_PLUS_MONTH`, `NORTHCHART_PRICE_PRO_MONTH` | USD monthly price; add `_KES` to fix the shilling price |
+| `NORTHCHART_KES_PER_USD` | Fixed rate instead of the live USDKES quote |
+| `PAYSTACK_SECRET_KEY`, `PAYSTACK_CURRENCY` | Card payments; currency `KES` (default) or `USD` once Paystack approves it |
+| `DARAJA_ENV`, `DARAJA_CONSUMER_KEY`, `DARAJA_CONSUMER_SECRET` | M-Pesa API app (`sandbox` or `production`) |
+| `DARAJA_SHORTCODE`, `DARAJA_PASSKEY`, `DARAJA_TILL` | Paybill shortcode and Lipa na M-Pesa passkey; Till number for Buy Goods |
+| `NORTHCHART_LEGAL_NAME`, `NORTHCHART_KRA_PIN` | Shown on receipts |
+
 ## Trading tracker and Trading OS
 
 `/tracker` (also linked as **Tracker** in the desk header) is the record-keeping side of the desk, built on the GIVONDO Trading OS in `trading_os/`:
