@@ -116,6 +116,15 @@ textarea.cell::placeholder{color:var(--dim2);font-style:italic}
 textarea.inp{width:100%;min-height:96px;resize:vertical;line-height:1.5}
 .acts{display:flex;align-items:center;gap:8px;margin-top:6px}
 .hint{font-size:11px;color:var(--dim)}
+.empty .go{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:16px}
+.empty .go a,.empty .go button{font:600 12.5px var(--nc-font);padding:9px 14px;border-radius:var(--radius-sm);border:1px solid var(--bd2);
+background:var(--p1);color:var(--tx);cursor:pointer;text-decoration:none}
+.empty .go .primary{background:var(--tx);color:var(--bg);border-color:var(--tx)}
+.addg{display:grid;grid-template-columns:repeat(2,1fr);gap:10px 12px}
+.addg .fldc{margin:0}.addg .inp{width:100%}.addg .full{grid-column:1/-1}
+.addg .fldc>label small{text-transform:none;letter-spacing:0;font-weight:500;color:var(--dim2)}
+.err{color:var(--r);font-size:12px;min-height:16px;margin-top:8px}
+@media(max-width:560px){.addg{grid-template-columns:1fr}}
 @media(max-width:640px){.grid{grid-template-columns:repeat(2,1fr)}}
 </style>
 <!--NC:HEAD-->
@@ -130,6 +139,7 @@ textarea.inp{width:100%;min-height:96px;resize:vertical;line-height:1.5}
   <select class="sel" id="inst" aria-label="Instrument"><option value="">All instruments</option></select>
   <label class="chk"><input type="checkbox" id="paper"> Include desk paper trades</label>
   <span class="sp"></span>
+  <button class="nc-pill" id="addBtn" title="Add a closed trade by hand">+ Add a trade</button>
   <button class="primary" id="reviewBtn" disabled>Review</button>
   <button class="nc-pill" id="sync" title="Journal any synced trades now">Sync now</button>
   <a class="nc-pill" href="/api/tracker/export?kind=trades" title="Journal as CSV">CSV</a>
@@ -150,6 +160,32 @@ textarea.inp{width:100%;min-height:96px;resize:vertical;line-height:1.5}
 <div class="scrim" id="scrim" role="dialog" aria-modal="true" aria-labelledby="rvTitle">
   <div class="card2" id="card"></div>
 </div>
+<div class="scrim" id="addScrim" role="dialog" aria-modal="true" aria-labelledby="addTitle">
+  <form class="card2" id="addForm" novalidate>
+    <h2 id="addTitle">Add a trade</h2>
+    <p class="meta">A trade you have already closed. It goes into your journal with the desk's view at the time you entered.</p>
+    <div class="addg">
+      <div class="fldc"><label for="aInst">Instrument</label><input class="inp" id="aInst" list="aInstList" placeholder="XAUUSD" autocomplete="off" required></div>
+      <div class="fldc"><label>Direction</label><div class="segm" id="aSide" role="group" aria-label="Direction">
+        <button type="button" data-v="BUY" class="on">Buy</button><button type="button" data-v="SELL">Sell</button></div></div>
+      <div class="fldc"><label for="aEntry">Entry price</label><input class="inp" id="aEntry" inputmode="decimal" required></div>
+      <div class="fldc"><label for="aExit">Exit price</label><input class="inp" id="aExit" inputmode="decimal" required></div>
+      <div class="fldc"><label for="aStop">Stop <small>(leave empty if none)</small></label><input class="inp" id="aStop" inputmode="decimal"></div>
+      <div class="fldc"><label for="aVol">Size in lots</label><input class="inp" id="aVol" inputmode="decimal" placeholder="0.10" required></div>
+      <div class="fldc"><label for="aOpen">Opened</label><input class="inp" id="aOpen" type="datetime-local" required></div>
+      <div class="fldc"><label for="aClose">Closed</label><input class="inp" id="aClose" type="datetime-local" required></div>
+      <div class="fldc"><label for="aNet">Net profit or loss <small>(optional, account currency)</small></label><input class="inp" id="aNet" inputmode="decimal" placeholder="-25.40"></div>
+      <div class="fldc"><label for="aType">Account</label><select class="inp" id="aType"><option value="PERSONAL">My own money</option><option value="PROP">Prop firm</option><option value="DEMO">Demo</option></select></div>
+    </div>
+    <div class="err" id="aErr" role="alert"></div>
+    <div class="acts" style="margin-top:10px"><button class="primary" id="aSave" type="submit">Add to journal</button>
+      <button class="nc-pill" type="button" id="aCancel">Cancel</button>
+      <span class="hint" style="margin-left:auto">Times are your local time.</span></div>
+  </form>
+</div>
+<datalist id="aInstList"><option>XAUUSD</option><option>XAGUSD</option><option>EURUSD</option><option>GBPUSD</option><option>USDJPY</option>
+<option>AUDUSD</option><option>NZDUSD</option><option>USDCAD</option><option>US30</option><option>NAS100</option><option>USOIL</option>
+<option>BTCUSD</option><option>ETHUSD</option></datalist>
 <div id="menu" role="menu"></div>
 <div class="toast" id="toast" role="status"></div>
 <script>
@@ -170,6 +206,34 @@ let queue=[], qi=0, rv=null;
 function toast(msg,err){ const t=$("toast"); t.textContent=msg; t.className="toast show"+(err?" err":""); clearTimeout(t._h); t._h=setTimeout(()=>t.className="toast",2600) }
 async function api(path,body){ const r=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});
   const j=await r.json(); if(!r.ok||j.ok===false) throw new Error(j.error||"not saved"); return j }
+
+// ---- add a trade by hand
+let aSide="BUY";
+const pad=n=>String(n).padStart(2,"0");
+const localInput=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+function openAdd(){
+  const now=new Date(), hour=new Date(now-3600e3);
+  if(!$("aOpen").value) $("aOpen").value=localInput(hour);
+  if(!$("aClose").value) $("aClose").value=localInput(now);
+  $("aErr").textContent=""; $("addScrim").classList.add("on"); setTimeout(()=>$("aInst").focus(),30) }
+function closeAdd(){ $("addScrim").classList.remove("on") }
+$("addBtn").onclick=openAdd; $("aCancel").onclick=closeAdd;
+$("addScrim").addEventListener("click",e=>{ if(e.target.id==="addScrim") closeAdd() });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&$("addScrim").classList.contains("on")) closeAdd() });
+$("aSide").querySelectorAll("button").forEach(b=>b.onclick=()=>{ aSide=b.dataset.v;
+  $("aSide").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)) });
+$("addForm").onsubmit=async e=>{ e.preventDefault();
+  const iso=id=>{ const v=$(id).value; const d=v?new Date(v):null; return d&&!isNaN(d)?d.toISOString():"" };
+  const body={instrument:$("aInst").value.trim(),direction:aSide,entry_price:$("aEntry").value,exit_price:$("aExit").value,
+    stop_loss:$("aStop").value,volume:$("aVol").value,open_time_utc:iso("aOpen"),close_time_utc:iso("aClose"),
+    net_pl:$("aNet").value,account_type:$("aType").value};
+  const b=$("aSave"); b.disabled=true; $("aErr").textContent="";
+  try{ const r=await fetch("/api/brokers/manual",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const j=await r.json().catch(()=>({})); if(!r.ok||j.ok===false) throw new Error(j.error||"Not saved. Try again.");
+    closeAdd(); $("addForm").reset(); $("aOpen").value=$("aClose").value="";
+    toast(body.stop_loss?"Trade added to your journal":"Trade added. Add its stop to finish it."); await load() }
+  catch(err){ $("aErr").textContent=err.message }
+  finally{ b.disabled=false } };
 
 async function load(){
   if(editing||rv) return;
@@ -192,7 +256,7 @@ function stats(){
     ["Losing streak",s.max_losing_streak??0,""],["With / against desk",(s.with_desk??0)+" / "+(s.against_desk??0),""],
     ["Discipline breaches",s.discipline_breaches??0,s.discipline_breaches?"neg":""],["Needs stop",s.needs_stop??0,s.needs_stop?"neg":""]];
   $("stats").innerHTML=cells.map(([l,v,c])=>`<div><span class="lb">${l}</span><span class="v ${c}">${esc(v)}</span></div>`).join("");
-  const n=s.to_review||0; $("reviewBtn").disabled=!n; $("reviewBtn").textContent=n?`Review ${n} trade${n>1?"s":""}`:"All reviewed";
+  const n=s.to_review||0; $("reviewBtn").disabled=!n; $("reviewBtn").hidden=!(s.trades||n); $("reviewBtn").textContent=n?`Review ${n} trade${n>1?"s":""}`:"All reviewed";
 }
 const COLS=[["status","Status"],["opened","Opened"],["instrument","Trade"],
   ["volume","Size","n"],["entry","Entry","n"],["stop","Stop","n"],["exit","Exit","n"],["risk","Risk","n"],["net","Net P/L","n"],
@@ -214,9 +278,11 @@ function render(){
   stats();
   const rows=rowsView();
   if(!data.rows.length){
-    $("sheet").innerHTML=`<div class="empty"><h3>No trades yet</h3><p>Your trades appear here by themselves once a broker is
-      connected or TradingView trade sync is running. Each trade is matched to the desk's view at entry, its risk is worked
-      out for you, and a draft note is written for you to accept or edit.</p></div>`; return }
+    $("sheet").innerHTML=`<div class="empty"><h3>No trades yet</h3><p>Connect your broker and every closed trade arrives here by
+      itself, matched to the desk's view at entry with its risk worked out. You can also bring in a statement file or add a
+      trade by hand.</p><div class="go"><a class="primary" href="/account#brokers">Connect a broker</a>
+      <a href="/account#brokers" data-import="1">Import a statement</a><button type="button" data-add="1">Add a trade by hand</button></div></div>`;
+    $("sheet").querySelector("[data-add]").onclick=openAdd; return }
   const emo=data.emotions||[];
   const head="<tr>"+COLS.map(([k,l,n])=>`<th class="${n||""}" data-k="${k}">${l}${sortKey===k?`<span class="ar">${sortDir>0?"▲":"▼"}</span>`:""}</th>`).join("")+"</tr>";
   const body=rows.map(r=>{

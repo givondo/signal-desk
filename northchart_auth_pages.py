@@ -387,6 +387,7 @@ async function load(){
   $("roleBadge").hidden=u.role!=="owner"; $("unverified").hidden=!!u.verified;
   if(document.activeElement!==$("name")){ $("name").value=u.name||""; $("saveName").disabled=true }
   const pn={free:"Free",plus:"Plus",pro:"Pro"}[me.plan]||"Free", owner=u.role==="owner";
+  PLAN={plan:me.plan||"free",open:owner||me.billing==="off"}; if(BK&&$("bpanel").dataset.b) brokerPanel($("bpanel").dataset.b);
   $("planName").textContent=owner?"Owner":me.billing==="off"?"Everything is open":"Northcharts "+pn;
   $("planText").textContent=owner?"You own this desk, so every feature is on.":me.billing==="off"?"Every feature is open on this desk for now.":
     me.plan==="free"?"Desk calls, the chart and your manual journal. Plus adds automatic broker sync and the agent desk.":"Manage payments and receipts on the billing page.";
@@ -436,15 +437,20 @@ document.addEventListener("click",async e=>{ const b=e.target.closest("button[da
     if(b.dataset.inv) await post("/api/auth/invites/revoke",{id:b.dataset.inv}); load() }catch(err){ flash(err.message) } });
 
 let BK=null;
-const kindName={bridge:"Northcharts Bridge",metaapi:"Investor password",statement:"Statement upload",tradingview:"TradingView sync"};
+const kindName={bridge:"Northcharts Bridge",metaapi:"Investor password",statement:"Statement upload",tradingview:"TradingView sync",manual:"Added in your journal"};
+let PLAN={plan:"free",open:false};
+const canSync=()=>PLAN.open||PLAN.plan==="plus"||PLAN.plan==="pro", canCloud=()=>PLAN.open||PLAN.plan==="pro";
+const upsell=(plan,what)=>`<div class="note" style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+  <span style="flex:1;min-width:200px">${what} is part of Northcharts ${plan==="pro"?"Pro":"Plus"}.</span>
+  <a class="btn2 pri" style="text-decoration:none" href="/billing?plan=${plan}">See ${plan==="pro"?"Pro":"Plus"}</a></div>`;
 async function loadBrokers(){
   BK=await (await fetch("/api/brokers")).json();
   const cs=BK.connections||[];
   $("connCard").hidden=!cs.length; $("addTitle").textContent=cs.length?"Connect another broker":"Connect a broker";
   $("conns").innerHTML=cs.map(c=>`<div class="item"><div style="flex:1;min-width:0"><div class="t1">${escH(c.label||c.broker)}
     <span class="badge ${c.state==="error"?"warn":"ok"}">${c.state==="error"?"Needs attention":"Connected"}</span></div>
-    <div class="t2">${escH(kindName[c.kind]||c.kind)} · ${c.trades||0} trade${c.trades===1?"":"s"} · last sync ${when(c.last_sync)}${c.last_error?' · <span style="color:var(--r)">'+escH(c.last_error)+'</span>':""}</div></div>
-    ${c.kind==="metaapi"?`<button class="btn2" data-sync="${c.id}">Sync now</button>`:""}<button class="btn2 danger" data-rm="${c.id}">Disconnect</button></div>`).join("");
+    <div class="t2">${escH(kindName[c.kind]||c.kind)} · ${c.trades||0} trade${c.trades===1?"":"s"} · ${c.kind==="manual"?"last added":"last sync"} ${when(c.last_sync)}${c.last_error?' · <span style="color:var(--r)">'+escH(c.last_error)+'</span>':""}</div></div>
+    ${c.kind==="metaapi"?`<button class="btn2" data-sync="${c.id}">Sync now</button>`:""}${c.kind==="manual"?'<a class="btn2" href="/journal" style="text-decoration:none">Open journal</a>':`<button class="btn2 danger" data-rm="${c.id}">Disconnect</button>`}</div>`).join("");
   const pl=(BK.planned||[]).map(p=>p.name); $("planned").textContent=pl.length?"Coming soon: "+pl.join(", ")+".":"";
   showBrokers($("bq").value);
 }
@@ -458,14 +464,15 @@ function showBrokers(q){
 function brokerPanel(id){
   const b=BK.brokers.find(x=>x.id===id); const mt=b.platforms.some(p=>p==="mt5"||p==="mt4");
   const routes=[];
-  if(mt) routes.push(`<div class="route"><h3>Install the Northcharts Bridge <span class="badge ok">Free · recommended</span></h3>
+  const sync=canSync(), cloud=canCloud();
+  if(mt) routes.push(`<div class="route"><h3>Install the Northcharts Bridge ${sync?'<span class="badge ok">Recommended</span>':'<span class="badge mut">Plus</span>'}</h3>
     <p class="lead" style="margin:0">A small read-only add-on for your MetaTrader. Your password never leaves your computer.</p>
     <ol><li>Download it for <a href="/bridge/NorthchartBridge.mq5">MetaTrader 5</a> or <a href="/bridge/NorthchartBridge.mq4">MetaTrader 4</a>.</li>
     <li>In MetaTrader, open File &gt; Open Data Folder &gt; MQL5 (or MQL4) &gt; Experts, put the file there, then refresh the Navigator.</li>
     <li>Open Tools &gt; Options &gt; Expert Advisors, tick <i>Allow WebRequest for listed URL</i> and add <code>${escH(BK.desk_url)}</code>.</li>
     <li>Drag Northcharts Bridge onto any chart and paste your token.</li></ol>
-    <button class="btn2 pri" id="brTok">Get my token</button><div id="brTokOut"></div></div>`);
-  if(mt) routes.push(`<div class="route"><h3>Use your investor password <span class="badge mut">No install</span></h3>`+(BK.routes.metaapi?`
+    ${sync?'<button class="btn2 pri" id="brTok">Get my token</button><div id="brTokOut"></div>':upsell("plus","Automatic sync with the Bridge")}</div>`);
+  if(mt) routes.push(`<div class="route"><h3>Use your investor password <span class="badge mut">${cloud?"No install":"Pro"}</span></h3>`+(BK.routes.metaapi&&!cloud?upsell("pro","Cloud sync with your investor password"):BK.routes.metaapi?`
     <p class="lead" style="margin:0">Use the <b>investor</b> (read-only) password from your broker, never the master password. Northcharts refuses a master password and does not store it.</p>
     <div class="grid2" style="margin-top:10px"><div class="f"><label>Platform</label><select id="maPlat">${b.platforms.filter(p=>p==="mt5"||p==="mt4").map(p=>`<option value="${p}">${p==="mt5"?"MetaTrader 5":"MetaTrader 4"}</option>`).join("")}</select></div>
     <div class="f"><label>Account type</label><select id="maType"><option value="REAL">Live</option><option value="DEMO">Demo</option><option value="PROP">Prop firm</option></select></div>
@@ -474,14 +481,17 @@ function brokerPanel(id){
     <div class="f" style="grid-column:1/-1"><label>Investor password</label><input id="maPw" type="password" autocomplete="off"></div></div>
     <button class="btn2 pri" id="maGo" style="margin-top:10px">Connect read-only</button>`:`<p class="lead" style="margin:0">Not switched on for this desk. The Bridge does the same job for free.</p>`)+`</div>`);
   if(b.platforms.includes("tradingview")) routes.push(`<div class="route"><h3>TradingView trade sync</h3><p class="lead" style="margin:0">If you trade ${escH(b.name)} through TradingView, run <code>tools/start_tradingview_sync.ps1</code> with <code>DESK_TOKEN</code> set to a token from Advanced, below.</p></div>`);
-  routes.push(`<div class="route"><h3>Upload a statement</h3><p class="lead" style="margin:0">MetaTrader: History tab, right-click &gt; Report &gt; HTML. cTrader and prop firms: export history as CSV. Trades already in your journal are skipped.</p>
+  const stmt=(`<div class="route"><h3>Upload a statement ${sync?"":'<span class="badge ok">Free</span>'}</h3><p class="lead" style="margin:0">MetaTrader: History tab, right-click &gt; Report &gt; HTML. cTrader and prop firms: export history as CSV. Trades already in your journal are skipped.</p>
     <div class="grid2" style="margin-top:10px"><div class="f"><label>File</label><input id="stFile" type="file" accept=".htm,.html,.csv,.txt"></div>
     <div class="f"><label>Times in the file are</label><select id="stOff">${[0,1,2,3,-4,-5].map(o=>`<option value="${o}">UTC${o>0?"+"+o:o<0?o:""}${o===0?" (Exness, cTrader)":o===2||o===3?" (most MetaTrader servers)":""}</option>`).join("")}</select></div>
     <div class="f"><label>Account type</label><select id="stType"><option value="REAL">Live</option><option value="DEMO">Demo</option><option value="PROP">Prop firm</option></select></div>
     <div class="f"><label>Account name</label><input id="stLabel" autocomplete="off" placeholder="${escH(b.name.toUpperCase().replace(/[^A-Z0-9]+/g,"-"))}-01"></div></div>
     <div id="stMap"></div><button class="btn2 pri" id="stGo" style="margin-top:10px">Import trades</button></div>`);
+  if(sync) routes.push(stmt); else routes.unshift(stmt);
   let h=`<div class="bhead"><div style="flex:1;min-width:0"><div class="t1">${escH(b.name)}${b.cma?' <span class="badge ok">CMA licensed</span>':""}</div>
     <div class="t2">${escH(b.platform_names.join(", "))}${b.note?" · "+escH(b.note):""}</div></div><button class="btn2" id="bClose">Close</button></div>`
+    +(sync?"":`<p class="lead" style="margin:12px 0 0">On Free, bring your ${escH(b.name)} trades in with a statement file, or
+      <a href="/journal">add a trade by hand</a>. Plus syncs them by itself.</p>`)
     +(!b.cma&&!b.prop&&b.id!=="other_mt"?`<div class="note warn" style="margin-top:12px">${escH(b.name)} is not on the CMA register of brokers licensed in Kenya. Northcharts can still journal its trades; check where your money is held before you deposit.</div>`:"")+routes[0];
   if(routes.length>1) h+=`<details class="more"><summary>Other ways to connect (${routes.length-1})</summary>${routes.slice(1).join("")}</details>`;
   $("bpanel").innerHTML=h; $("bpanel").dataset.b=id; showBrokers($("bq").value);

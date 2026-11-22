@@ -208,6 +208,40 @@ def _side(v):
     return ""
 
 
+def manual_fill(body: dict, now=None) -> dict:
+    """One closed trade typed in by the trader. Raises ValueError with a plain message when something is off."""
+    inst = re.sub(r"[^A-Z0-9._/-]", "", str(body.get("instrument") or "").upper().replace(" ", ""))[:24]
+    side = _side(body.get("direction"))
+    entry, exit_, vol = _num(body.get("entry_price")), _num(body.get("exit_price")), _num(body.get("volume"))
+    stop, tp, net = _num(body.get("stop_loss")), _num(body.get("take_profit")), _num(body.get("net_pl"))
+    opened, closed = parse_time(body.get("open_time_utc")), parse_time(body.get("close_time_utc"))
+    if not inst:
+        raise ValueError("Enter the instrument, for example XAUUSD.")
+    if not side:
+        raise ValueError("Pick buy or sell.")
+    if not entry or entry <= 0 or not exit_ or exit_ <= 0:
+        raise ValueError("Enter the entry and exit prices.")
+    if not vol or vol <= 0:
+        raise ValueError("Enter the size in lots, for example 0.10.")
+    if not opened or not closed:
+        raise ValueError("Enter when the trade opened and closed.")
+    if closed < opened:
+        raise ValueError("The trade closes before it opens. Check the two times.")
+    now = now or datetime.now(timezone.utc)
+    if closed > _iso(now + timedelta(minutes=10)):
+        raise ValueError("Only closed trades can be added. The close time is in the future.")
+    if stop is not None and stop > 0 and ((side == "BUY" and stop >= entry) or (side == "SELL" and stop <= entry)):
+        raise ValueError("The stop must be below the entry for a buy and above it for a sell.")
+    key = f"{inst}|{side}|{entry}|{exit_}|{vol}|{opened}|{closed}"
+    return {"broker_trade_id": "M" + hashlib.sha256(key.encode()).hexdigest()[:12].upper(), "instrument": inst,
+            "direction": side, "volume": vol, "entry_price": entry, "exit_price": exit_,
+            "stop_loss": stop if stop and stop > 0 else "", "take_profit": tp if tp and tp > 0 else "",
+            "open_time_utc": opened, "close_time_utc": closed, "commission": "", "swap": "",
+            "gross_pl": net if net is not None else "", "net_pl": net if net is not None else "",
+            "currency": (str(body.get("currency") or "USD").upper()[:3] or "USD"),
+            "raw": json.dumps({"entered_by": "you"})}
+
+
 class _Tables(html.parser.HTMLParser):
     """All table rows of an HTML document as lists of cell text."""
 
