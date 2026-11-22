@@ -1,6 +1,6 @@
 # TradingView teardown and open-source survey
 
-What Northchart should copy, what it should do differently, and what it must stop depending on. Written 21 November 2026.
+What Northcharts should copy, what it should do differently, and what it must stop depending on. Written 21 November 2026.
 
 Scope: this is a teardown of TradingView's public product (its website, documentation and published library licences) and of open-source projects on GitHub. We did not decompile, scrape or copy any TradingView code, and we should not: TradingView's charting libraries are proprietary, and using their private endpoints to build a competitor is a terms-of-service and business risk.
 
@@ -18,18 +18,18 @@ Scope: this is a teardown of TradingView's public product (its website, document
 
 The distribution layer is the lesson. TradingView gives its libraries away with an attribution requirement (Lightweight Charts) or a public-and-free-only licence (Advanced Charts), so its brand rides on other people's products.
 
-## 2. Where Northchart can win
+## 2. Where Northcharts can win
 
-TradingView is a general tool for everyone. Northchart should win a narrow position first:
+TradingView is a general tool for everyone. Northcharts should win a narrow position first:
 
-1. **Agent-native.** Every capability is a tool that ChatGPT, Claude or any MCP client can call (Northchart Connect), and the web UI uses the same tools in its agent desk. TradingView's AI story is bolted on through third-party bridges that automate its desktop app.
-2. **Risk-first.** Signals are graded and gated by a risk governor, sized per account by the router, and journalled in a sealed record. TradingView shows indicators; Northchart shows whether a trade is allowed.
+1. **Agent-native.** Every capability is a tool that ChatGPT, Claude or any MCP client can call (Northcharts Connect), and the web UI uses the same tools in its agent desk. TradingView's AI story is bolted on through third-party bridges that automate its desktop app.
+2. **Risk-first.** Signals are graded and gated by a risk governor, sized per account by the router, and journalled in a sealed record. TradingView shows indicators; Northcharts shows whether a trade is allowed.
 3. **Priced and paid for Kenya and Africa.** M-Pesa, KES pricing, local session clock (EAT), CMA-aware positioning.
 4. **A live floor.** The physical trading floor and the daily show (The Desk Today) give community content TradingView's ideas feed cannot copy locally.
 
 ## 3. Open-source projects worth using or learning from
 
-| Project | Licence | Use for Northchart |
+| Project | Licence | Use for Northcharts |
 |---|---|---|
 | KLineChart and KLineChart Pro (klinecharts) | Apache 2.0 | **Recommended chart engine.** Canvas, zero dependencies, mobile support, indicators and drawing overlays, no on-chart vendor logo |
 | TradingView Lightweight Charts | Apache 2.0 with mandatory TradingView attribution | Fine for quick widgets; wrong for a competitor because every chart credits TradingView |
@@ -53,8 +53,8 @@ Replace in this order:
 | # | Item | Status |
 |---|---|---|
 | 1 | Agent desk in the UI (command bar, result cards, activity feed, connect guide), opened with Ctrl+K or `/` like a command palette | Done in this change |
-| 2 | Northchart Connect remote MCP server with OAuth sign-in for ChatGPT and Claude, read-only tools | Done in this change |
-| 3 | Northchart naming in the UI | Done in this change |
+| 2 | Northcharts Connect remote MCP server with OAuth sign-in for ChatGPT and Claude, read-only tools | Done in this change |
+| 3 | Northcharts naming in the UI | Done in this change |
 | 4 | Licensed data feed and own indicator pipeline | Next: needs a vendor decision and budget |
 | 5 | KLineChart chart engine with saved layouts and drawing sync | Next |
 | 6 | Server-side alerts that also notify agents (MCP) and Telegram | Next |

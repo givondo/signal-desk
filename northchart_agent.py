@@ -1,4 +1,4 @@
-"""Northchart agent: the streaming brain behind the agent desk.
+"""Northcharts agent: the streaming brain behind the agent desk.
 
 ``DeskAgent.stream(question, symbol, history)`` yields events that the server
 sends to the browser as Server-Sent Events:
@@ -41,8 +41,8 @@ CLIENT = "Agent desk"
 MAX_TURNS = 6
 WORD_DELAY = float(os.environ.get("NORTHCHART_STREAM_DELAY", "0"))  # the browser paces the reveal
 
-SYSTEM_PROMPT = """You are the Northchart desk agent, a research assistant on a multi-asset trading desk \
-(gold first, plus FX majors, crypto, US indices and WTI oil). You work only through the Northchart tools, \
+SYSTEM_PROMPT = """You are the Northcharts desk agent, a research assistant on a multi-asset trading desk \
+(gold first, plus FX majors, crypto, US indices and WTI oil). You work only through the Northcharts tools, \
 which are read-only: nothing you do can place, change or cancel an order.
 
 Rules:

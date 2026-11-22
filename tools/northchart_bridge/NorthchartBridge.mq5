@@ -1,15 +1,15 @@
 //+------------------------------------------------------------------+
-//| Northchart Bridge for MetaTrader 5                                |
-//| Sends your closed trades to your Northchart journal.              |
+//| Northcharts Bridge for MetaTrader 5                               |
+//| Sends your closed trades to your Northcharts journal.             |
 //|                                                                    |
 //| Read-only by design: this add-on only reads the terminal's trade   |
 //| history. It contains no order, modify or close calls, so it cannot |
 //| place, change or cancel trades. Your password never leaves the     |
-//| terminal; it signs in to Northchart with a sync token that can     |
+//| terminal; it signs in to Northcharts with a sync token that can    |
 //| only add trades to your journal.                                   |
 //|                                                                    |
 //| Setup:                                                             |
-//| 1. Northchart > Account > Sync tokens: create a token, copy it.    |
+//| 1. Northcharts > Account > Sync tokens: create a token, copy it.   |
 //| 2. MetaTrader: Tools > Options > Expert Advisors > tick "Allow     |
 //|    WebRequest for listed URL" and add your desk address, e.g.      |
 //|    https://desktrading-today.precifarm.com                         |
@@ -20,9 +20,9 @@
 #property copyright "Precifarm AI Ltd"
 #property link      "https://desktrading-today.precifarm.com"
 #property version   "1.00"
-#property description "Sends closed trades to your Northchart journal. Read-only: it never trades."
+#property description "Sends closed trades to your Northcharts journal. Read-only: it never trades."
 
-input string DeskUrl        = "https://desktrading-today.precifarm.com"; // Northchart address
+input string DeskUrl        = "https://desktrading-today.precifarm.com"; // Northcharts address
 input string SyncToken      = "";                                        // Sync token (starts nci_)
 input string BrokerName     = "";                                        // Broker name (blank = from the terminal)
 input int    LookbackDays   = 30;                                        // History sent on the first run
@@ -35,7 +35,7 @@ int OnInit()
 {
    if(StringLen(SyncToken) < 10 || StringSubstr(SyncToken, 0, 4) != "nci_")
    {
-      Alert("Northchart Bridge: paste your sync token (Account > Sync tokens on Northchart).");
+      Alert("Northcharts Bridge: paste your sync token (Account > Sync tokens on Northcharts).");
       return(INIT_PARAMETERS_INCORRECT);
    }
    g_key = "NC_BRIDGE_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
@@ -176,17 +176,17 @@ bool Post(string items, int count)
    {
       int err = GetLastError();
       if(err == 4014)
-         Print("Northchart Bridge: allow ", url, " in Tools > Options > Expert Advisors > Allow WebRequest.");
+         Print("Northcharts Bridge: allow ", url, " in Tools > Options > Expert Advisors > Allow WebRequest.");
       else
-         Print("Northchart Bridge: could not reach the desk (error ", err, "). Will retry.");
+         Print("Northcharts Bridge: could not reach the desk (error ", err, "). Will retry.");
       return false;
    }
    if(code != 200)
    {
-      Print("Northchart Bridge: desk answered ", code, ": ", CharArrayToString(result, 0, -1, CP_UTF8));
+      Print("Northcharts Bridge: desk answered ", code, ": ", CharArrayToString(result, 0, -1, CP_UTF8));
       return false;
    }
    g_lastOk = TimeCurrent();
-   Print("Northchart Bridge: sent ", count, " closed trade(s).");
+   Print("Northcharts Bridge: sent ", count, " closed trade(s).");
    return true;
 }

@@ -1,8 +1,8 @@
-"""Broker connections for Northchart: read-only, per user.
+"""Broker connections for Northcharts: read-only, per user.
 
 Routes into the journal, best first:
 
-* Northchart Bridge (MetaTrader 4 and 5, free). A small add-on (Expert Advisor) runs in
+* Northcharts Bridge (MetaTrader 4 and 5, free). A small add-on (Expert Advisor) runs in
   the trader's own terminal, reads closed trades from its history and posts them to
   /api/ingest/bridge with the user's sync token. No password leaves their computer and
   the add-on contains no trading calls.
@@ -382,7 +382,7 @@ def parse_statement(filename, raw: bytes, offset_hours=0.0, mapping=None):
 
 # ------------------------------------------------------------------ the Bridge
 def bridge_fills(body):
-    """Closed positions posted by the Northchart Bridge add-on, already in UTC."""
+    """Closed positions posted by the Northcharts Bridge add-on, already in UTC."""
     out = []
     for d in body.get("positions") or []:
         if not isinstance(d, dict):
